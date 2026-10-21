@@ -557,20 +557,13 @@
       return '<div role="tabpanel" class="panel" id="' + id + '-panel-' + k + '" aria-labelledby="' + id + '-tab-' + k + '"' + (k === sel ? '' : ' hidden') + '>' + (lock ? lockedHtml() : x[2]) + '</div>';
     }).join('');
 
-    // pager
-    var i = S.order.indexOf(id), prev = S.order[i - 1], next = S.order[i + 1];
-    var pg = '<nav class="pager" aria-label="pager">' +
-      (prev ? '<a class="pg prev" href="#' + prev + '"><span class="pg-k">← ' + esc(t('prev')) + '</span><span class="pg-t" lang="fr">' + esc(S.byId[prev].name) + '</span></a>' : '<span></span>') +
-      (next ? '<a class="pg next" href="#' + next + '"><span class="pg-k">' + esc(t('next')) + ' →</span><span class="pg-t" lang="fr">' + esc(S.byId[next].name) + '</span></a>'
-        : '<a class="pg next" href="#decisions"><span class="pg-k">' + esc(t('next')) + ' →</span><span class="pg-t">' + esc(L((S.site.decisions || {}).title) || t('decisions')) + '</span></a>') + '</nav>';
-
     return (E ? settingsHtml(p) : '') +
       '<section class="view item wiki" data-view="' + id + '">' +
       crumbHtml(id) +
       '<header class="wiki-head"><div class="piece-head">' + F(cp + 'h2.' + lg, V('h2'), 'h2', '', { raw: 1, single: 1, attr: ' tabindex="-1"' }) + '</div>' + relHtml(id) + '</header>' +
       infobox +
       '<div class="wiki-body">' + F(cp + 'lead.' + lg, V('lead'), 'p', 'lead-p', { pid: id, done: done }) + descHtml + stdHero +
-      '<div class="tabs wiki-tabs" role="tablist">' + tl + '</div>' + tp + '</div>' + pg + '</section>';
+      '<div class="tabs wiki-tabs" role="tablist">' + tl + '</div>' + tp + '</div></section>';
   }
 
   function lockedHtml() {
