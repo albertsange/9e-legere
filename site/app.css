@@ -229,3 +229,7 @@ span.ed,b.ed,strong.ed{display:inline-block}
 .hist-list time{font-size:.85rem;color:var(--muted)}
 .hist-list strong{color:var(--ink)}
 .hist-fields{grid-column:1/-1;font-size:.88rem;color:var(--muted)}
+
+/* the info box only sticks while it fits on screen; in edit mode it scrolls with the page */
+@media (min-width:861px){.infobox{max-height:calc(100vh - 6rem);overflow:auto}}
+body.editing .infobox{position:static;max-height:none;overflow:visible}

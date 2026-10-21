@@ -235,7 +235,7 @@
   function upload(bucket, file, folder, maxEdge) {
     var base = baseName(file, folder);
     var ext = (file.name.match(/\.[a-z0-9]+$/i) || [''])[0].toLowerCase();
-    return (maxEdge ? shrink(file, maxEdge, 0.85) : Promise.resolve(null)).then(function (r) {
+    return (maxEdge ? shrink(file, maxEdge, IMG.q) : Promise.resolve(null)).then(function (r) {
       return r ? putBlob(bucket, r.blob, base + '.jpg', 'image/jpeg') : putBlob(bucket, file, base + ext, file.type);
     });
   }
@@ -458,6 +458,10 @@
   }
   function loadEdits(pid) {
     if (S.edits[pid]) return Promise.resolve(S.edits[pid]);
+    try {
+      var qb = sb.from('page_edits').select('editor_name,edited_at,fields').eq('page_id', pid).order('edited_at', { ascending: false });
+      return (qb.limit ? qb.limit(200) : qb).then(function (r) { S.edits[pid] = q(r) || []; return S.edits[pid]; });
+    } catch (e) { return Promise.resolve([]); }
     return sb.from('page_edits').select('editor_name,edited_at,fields').eq('page_id', pid).order('edited_at', { ascending: false }).limit(200)
       .then(function (r) { S.edits[pid] = q(r) || []; return S.edits[pid]; });
   }
@@ -610,8 +614,10 @@
       '</section>' : '';
 
     panels.push(['dl', pr && pr.downloads && pr.downloads.length || null, pr ? dlHtml(id, pr, E) : '']);
+    // the summary tab (lead, description and 9e standard) is the one open by default
+    panels.unshift(['sum', null, F(cp + 'lead.' + lg, V('lead'), 'p', 'lead-p', { pid: id, done: done }) + descHtml + stdHero]);
 
-    var sel = S.tab[id] && panels.some(function (x) { return x[0] === S.tab[id]; }) ? S.tab[id] : 'parts';
+    var sel = S.tab[id] && panels.some(function (x) { return x[0] === S.tab[id]; }) ? S.tab[id] : 'sum';
     var tl = panels.map(function (x) {
       var k = x[0], lock = LOCKED[k] && !member;
       return '<button type="button" role="tab" id="' + id + '-tab-' + k + '" aria-controls="' + id + '-panel-' + k + '" aria-selected="' + (k === sel) + '" tabindex="' + (k === sel ? 0 : -1) + '" data-tab="' + k + '"' +
@@ -628,7 +634,7 @@
       crumbHtml(id) +
       '<header class="wiki-head"><div class="piece-head">' + F(cp + 'h2.' + lg, V('h2'), 'h2', '', { raw: 1, single: 1, attr: ' tabindex="-1"' }) + penBtn() + '</div>' + editMeta(id) + relHtml(id) + '</header>' +
       infobox +
-      '<div class="wiki-body">' + F(cp + 'lead.' + lg, V('lead'), 'p', 'lead-p', { pid: id, done: done }) + descHtml + stdHero +
+      '<div class="wiki-body">' +
       '<div class="tabs wiki-tabs" role="tablist">' + tl + '</div>' + tp + '</div></section>';
   }
 
@@ -746,8 +752,10 @@
   }
 
   /* ------------------------------------------------------------------ images are shrunk in the browser before upload (saves storage and traffic) */
+  // every photo is reduced in the browser before upload: longest side and JPEG quality
+  var IMG = { evid: 1600, thumb: 480, page: 1400, q: 0.8, qThumb: 0.75 };
   function shrink(file, maxEdge, quality) {
-    if (!/^image\/(jpeg|png|webp|bmp)$/i.test(file.type || '') || !window.createImageBitmap) return Promise.resolve(null);
+    if (!/^image\/(jpeg|png|webp|bmp|heic|heif|avif|gif|tiff)$/i.test(file.type || '') || !window.createImageBitmap) return Promise.resolve(null);
     return createImageBitmap(file, { imageOrientation: 'from-image' }).then(function (bmp) {
       var k = Math.min(1, maxEdge / Math.max(bmp.width, bmp.height));
       var w = Math.round(bmp.width * k), h = Math.round(bmp.height * k);
@@ -766,10 +774,10 @@
   function baseName(file, folder) {
     return folder + '/' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5) + '-' + (slug(file.name.replace(/\.[^.]+$/, '')) || 'file');
   }
-  // one photo for the evidence gallery: a large version (2000 px) and a thumbnail (600 px)
+  // one photo for the evidence gallery: a large version (1600 px) and a thumbnail (480 px)
   function uploadPhoto(file, folder) {
     var base = baseName(file, folder);
-    return Promise.all([shrink(file, 2000, 0.85), shrink(file, 600, 0.8)]).then(function (r) {
+    return Promise.all([shrink(file, IMG.evid, IMG.q), shrink(file, IMG.thumb, IMG.qThumb)]).then(function (r) {
       var big = r[0], small = r[1];
       if (!big || !small) {
         var ext = (file.name.match(/\.[a-z0-9]+$/i) || [''])[0].toLowerCase();
@@ -1064,7 +1072,7 @@
       pickFile('image/*').then(function (files) {
         if (!files.length) return;
         toast(t('uploading'));
-        return upload(PUBLIC_BUCKET, files[0], 'inline', 1600).then(function (url) {
+        return upload(PUBLIC_BUCKET, files[0], 'inline', IMG.page).then(function (url) {
           target.focus();
           if (savedRange) { var s = window.getSelection(); s.removeAllRanges(); s.addRange(savedRange); }
           document.execCommand('insertImage', false, url);
@@ -1156,7 +1164,7 @@
         pickFile('image/*').then(function (files) {
           if (!files.length) return;
           syncDraft(); toast(t('uploading'));
-          return upload(PUBLIC_BUCKET, files[0], 'img', 1600).then(function (url) { setPath(S.draft, target, url); if (also) setPath(S.draft, also, url); S.dirty = true; keepScroll(render); });
+          return upload(PUBLIC_BUCKET, files[0], 'img', IMG.page).then(function (url) { setPath(S.draft, target, url); if (also) setPath(S.draft, also, url); S.dirty = true; keepScroll(render); });
         }).catch(fail);
         return;
       }

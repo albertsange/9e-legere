@@ -25,6 +25,7 @@ window.I18N = (function () {
     sub: U("Peça {n} de l'uniforme del 9e Léger", "Item {n} of the 9e Léger uniform", "Capo {n} dell'uniforme del 9e Léger", "Pièce {n} de l'uniforme du 9e Léger", "Stück {n} der Uniform des 9e Léger"),
     cap: U("Detall de la làmina de referència (1809).", "Detail of the reference plate (1809).", "Dettaglio della tavola di riferimento (1809).", "Détail de la planche de référence (1809).", "Ausschnitt der Referenztafel (1809)."),
     ib_std: U("Estàndard del 9e:", "9e standard:", "Standard del 9e:", "Standard du 9e :", "Standard des 9e:"),
+    t_sum: U("Resum", "Summary", "Riepilogo", "Résumé", "Übersicht"),
     t_parts: U("Informació", "Information", "Informazioni", "Informations", "Informationen"),
     t_reg: U("Regulacions", "Regulations", "Regolamenti", "Règlements", "Vorschriften"),
     t_evid: U("Evidències", "Evidence", "Evidenze", "Preuves", "Belege"),
