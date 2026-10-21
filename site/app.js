@@ -6,6 +6,13 @@
   var CFG = window.APP_CONFIG || {};
   var I = window.I18N;
   var LANGS = ['ca', 'en', 'it', 'fr', 'de'];
+  var FLAGS = {
+    ca: '<svg class="flag" viewBox="0 0 18 12" aria-hidden="true"><rect width="18" height="12" fill="#fcdd09"/><path d="M0 1.33h18v1.34H0zM0 4h18v1.33H0zM0 6.67h18V8H0zM0 9.33h18v1.34H0z" fill="#da121a"/></svg>',
+    en: '<svg class="flag" viewBox="0 0 60 30" aria-hidden="true"><clipPath id="fl-uk"><path d="M0 0v30h60V0z"/></clipPath><g clip-path="url(#fl-uk)"><path d="M0 0v30h60V0z" fill="#012169"/><path d="M0 0l60 30m0-30L0 30" stroke="#fff" stroke-width="6"/><path d="M0 0l60 30m0-30L0 30" stroke="#c8102e" stroke-width="2.4"/><path d="M30 0v30M0 15h60" stroke="#fff" stroke-width="10"/><path d="M30 0v30M0 15h60" stroke="#c8102e" stroke-width="6"/></g></svg>',
+    it: '<svg class="flag" viewBox="0 0 3 2" aria-hidden="true"><rect width="1" height="2" fill="#009246"/><rect x="1" width="1" height="2" fill="#fff"/><rect x="2" width="1" height="2" fill="#ce2b37"/></svg>',
+    fr: '<svg class="flag" viewBox="0 0 3 2" aria-hidden="true"><rect width="1" height="2" fill="#002395"/><rect x="1" width="1" height="2" fill="#fff"/><rect x="2" width="1" height="2" fill="#ed2939"/></svg>',
+    de: '<svg class="flag" viewBox="0 0 5 3" aria-hidden="true"><rect width="5" height="1" fill="#000"/><rect y="1" width="5" height="1" fill="#dd0000"/><rect y="2" width="5" height="1" fill="#ffce00"/></svg>'
+  };
   var LANG_NAMES = { ca: 'Català', en: 'English', it: 'Italiano', fr: 'Français', de: 'Deutsch' };
   var LOCKED = { reg: 1, evid: 1, dl: 1 };
   var PUBLIC_BUCKET = 'public-media', PRIVATE_BUCKET = 'private-media';
@@ -131,12 +138,23 @@
     var html = opt.raw ? clean(value) : rich(value || '', opt.pid, opt.done);
     return '<' + tag + (cls ? ' class="' + cls + '"' : '') + (opt.attr || '') + '>' + html + '</' + tag + '>';
   }
-  function listBtns(listPath, i, n) {
+  var BIN = '<svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  var PEN = '<svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true"><path d="M4 20l1-5L16 4l4 4L9 19l-5 1zM14 6l4 4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>';
+  // right-hand tool of an editable list row: delete
+  function listBtns(listPath, i) {
     if (!S.edit) return '';
-    return '<span class="row-tools">' +
-      (i > 0 ? '<button type="button" class="mini" data-act="up" data-list="' + listPath + '" data-i="' + i + '" aria-label="up">↑</button>' : '') +
-      (i < n - 1 ? '<button type="button" class="mini" data-act="down" data-list="' + listPath + '" data-i="' + i + '" aria-label="down">↓</button>' : '') +
-      '<button type="button" class="mini del" data-act="del" data-list="' + listPath + '" data-i="' + i + '" aria-label="' + esc(t('remove')) + '">×</button></span>';
+    return '<span class="row-tools"><button type="button" class="mini del" data-act="del" data-list="' + listPath + '" data-i="' + i + '" aria-label="' + esc(t('remove')) + '" title="' + esc(t('remove')) + '">' + BIN + '</button></span>';
+  }
+  // left-hand tool of an editable list row: drag to reorder
+  function dragH(listPath, i) {
+    if (!S.edit) return '';
+    return '<span class="drag-h" draggable="true" data-dnd="' + listPath + '" data-i="' + i + '" title="' + esc(t('drag')) + '" aria-hidden="true">⠿</span>';
+  }
+  function rowAttr(listPath, i) { return S.edit ? ' data-row="' + listPath + '" data-ri="' + i + '"' : ''; }
+  // pencil next to page titles: enters or leaves edit mode
+  function penBtn() {
+    if (!isAdmin()) return '';
+    return '<button type="button" class="pen' + (S.edit ? ' on' : '') + '" data-act="toggle-edit" aria-pressed="' + S.edit + '" aria-label="' + esc(t('edit')) + '" title="' + esc(t('edit')) + '">' + PEN + '</button>';
   }
   function addBtn(listPath, tpl, label) {
     if (!S.edit) return '';
@@ -145,7 +163,7 @@
   var TPL = {
     str: function () { return ''; },
     pair: function () { return ['', '']; },
-    reg: function () { return { year: '', name: '', parts: [{ label: '', fr: '', tr: { ca: '' } }] }; },
+    reg: function () { return { _new: true, year: '', name: '', parts: [{ label: '', fr: '', tr: { ca: '' } }] }; },
     regpart: function () { return { label: '', fr: '', tr: { ca: '' } }; },
     group: function () { return { title: { ca: '' }, desc: { ca: '' }, figs: [] }; }
   };
@@ -234,16 +252,20 @@
   function renderChrome() {
     document.documentElement.lang = S.lang;
     document.documentElement.dataset.lang = S.lang;
-    var sel = document.getElementById('lang-select');
-    sel.innerHTML = LANGS.map(function (k) { return '<option value="' + k + '"' + (k === S.lang ? ' selected' : '') + '>' + LANG_NAMES[k] + '</option>'; }).join('');
-    document.getElementById('lang-label').textContent = t('lang');
+    document.getElementById('lang-pick').innerHTML =
+      '<button type="button" class="lang-btn" data-act="lang-open" aria-haspopup="true" aria-expanded="false" aria-label="' + esc(t('lang') + ': ' + LANG_NAMES[S.lang]) + '">' + FLAGS[S.lang] + '<span>' + S.lang.toUpperCase() + '</span></button>' +
+      '<div class="lang-pop" id="lang-pop" hidden>' + LANGS.filter(function (k) { return k !== S.lang; }).map(function (k) {
+        return '<button type="button" data-act="lang-set" data-lang="' + k + '" lang="' + k + '">' + FLAGS[k] + '<span>' + LANG_NAMES[k] + '</span></button>';
+      }).join('') + '</div>';
     document.getElementById('q').placeholder = t('search');
     document.getElementById('menu-sr').textContent = t('menu');
 
     function nav(id) {
       var p = S.byId[id], kids = S.children[id] || [];
-      return '<li' + (kids.length ? ' class="has-kids"' : '') + '><a href="#' + id + '" data-sec="' + id + '"><span lang="fr">' + esc(p.name || id) + '</span></a>' +
+      if (isSection(id)) return '<li class="has-kids"><a href="#' + id + '" data-sec="' + id + '"><span>' + esc(plain(L((p.content || {}).h2)) || p.name || id) + '</span></a>' +
         (kids.length ? '<ol class="sub">' + kids.map(nav).join('') + '</ol>' : '') + '</li>';
+      // an item and its sub-pages are separate entries, the sub-pages right after their parent
+      return '<li><a href="#' + id + '" data-sec="' + id + '"><span lang="fr">' + esc(p.name || id) + '</span></a></li>' + kids.map(nav).join('');
     }
     document.getElementById('menu-body').innerHTML =
       '<ol class="extra top-link"><li><a href="#" data-sec="home"><span class="n">⌂</span><span>' + esc(t('home')) + '</span></a></li></ol>' +
@@ -257,8 +279,7 @@
       acct.innerHTML = '<button type="button" class="btn-ghost" data-act="login">' + esc(t('login')) + '</button>';
     } else {
       var who = S.profile ? (S.profile.nom_guerre || S.profile.first_name || S.session.user.email) : S.session.user.email;
-      acct.innerHTML = (isAdmin() ? '<button type="button" class="btn-ghost edit-toggle' + (S.edit ? ' on' : '') + '" data-act="toggle-edit" aria-pressed="' + S.edit + '">✎ ' + esc(t('edit')) + '</button>' : '') +
-        '<details class="acct-menu"><summary class="btn-ghost"><span class="acct-ico" aria-hidden="true"></span>' + esc(who) + '</summary><div class="acct-pop">' +
+      acct.innerHTML = '<details class="acct-menu"><summary class="btn-ghost"><span class="acct-ico" aria-hidden="true"></span>' + esc(who) + '</summary><div class="acct-pop">' +
         '<a href="#compte">' + esc(t('account')) + '</a>' +
         (isAdmin() ? '<a href="#gestio">' + esc(t('admin')) + '</a>' : '') +
         '<button type="button" data-act="logout">' + esc(t('logout')) + '</button></div></details>';
@@ -326,7 +347,11 @@
     if (!S.draft) return;
     Array.prototype.forEach.call(main.querySelectorAll('[data-path]'), function (el) {
       var path = el.getAttribute('data-path'), v;
-      if (el.isContentEditable) {
+      if (el.isContentEditable && el.hasAttribute('data-paras')) {
+        // one box for the whole description, stored as a list of paragraphs
+        v = clean(el.innerHTML).replace(/<\/(p|div)>/gi, '\u0001').replace(/<(p|div)(\s[^>]*)?>/gi, '').replace(/(<br\s*\/?>\s*){2,}/gi, '\u0001')
+          .split('\u0001').map(function (x) { return x.replace(/^(\s|&nbsp;|<br\s*\/?>)+|(\s|&nbsp;|<br\s*\/?>)+$/gi, ''); }).filter(function (x) { return plain(x); });
+      } else if (el.isContentEditable) {
         v = clean(el.innerHTML).replace(/(<br\s*\/?>|\s|&nbsp;)+$/i, '');
         if (el.hasAttribute('data-single')) v = v.replace(/<br\s*\/?>/gi, ' ');
         if (!plain(v) && !/<img/i.test(v)) v = '';
@@ -407,7 +432,7 @@
     return '<section class="view home" data-view="home">' +
       '<header class="top compact"><div>' +
       F(P('eyebrow'), V('eyebrow'), 'div', 'eyebrow', { raw: 1, single: 1 }) +
-      F(P('h1'), V('h1'), 'h1', '', { raw: 1, single: 1, attr: ' tabindex="-1"' }) +
+      '<div class="piece-head">' + F(P('h1'), V('h1'), 'h1', '', { raw: 1, single: 1, attr: ' tabindex="-1"' }) + penBtn() + '</div>' +
       F(P('lead1'), V('lead1'), 'p', 'lead', { raw: 1 }) +
       '<details class="intro-more"' + (S.edit ? ' open' : '') + '><summary>' + esc(t('intro_more')) + '</summary>' +
       F(P('lead2'), V('lead2'), 'p', '', { raw: 1 }) + F(P('lead3'), V('lead3'), 'p', '', { raw: 1 }) + F(P('crit'), V('crit'), 'p', 'criteri', { raw: 1 }) +
@@ -423,8 +448,9 @@
       '<p class="home-more"><a class="tlink" href="#decisions">' + esc(L((S.site.decisions || {}).title) || t('decisions')) + '</a><a class="tlink" href="#fonts">' + esc(L((S.site.fonts || {}).title) || t('sources')) + '</a>' +
       (isAdmin() ? '<a class="tlink" href="#nova">+ ' + esc(t('new_page')) + '</a>' : '') + '</p></section>';
   }
+  function flatItems(ids) { var out = []; ids.forEach(function (x) { out.push(x); out = out.concat(flatItems(S.children[x] || [])); }); return out; }
   function homeRow(id) {
-    var p = S.byId[id], c = p.content || {}, kids = (S.children[id] || []).filter(function (x) { return !isSection(x); });
+    var p = S.byId[id], c = p.content || {}, kids = [];
     return '<li class="hrow"><a class="hrow-main" href="#' + id + '">' + (p.card || p.image ? '<img src="' + imgSrc(p.card || p.image) + '" alt="" loading="lazy" width="96" height="72">' : '<span class="img-ph small" aria-hidden="true"></span>') +
       '<span class="hrow-t"><span class="hrow-title">' + clean(L(c.h2) || p.name) + '</span>' +
       '<span class="hrow-fr" lang="fr">' + esc(p.ib || '') + '</span></span></a>' +
@@ -449,14 +475,14 @@
     var V = function (k) { return E ? (c[k] || {})[lg] : L(c[k]); };
     var kids = S.children[id] || [], items = kids.filter(function (x) { return !isSection(x); }), subs = kids.filter(isSection);
     return (E ? settingsHtml(p) : '') + '<section class="view section-view" data-view="' + id + '">' + crumbHtml(id) +
-      F(cp + 'h2.' + lg, V('h2'), 'h2', 'page-title', { raw: 1, single: 1, attr: ' tabindex="-1"' }) +
+      '<div class="piece-head">' + F(cp + 'h2.' + lg, V('h2'), 'h2', 'page-title', { raw: 1, single: 1, attr: ' tabindex="-1"' }) + penBtn() + '</div>' +
       F(cp + 'lead.' + lg, V('lead'), 'p', 'lead', { raw: 1 }) +
-      (items.length ? '<ul class="hlist">' + items.map(homeRow).join('') + '</ul>' : '') +
+      (items.length ? '<ul class="hlist">' + flatItems(items).map(homeRow).join('') + '</ul>' : '') +
       subs.map(function (sid) {
         var sc = S.byId[sid].content || {};
         return '<div class="grid-head sub-sec"><h3><a href="#' + sid + '">' + clean(L(sc.h2) || S.byId[sid].name) + '</a></h3>' +
           (L(sc.lead) ? '<p class="muted">' + esc(plain(L(sc.lead))) + '</p>' : '') + '</div>' +
-          '<ul class="hlist">' + (S.children[sid] || []).filter(function (x) { return !isSection(x); }).map(homeRow).join('') + '</ul>';
+          '<ul class="hlist">' + flatItems((S.children[sid] || []).filter(function (x) { return !isSection(x); })).map(homeRow).join('') + '</ul>';
       }).join('') + '</section>';
   }
   function blockView(key) {
@@ -465,7 +491,7 @@
     var title = S.edit ? (b.title || {})[S.lang] : (L(b.title) || t(key === 'fonts' ? 'sources' : 'decisions'));
     var body = S.edit ? (b.html || {})[S.lang] : L(b.html);
     return '<section class="view" data-view="' + key + '"><p class="crumb"><a href="#">' + esc(t('home')) + '</a> <span aria-hidden="true">/</span> ' + esc(plain(L(b.title)) || t(key === 'fonts' ? 'sources' : 'decisions')) + '</p>' +
-      F('site.' + key + '.title.' + S.lang, title, 'h2', 'page-title', { raw: 1, single: 1, attr: ' tabindex="-1"' }) +
+      '<div class="piece-head">' + F('site.' + key + '.title.' + S.lang, title, 'h2', 'page-title', { raw: 1, single: 1, attr: ' tabindex="-1"' }) + penBtn() + '</div>' +
       '<div class="table-wrap block-' + key + '">' + F('site.' + key + '.html.' + S.lang, body, 'div', 'block-html', { raw: 1 }) + '</div>' +
       (S.edit && key === 'decisions' ? '<button type="button" class="add-btn" data-act="addrow">+ ' + esc(t('add_row')) + '</button>' : '') +
       '</section>';
@@ -505,29 +531,29 @@
     // infobox
     var info = VA('info');
     var infoRows = info.map(function (r, i) {
-      return '<tr><th scope="row">' + F(cp + 'info.' + lg + '.' + i + '.0', r[0], 'span', '', { raw: 1, single: 1 }) + '</th><td>' +
-        F(cp + 'info.' + lg + '.' + i + '.1', r[1], 'span', '', { raw: 1 }) + listBtns(cp + 'info.' + lg, i, info.length) + '</td></tr>';
+      return '<tr' + rowAttr(cp + 'info.' + lg, i) + '><th scope="row">' + dragH(cp + 'info.' + lg, i) + F(cp + 'info.' + lg + '.' + i + '.0', r[0], 'span', '', { raw: 1, single: 1 }) + '</th><td>' +
+        F(cp + 'info.' + lg + '.' + i + '.1', r[1], 'span', '', { raw: 1 }) + listBtns(cp + 'info.' + lg, i) + '</td></tr>';
     }).join('');
     var infobox = '<aside class="infobox" aria-label="' + esc(p.name) + '">' +
       (E ? '<p class="ib-title ed" contenteditable="true" data-single="1" data-path="page.ib" data-ph="' + esc(t('f_ib')) + '">' + clean(p.ib) + '</p>' : '<p class="ib-title" lang="fr">' + esc(p.ib) + '</p>') +
       '<figure>' + (p.image ? '<img src="' + imgSrc(p.image) + '" alt="" width="480" height="600">' : '<span class="img-ph" aria-hidden="true"></span>') +
       '<figcaption>' + esc(t('cap')) + '</figcaption>' +
-      (E ? '<span class="img-tools"><button type="button" class="btn-small" data-act="img" data-target="page.image">' + esc(t('change_img')) + '</button>' +
-        '<button type="button" class="btn-small" data-act="img" data-target="page.card">' + esc(t('change_card')) + '</button></span>' : '') + '</figure>' +
+      (E ? '<span class="img-tools"><button type="button" class="btn-small" data-act="img" data-target="page.image" data-also="page.card">' + esc(t('change_img')) + '</button></span>' : '') + '</figure>' +
       '<table>' + infoRows + '</table>' + addBtn(cp + 'info.' + lg, 'pair', 'add_row') + '</aside>';
 
     // body
     var desc = VA('desc');
-    var descHtml = desc.map(function (x, i) {
-      return E ? '<div class="ed-row">' + F(cp + 'desc.' + lg + '.' + i, x, 'div', 'ed-p') + listBtns(cp + 'desc.' + lg, i, desc.length) + '</div>' : F('', x, 'p', '', { pid: id, done: done });
-    }).join('') + addBtn(cp + 'desc.' + lg, 'str', 'add_par');
+    var descHtml = E
+      ? '<div class="ed ed-desc" contenteditable="true" data-path="' + cp + 'desc.' + lg + '" data-paras="1" data-ph="' + esc(t('empty_hint')) + '">' +
+        desc.map(function (x) { return '<p>' + clean(x) + '</p>'; }).join('') + '</div>'
+      : desc.map(function (x) { return F('', x, 'p', '', { pid: id, done: done }); }).join('');
 
     // tabs
     var panels = [];
     var parts = VA('parts');
     var partsHtml = '<dl class="parts">' + parts.map(function (r, i) {
-      return '<div><dt>' + F(cp + 'parts.' + lg + '.' + i + '.0', r[0], 'span', '', { raw: 1, single: 1 }) + '</dt><dd>' +
-        F(cp + 'parts.' + lg + '.' + i + '.1', r[1], 'span', '', { pid: id }) + listBtns(cp + 'parts.' + lg, i, parts.length) + '</dd></div>';
+      return '<div' + rowAttr(cp + 'parts.' + lg, i) + '><dt>' + dragH(cp + 'parts.' + lg, i) + F(cp + 'parts.' + lg + '.' + i + '.0', r[0], 'span', '', { raw: 1, single: 1 }) + '</dt><dd>' +
+        F(cp + 'parts.' + lg + '.' + i + '.1', r[1], 'span', '', { pid: id }) + listBtns(cp + 'parts.' + lg, i) + '</dd></div>';
     }).join('') + '</dl>' + addBtn(cp + 'parts.' + lg, 'pair', 'add_row');
     if (c.diagram && !E) partsHtml += '<figure class="diagram">' + clean(c.diagram) + '</figure>';
     if (E) partsHtml += '<details class="ed-svg"><summary>' + esc(t('diagram_src')) + '</summary><textarea data-path="page.content.diagram" rows="8">' + esc(c.diagram || '') + '</textarea></details>';
@@ -560,7 +586,7 @@
     return (E ? settingsHtml(p) : '') +
       '<section class="view item wiki" data-view="' + id + '">' +
       crumbHtml(id) +
-      '<header class="wiki-head"><div class="piece-head">' + F(cp + 'h2.' + lg, V('h2'), 'h2', '', { raw: 1, single: 1, attr: ' tabindex="-1"' }) + '</div>' + relHtml(id) + '</header>' +
+      '<header class="wiki-head"><div class="piece-head">' + F(cp + 'h2.' + lg, V('h2'), 'h2', '', { raw: 1, single: 1, attr: ' tabindex="-1"' }) + penBtn() + '</div>' + relHtml(id) + '</header>' +
       infobox +
       '<div class="wiki-body">' + F(cp + 'lead.' + lg, V('lead'), 'p', 'lead-p', { pid: id, done: done }) + descHtml + stdHero +
       '<div class="tabs wiki-tabs" role="tablist">' + tl + '</div>' + tp + '</div></section>';
@@ -578,7 +604,9 @@
     var regs = pr.regs || [];
     var out = '<div class="regs" id="' + id + '-reg"><div class="regs-head"><span>' + esc(t('regs_head')) + '</span><span></span>' +
       (E ? '' : '<button type="button" class="regs-toggle" data-target="' + id + '-reg" aria-expanded="false"><span class="when-closed">' + esc(t('open_all')) + '</span><span class="when-open">' + esc(t('close_all')) + '</span></button>') + '</div>';
+    var EE = E;
     regs.forEach(function (r, n) {
+      var E = EE && !!r._new;
       var parts = r.parts || [];
       var base = pp + 'regs.' + n;
       var fr = parts.map(function (x, j) {
@@ -588,20 +616,20 @@
       }).join('');
       var tr = parts.map(function (x, j) {
         var trv = E ? ((x.tr || {})[lg]) : (lg === 'fr' ? '' : L(x.tr));
-        if (E) return '<div class="ed-regpart">' + F(base + '.parts.' + j + '.tr.' + lg, trv, 'p', '', { raw: 1 }) + listBtns(base + '.parts', j, parts.length) + '</div>';
+        if (E) return '<div class="ed-regpart">' + F(base + '.parts.' + j + '.tr.' + lg, trv, 'p', '', { raw: 1 }) + listBtns(base + '.parts', j) + '</div>';
         return '<p>' + (x.label ? '<b>' + clean(x.label) + '.</b> ' : '') + clean(trv) + '</p>';
       }).join('');
       var head = E
         ? '<div class="ed-reghead"><span class="reg-n">[' + (n + 1) + ']</span>' + F(base + '.year', r.year, 'b', 'yr-y', { raw: 1, single: 1, ph: t('year') }) + ' — ' +
-          F(base + '.name', r.name, 'span', '', { raw: 1, single: 1, ph: t('reg_name') }) + listBtns(pp + 'regs', n, regs.length) + '</div>'
+          F(base + '.name', r.name, 'span', '', { raw: 1, single: 1, ph: t('reg_name') }) + listBtns(pp + 'regs', n) + '</div>'
         : '<summary><span class="reg-date"><span class="reg-n">[' + (n + 1) + ']</span> <b class="yr-y">' + esc(r.year) + '</b> — <span lang="fr">' + clean(r.name) + '</span></span>' +
-          '<span class="yr-count">' + (parts.length > 1 ? parts.length : '') + '</span><span class="chev" aria-hidden="true"></span></summary>';
+          '<span class="yr-count">' + (parts.length > 1 ? parts.length : '') + '</span>' + (EE ? listBtns(pp + 'regs', n) : '') + '<span class="chev" aria-hidden="true"></span></summary>';
       var body = '<div class="reg-body"><div class="orig"><span class="lbl">' + esc(t('fr_text')) + '</span>' + fr + '</div>' +
         '<div class="tr"><span class="lbl">' + esc(t('tr_text')) + '</span>' + tr + '</div></div>' + (E ? addBtn(base + '.parts', 'regpart', 'add_text') : '');
       out += E ? '<div class="reg yr ed-reg" id="' + id + '-reg-r' + (n + 1) + '">' + head + body + '</div>'
         : '<details id="' + id + '-reg-r' + (n + 1) + '" class="reg yr">' + head + body + '</details>';
     });
-    out += '</div>' + addBtn(pp + 'regs', 'reg', 'add_reg');
+    out += '</div>' + (EE ? addBtn(pp + 'regs', 'reg', 'add_reg') : '');
     var note = E ? ((pr.note || {})[lg]) : L(pr.note);
     if (note || E) out += F(pp + 'note.' + lg, note, 'p', 'regs-note', { raw: 1, ph: t('note') });
     return narr + out;
@@ -615,14 +643,13 @@
   }
   function evidHtml(id, pr, E) {
     var lg = S.lang, groups = groupsOf(pr);
-    var intro = E ? (pr.evid || {})[lg] : L(pr.evid);
-    var out = (intro || E) ? F('priv.evid.' + lg, intro, 'p', 'gal-intro', { pid: id }) : '';
-    if (!groups.length && !E && !intro) return '<p class="muted">' + esc(t('no_evid')) + '</p>';
+    var out = '';
+    if (!groups.length && !E) return '<p class="muted">' + esc(t('no_evid')) + '</p>';
     groups.forEach(function (g, gi) {
       var base = 'priv.groups.' + gi, figs = g.figs || [];
       var title = E ? (g.title || {})[lg] : L(g.title), desc = E ? (g.desc || {})[lg] : L(g.desc);
       out += '<section class="gal-group' + (E ? ' ed-group' : '') + '">' +
-        (E ? '<div class="gal-head">' + F(base + '.title.' + lg, title, 'h3', 'gal-title', { raw: 1, single: 1, ph: t('group_title') }) + listBtns('priv.groups', gi, groups.length) + '</div>'
+        (E ? '<div class="gal-head"' + rowAttr('priv.groups', gi) + '>' + dragH('priv.groups', gi) + F(base + '.title.' + lg, title, 'h3', 'gal-title', { raw: 1, single: 1, ph: t('group_title') }) + listBtns('priv.groups', gi) + '</div>'
           : (title ? '<h3 class="gal-title">' + clean(title) + '</h3>' : '')) +
         ((desc || E) ? F(base + '.desc.' + lg, desc, 'p', 'gal-desc', { raw: 1, ph: t('group_desc') }) : '') +
         '<div class="gallery">' + figs.map(function (f, i) {
@@ -633,9 +660,9 @@
             (cap ? '<figcaption>' + clean(cap) + '</figcaption>' : '') + '</figure>';
           var moveOpts = groups.length > 1 ? '<select class="gal-move" data-g="' + gi + '" data-i="' + i + '" aria-label="' + esc(t('move_to')) + '"><option value="">' + esc(t('move_to')) + '…</option>' +
             groups.map(function (o, oi) { return oi === gi ? '' : '<option value="' + oi + '">' + esc(plain(L(o.title)) || (t('group') + ' ' + (oi + 1))) + '</option>'; }).join('') + '</select>' : '';
-          return '<figure class="gal-item">' + img + F(base + '.figs.' + i + '.cap.' + lg, cap, 'figcaption', '', { raw: 1, ph: t('caption') }) +
+          return '<figure class="gal-item"' + rowAttr(base + '.figs', i) + '>' + dragH(base + '.figs', i) + img + F(base + '.figs.' + i + '.cap.' + lg, cap, 'figcaption', '', { raw: 1, ph: t('caption') }) +
             '<span class="fig-tools"><input type="text" data-path="' + base + '.figs.' + i + '.alt" value="' + esc(f.alt || '') + '" placeholder="' + esc(t('alt')) + '" aria-label="' + esc(t('alt')) + '">' +
-            moveOpts + listBtns(base + '.figs', i, figs.length) + '</span></figure>';
+            moveOpts + listBtns(base + '.figs', i) + '</span></figure>';
         }).join('') + '</div>' +
         (E ? '<button type="button" class="add-btn" data-act="add-photos" data-g="' + gi + '">+ ' + esc(t('add_photos')) + '</button>' : '') + '</section>';
     });
@@ -733,10 +760,10 @@
     if (!dls.length && !E) return '<p class="muted">' + esc(t('no_dl')) + '</p>';
     return '<div class="dl-grid">' + dls.map(function (d, i) {
       var ext = ((d.filename || '').match(/\.([a-z0-9]+)$/i) || ['', 'file'])[1].toUpperCase().slice(0, 4);
-      return '<div class="dl-card live"><span class="dl-ico" aria-hidden="true">' + esc(ext) + '</span><div>' +
+      return '<div class="dl-card live"' + rowAttr('priv.downloads', i) + '>' + dragH('priv.downloads', i) + '<span class="dl-ico" aria-hidden="true">' + esc(ext) + '</span><div>' +
         F('priv.downloads.' + i + '.title.' + lg, E ? (d.title || {})[lg] : (L(d.title) || d.filename), 'strong', '', { raw: 1, single: 1 }) +
         F('priv.downloads.' + i + '.desc.' + lg, E ? (d.desc || {})[lg] : L(d.desc), 'p', '', { raw: 1 }) + '</div>' +
-        (E ? listBtns('priv.downloads', i, dls.length)
+        (E ? listBtns('priv.downloads', i)
           : '<button type="button" class="btn-small dl-go" data-act="download" data-path="' + esc(d.path) + '" data-name="' + esc(d.filename || 'file') + '">' + esc(t('download')) + '</button>') + '</div>';
     }).join('') + '</div>' + (E ? '<button type="button" class="add-btn" data-act="add-file">+ ' + esc(t('add_file')) + '</button>' : '');
   }
@@ -752,7 +779,22 @@
       '<label>' + esc(t('f_sort')) + '<input type="number" data-path="page.sort" value="' + (p.sort || 0) + '"></label>' +
       '<label class="wide">' + esc(t('f_keywords')) + '<input type="text" data-csv="1" data-path="page.content.keywords" value="' + esc(((p.content || {}).keywords || []).join(', ')) + '"></label>' +
       '<label class="wide">' + esc(t('f_related')) + '<input type="text" data-csv="1" data-path="page.related" value="' + esc((p.related || []).join(', ')) + '"></label>' +
-      '</div><button type="button" class="btn-danger" data-act="delete-page">' + esc(t('delete_page')) + '</button></section>';
+      '</div>' + subcatHtml(p) + '<button type="button" class="btn-danger" data-act="delete-page">' + esc(t('delete_page')) + '</button></section>';
+  }
+  // sub-categories of the page being edited: detach one, attach an existing page or create a new one
+  function subcatHtml(p) {
+    var kids = S.children[p.id] || [];
+    var banned = {}; banned[p.id] = 1;
+    (function up(x) { var par = S.byId[x] && S.byId[x].parent_id; if (par && !banned[par]) { banned[par] = 1; up(par); } })(p.id);
+    var cand = S.allOrder.filter(function (x) { return !banned[x] && kids.indexOf(x) < 0; });
+    return '<div class="subcats"><h4>' + esc(t('subcats')) + '</h4>' +
+      (kids.length ? '<ul class="subcat-list">' + kids.map(function (x) {
+        return '<li><a href="#' + x + '">' + esc(S.byId[x].name) + '</a><button type="button" class="mini del" data-act="sub-detach" data-id="' + x + '" aria-label="' + esc(t('remove')) + '" title="' + esc(t('remove')) + '">' + BIN + '</button></li>';
+      }).join('') + '</ul>' : '<p class="muted">' + esc(t('no_subcats')) + '</p>') +
+      '<div class="subcat-add"><select id="subcat-pick" aria-label="' + esc(t('add_subcat')) + '"><option value="">' + esc(t('add_subcat')) + '…</option>' +
+      cand.map(function (x) { return '<option value="' + x + '">' + esc(S.byId[x].name) + '</option>'; }).join('') + '</select>' +
+      '<button type="button" class="btn-small" data-act="sub-attach" data-id="' + p.id + '">' + esc(t('add')) + '</button>' +
+      '<button type="button" class="btn-small" data-act="sub-new" data-id="' + p.id + '">+ ' + esc(t('new_subcat')) + '</button></div></div>';
   }
 
   /* ------------------------------------------------------------------ views: account, sign-up, admin, new page */
@@ -845,7 +887,7 @@
   }
   function newPageView() {
     if (!isAdmin()) return '<section class="view narrow"><h2 class="page-title" tabindex="-1">' + esc(t('new_page')) + '</h2>' + lockedHtml() + '</section>';
-    var opts = '<option value="">' + esc(t('f_top')) + '</option>' + S.allOrder.map(function (x) { return '<option value="' + x + '">' + esc(S.byId[x].name) + '</option>'; }).join('');
+    var opts = '<option value="">' + esc(t('f_top')) + '</option>' + S.allOrder.map(function (x) { return '<option value="' + x + '"' + (S.newParent === x ? ' selected' : '') + '>' + esc(S.byId[x].name) + '</option>'; }).join('');
     return '<section class="view narrow"><h2 class="page-title" tabindex="-1">' + esc(t('new_page')) + '</h2><form class="form" id="f-newpage">' +
       field('pname', t('f_name'), 'text', '', ' required maxlength="80"') +
       field('h2', t('f_title') + ' (' + LANG_NAMES[S.lang] + ')', 'text', '', ' maxlength="120"') +
@@ -888,6 +930,7 @@
       if (!row.content.diagram) delete row.content.diagram;
       var orphans = orphansAfterSave(pg.id, S.draft.priv);
       job = sb.from('pages').update(row).eq('id', pg.id).then(q).then(function () {
+        (S.draft.priv.regs || []).forEach(function (r) { delete r._new; });
         return sb.from('page_private').upsert({ page_id: pg.id, content: S.draft.priv }).then(q);
       }).then(function () {
         if (orphans.length) return sb.storage.from(PRIVATE_BUCKET).remove(orphans).catch(function (e) { console.warn(e); });
@@ -960,6 +1003,7 @@
     else if (act === 'del') { if (!window.confirm(t('confirm_remove'))) return; arr.splice(i, 1); }
     else if (act === 'up' && i > 0) arr.splice(i - 1, 0, arr.splice(i, 1)[0]);
     else if (act === 'down' && i < arr.length - 1) arr.splice(i + 1, 0, arr.splice(i, 1)[0]);
+    else if (act === 'move' && tpl !== i && tpl >= 0 && tpl < arr.length) arr.splice(tpl, 0, arr.splice(i, 1)[0]);
     S.dirty = true;
     keepScroll(render);
   }
@@ -1068,11 +1112,11 @@
         listAction(act, el.getAttribute('data-list'), parseInt(el.getAttribute('data-i') || '0', 10), el.getAttribute('data-tpl')); return;
       }
       if (act === 'img') {
-        var target = el.getAttribute('data-target');
+        var target = el.getAttribute('data-target'), also = el.getAttribute('data-also');
         pickFile('image/*').then(function (files) {
           if (!files.length) return;
           syncDraft(); toast(t('uploading'));
-          return upload(PUBLIC_BUCKET, files[0], 'img', 1600).then(function (url) { setPath(S.draft, target, url); S.dirty = true; keepScroll(render); });
+          return upload(PUBLIC_BUCKET, files[0], 'img', 1600).then(function (url) { setPath(S.draft, target, url); if (also) setPath(S.draft, also, url); S.dirty = true; keepScroll(render); });
         }).catch(fail);
         return;
       }
@@ -1118,6 +1162,17 @@
         }).catch(fail);
         return;
       }
+      if (act === 'sub-detach' || act === 'sub-attach') {
+        var kid = act === 'sub-detach' ? el.getAttribute('data-id') : (document.getElementById('subcat-pick') || {}).value;
+        if (!kid) return;
+        var me = S.draft && S.draft.page ? S.draft.page.id : null;
+        var newPar = act === 'sub-detach' ? (S.byId[me].parent_id || null) : el.getAttribute('data-id');
+        sb.from('pages').update({ parent_id: newPar }).eq('id', kid).then(q).then(function () { return loadPublic(); }).then(function () { keepScroll(render); }).catch(fail);
+        return;
+      }
+      if (act === 'sub-new') { if (!leaveEditOk()) return; S.newParent = el.getAttribute('data-id'); S.edit = false; S.draft = null; S.dirty = false; location.hash = 'nova'; return; }
+      if (act === 'lang-open') { var lp = document.getElementById('lang-pop'); lp.hidden = !lp.hidden; el.setAttribute('aria-expanded', String(!lp.hidden)); return; }
+      if (act === 'lang-set') { document.getElementById('lang-pop').hidden = true; setLang(el.getAttribute('data-lang')); return; }
       if (act === 'delete-page') {
         if (!window.confirm(t('delete_page_q'))) return;
         var id = S.draft.page.id;
@@ -1290,14 +1345,40 @@
     if (e.target.name === 'pid') f.pid.dataset.touched = '1';
   });
 
-  document.getElementById('lang-select').addEventListener('change', function (e) {
+  document.addEventListener('click', function (e) {
+    var lp = document.getElementById('lang-pop');
+    if (lp && !lp.hidden && !e.target.closest('#lang-pick')) lp.hidden = true;
+  });
+  // drag and drop of editable list rows
+  var dnd = null;
+  document.addEventListener('dragstart', function (e) {
+    var h = e.target.closest && e.target.closest('.drag-h'); if (!h) return;
+    dnd = { list: h.getAttribute('data-dnd'), i: parseInt(h.getAttribute('data-i'), 10) };
+    e.dataTransfer.effectAllowed = 'move'; try { e.dataTransfer.setData('text/plain', 'row'); } catch (er) { /* ignore */ }
+    var row = h.closest('[data-row]'); if (row) row.classList.add('dragging');
+  });
+  document.addEventListener('dragover', function (e) {
+    if (!dnd) return;
+    var row = e.target.closest && e.target.closest('[data-row]');
+    if (row && row.getAttribute('data-row') === dnd.list) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }
+  });
+  document.addEventListener('drop', function (e) {
+    if (!dnd) return;
+    var row = e.target.closest && e.target.closest('[data-row]');
+    if (row && row.getAttribute('data-row') === dnd.list) { e.preventDefault(); listAction('move', dnd.list, dnd.i, parseInt(row.getAttribute('data-ri'), 10)); }
+    dnd = null;
+  });
+  document.addEventListener('dragend', function () { dnd = null; Array.prototype.forEach.call(document.querySelectorAll('.dragging'), function (r) { r.classList.remove('dragging'); }); });
+
+  function setLang(lang) {
+    if (LANGS.indexOf(lang) < 0 || lang === S.lang) return;
     syncDraft(); pruneFallbacks();
-    S.lang = e.target.value;
+    S.lang = lang;
     try { localStorage.setItem('9e-lang', S.lang); } catch (er) { /* ignore */ }
     prefillLang();
     searchIndex = null;
     keepScroll(render);
-  });
+  }
 
   /* ------------------------------------------------------------------ side menu */
   (function () {
