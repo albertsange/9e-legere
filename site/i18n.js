@@ -104,6 +104,7 @@ window.I18N = (function () {
     import_go: U("Importa", "Import", "Importa", "Importer", "Importieren"),
     import_done: U("Importació feta.", "Import completed.", "Importazione completata.", "Import terminé.", "Import abgeschlossen."),
     backup: U("Descarrega una còpia de seguretat", "Download a backup", "Scarica una copia di sicurezza", "Télécharger une sauvegarde", "Sicherung herunterladen"),
+    you: U("tu", "you", "tu", "vous", "Sie"),
     no_members: U("Encara no hi ha cap membre.", "There are no members yet.", "Non ci sono ancora membri.", "Aucun membre pour l'instant.", "Noch keine Mitglieder."),
     confirm_remove: U("Segur que vols eliminar-ho?", "Are you sure you want to remove it?", "Sei sicuro di volerlo eliminare?", "Voulez-vous vraiment le supprimer ?", "Wirklich entfernen?"),
 

@@ -691,10 +691,14 @@
         '</th><th>' + esc(t('email')) + '</th><th>' + esc(t('status')) + '</th><th>' + esc(t('role')) + '</th><th></th></tr></thead><tbody>' +
         rows.map(function (m) {
           var me = S.session && m.id === S.session.user.id;
-          return '<tr data-id="' + m.id + '"><td>' + esc(m.first_name + ' ' + m.last_name) + '</td><td>' + esc(m.nom_guerre) + '</td><td>' + esc(m.esquadra) + '</td><td>' + esc(m.email) + '</td>' +
-            '<td><select name="status"' + (me ? ' disabled' : '') + '>' + ['pending', 'approved', 'blocked'].map(function (s) { return '<option value="' + s + '"' + (m.status === s ? ' selected' : '') + '>' + esc(t('st_' + s)) + '</option>'; }).join('') + '</select></td>' +
-            '<td><select name="role"' + (me ? ' disabled' : '') + '>' + ['member', 'admin'].map(function (s) { return '<option value="' + s + '"' + (m.role === s ? ' selected' : '') + '>' + esc(t(s === 'admin' ? 'r_admin' : 'r_member')) + '</option>'; }).join('') + '</select></td>' +
-            '<td>' + (me ? '' : '<button type="button" class="btn-small" data-act="save-member">' + esc(t('save')) + '</button>') + '</td></tr>';
+          var sq = S.squads.map(function (x) { return x.name; });
+          if (m.esquadra && sq.indexOf(m.esquadra) < 0) sq.push(m.esquadra);
+          var squadSel = '<select name="esquadra" aria-label="' + esc(t('esquadra')) + '">' + sq.map(function (n) { return '<option' + (n === m.esquadra ? ' selected' : '') + '>' + esc(n) + '</option>'; }).join('') + '</select>';
+          return '<tr data-id="' + m.id + '"' + (me ? ' data-me="1"' : '') + '><td>' + esc(m.first_name + ' ' + m.last_name) + (me ? ' <span class="muted">(' + esc(t('you')) + ')</span>' : '') + '</td><td>' + esc(m.nom_guerre) + '</td><td>' + squadSel + '</td><td>' + esc(m.email) + '</td>' +
+            (me ? '<td>' + esc(t('st_' + m.status)) + '</td><td>' + esc(t(m.role === 'admin' ? 'r_admin' : 'r_member')) + '</td>'
+              : '<td><select name="status" aria-label="' + esc(t('status')) + '">' + ['pending', 'approved', 'blocked'].map(function (s) { return '<option value="' + s + '"' + (m.status === s ? ' selected' : '') + '>' + esc(t('st_' + s)) + '</option>'; }).join('') + '</select></td>' +
+                '<td><select name="role" aria-label="' + esc(t('role')) + '">' + ['member', 'admin'].map(function (s) { return '<option value="' + s + '"' + (m.role === s ? ' selected' : '') + '>' + esc(t(s === 'admin' ? 'r_admin' : 'r_member')) + '</option>'; }).join('') + '</select></td>') +
+            '<td><button type="button" class="btn-small" data-act="save-member">' + esc(t('save')) + '</button></td></tr>';
         }).join('') + '</tbody></table>';
     }).catch(fail);
   }
@@ -920,8 +924,10 @@
       }
       if (act === 'save-member') {
         var row = el.closest('tr');
-        sb.from('profiles').update({ status: row.querySelector('[name=status]').value, role: row.querySelector('[name=role]').value }).eq('id', row.getAttribute('data-id'))
-          .then(q).then(function () { toast(t('saved')); }).catch(fail);
+        var upd = { esquadra: row.querySelector('[name=esquadra]').value };
+        if (!row.hasAttribute('data-me')) { upd.status = row.querySelector('[name=status]').value; upd.role = row.querySelector('[name=role]').value; }
+        sb.from('profiles').update(upd).eq('id', row.getAttribute('data-id'))
+          .then(q).then(function () { toast(t('saved')); if (row.hasAttribute('data-me')) loadProfile().then(renderChrome); }).catch(fail);
         return;
       }
       if (act === 'del-squad') {
