@@ -143,7 +143,8 @@
     str: function () { return ''; },
     pair: function () { return ['', '']; },
     reg: function () { return { year: '', name: '', parts: [{ label: '', fr: '', tr: { ca: '' } }] }; },
-    regpart: function () { return { label: '', fr: '', tr: { ca: '' } }; }
+    regpart: function () { return { label: '', fr: '', tr: { ca: '' } }; },
+    group: function () { return { title: { ca: '' }, desc: { ca: '' }, figs: [] }; }
   };
 
   /* ------------------------------------------------------------------ data */
@@ -207,13 +208,11 @@
       imgs.forEach(function (i) { var u = S.urls[i.getAttribute('data-priv')]; if (u) i.src = u.url; else i.classList.add('missing'); });
     }).catch(fail);
   }
-  function upload(bucket, file, folder) {
+  function upload(bucket, file, folder, maxEdge) {
+    var base = baseName(file, folder);
     var ext = (file.name.match(/\.[a-z0-9]+$/i) || [''])[0].toLowerCase();
-    var base = slug(file.name.replace(/\.[^.]+$/, '')) || 'file';
-    var path = folder + '/' + Date.now().toString(36) + '-' + base + ext;
-    return sb.storage.from(bucket).upload(path, file, { contentType: file.type || undefined, upsert: false }).then(function (r) {
-      q(r);
-      return bucket === PUBLIC_BUCKET ? sb.storage.from(bucket).getPublicUrl(path).data.publicUrl : path;
+    return (maxEdge ? shrink(file, maxEdge, 0.85) : Promise.resolve(null)).then(function (r) {
+      return r ? putBlob(bucket, r.blob, base + '.jpg', 'image/jpeg') : putBlob(bucket, file, base + ext, file.type);
     });
   }
   function pickFile(accept, multiple) {
@@ -237,14 +236,12 @@
 
     function nav(id) {
       var p = S.byId[id], kids = S.children[id] || [];
-      return '<li' + (kids.length ? ' class="has-kids"' : '') + '><a href="#' + id + '" data-sec="' + id + '"><span class="n">' + S.num[id] + '</span><span lang="fr">' + esc(p.name || id) + '</span>' +
-        '<span class="dot ' + (p.status === 'pending' ? 'pending' : 'proposed') + '" aria-hidden="true"></span></a>' +
+      return '<li' + (kids.length ? ' class="has-kids"' : '') + '><a href="#' + id + '" data-sec="' + id + '"><span lang="fr">' + esc(p.name || id) + '</span></a>' +
         (kids.length ? '<ol class="sub">' + kids.map(nav).join('') + '</ol>' : '') + '</li>';
     }
     document.getElementById('menu-body').innerHTML =
       '<ol class="extra top-link"><li><a href="#" data-sec="home"><span class="n">⌂</span><span>' + esc(t('home')) + '</span></a></li></ol>' +
       '<p>' + esc(t('index')) + '</p><ol class="menu-items">' + S.children[''].map(nav).join('') + '</ol>' +
-      '<p class="legend"><span><span class="dot proposed"></span>' + esc(t('proposed')) + '</span><span><span class="dot pending"></span>' + esc(t('pending')) + '</span></p>' +
       '<ol class="extra"><li><a href="#decisions" data-sec="decisions"><span class="n">·</span><span>' + esc(L((S.site.decisions || {}).title) || t('decisions')) + '</span></a></li>' +
       '<li><a href="#fonts" data-sec="fonts"><span class="n">·</span><span>' + esc(L((S.site.fonts || {}).title) || t('sources')) + '</span></a></li>' +
       (isAdmin() ? '<li><a href="#nova" data-sec="nova"><span class="n">+</span><span>' + esc(t('new_page')) + '</span></a></li>' : '') + '</ol>';
@@ -282,7 +279,7 @@
     if (S.byId[id]) {
       var pg = clone(S.byId[id]);
       var pr = clone(S.priv[id] || {});
-      pr.narr = pr.narr || { ca: '' }; pr.evid = pr.evid || { ca: '' }; pr.regs = pr.regs || []; pr.figs = pr.figs || []; pr.downloads = pr.downloads || [];
+      pr.narr = pr.narr || { ca: '' }; pr.evid = pr.evid || { ca: '' }; pr.regs = pr.regs || []; pr.groups = groupsOf(pr); delete pr.figs; delete pr.wide; pr.downloads = pr.downloads || [];
       var c = pg.content = pg.content || {};
       ['h2', 'lead', 'std', 'just'].forEach(function (k) { c[k] = c[k] || { ca: '' }; });
       ['desc', 'parts', 'info', 'gaps'].forEach(function (k) { c[k] = c[k] || { ca: [] }; });
@@ -395,8 +392,8 @@
     function row(id) {
       var p = S.byId[id], c = p.content || {}, kids = S.children[id] || [];
       return '<li class="hrow"><a class="hrow-main" href="#' + id + '">' + (p.card || p.image ? '<img src="' + imgSrc(p.card || p.image) + '" alt="" loading="lazy" width="96" height="72">' : '<span class="img-ph small" aria-hidden="true"></span>') +
-        '<span class="hrow-t"><span class="hrow-title"><span class="num">' + S.num[id] + '</span>' + clean(L(c.h2) || p.name) + '</span>' +
-        '<span class="hrow-fr" lang="fr">' + esc(p.ib || '') + '</span></span>' + chip(p.status) + '</a>' +
+        '<span class="hrow-t"><span class="hrow-title">' + clean(L(c.h2) || p.name) + '</span>' +
+        '<span class="hrow-fr" lang="fr">' + esc(p.ib || '') + '</span></span></a>' +
         (kids.length ? '<p class="hrow-kids">' + kids.map(tlink).join('') + '</p>' : '') + '</li>';
     }
     var plate = h.plate || 'img/lamina_9e_1809.png';
@@ -430,7 +427,7 @@
   }
   function tlink(id) {
     var p = S.byId[id]; if (!p) return '';
-    return '<a class="tlink" href="#' + id + '"><span class="tl-n">' + S.num[id] + '</span><span lang="fr">' + esc(p.name || id) + '</span></a>';
+    return '<a class="tlink" href="#' + id + '"><span lang="fr">' + esc(p.name || id) + '</span></a>';
   }
   function relHtml(id) {
     var rows = [], par = parentOf(id);
@@ -471,8 +468,7 @@
       '<figcaption>' + esc(t('cap')) + '</figcaption>' +
       (E ? '<span class="img-tools"><button type="button" class="btn-small" data-act="img" data-target="page.image">' + esc(t('change_img')) + '</button>' +
         '<button type="button" class="btn-small" data-act="img" data-target="page.card">' + esc(t('change_card')) + '</button></span>' : '') + '</figure>' +
-      '<table>' + infoRows + '</table>' + addBtn(cp + 'info.' + lg, 'pair', 'add_row') +
-      '<p class="ib-std"><b>' + esc(t('ib_std')) + '</b> ' + chip(p.status) + '</p></aside>';
+      '<table>' + infoRows + '</table>' + addBtn(cp + 'info.' + lg, 'pair', 'add_row') + '</aside>';
 
     // body
     var desc = VA('desc');
@@ -493,18 +489,13 @@
 
     var nregs = pr && pr.regs ? pr.regs.length : null;
     panels.push(['reg', nregs || null, pr ? regsHtml(id, pr, E) : '']);
-    var figs = pr && pr.figs ? pr.figs : [];
-    panels.push(['evid', figs.length || null, pr ? evidHtml(id, pr, E) : '']);
+    var nphotos = pr ? groupsOf(pr).reduce(function (n, g) { return n + (g.figs || []).length; }, 0) : 0;
+    panels.push(['evid', nphotos || null, pr ? evidHtml(id, pr, E) : '']);
 
-    var stdHtml = '<div class="std' + (p.status === 'pending' ? ' pending' : '') + '"><strong>' + esc(t('t_std')) + chip(p.status) + '</strong>' +
-      F(cp + 'std.' + lg, V('std'), 'p', '', { pid: id }) + '</div>' +
-      ((V('just') || E) ? '<section class="just"><h3>' + esc(t('just')) + '</h3>' + F(cp + 'just.' + lg, V('just'), 'p', '', { pid: id }) + '</section>' : '');
-    panels.push(['std', null, stdHtml]);
-
-    var gaps = VA('gaps');
-    if (gaps.length || E) panels.push(['gaps', gaps.length || null, '<div class="gaps"><ul>' + gaps.map(function (g, i) {
-      return '<li>' + F(cp + 'gaps.' + lg + '.' + i, g, 'span', '', { raw: 1 }) + listBtns(cp + 'gaps.' + lg, i, gaps.length) + '</li>';
-    }).join('') + '</ul>' + addBtn(cp + 'gaps.' + lg, 'str', 'add_item') + '</div>']);
+    var stdHero = (V('std') || E) ? '<section class="std-hero" aria-label="' + esc(t('t_std')) + '"><h3 class="std-title"><span class="star" aria-hidden="true">★</span>' + esc(t('t_std')) + '</h3>' +
+      F(cp + 'std.' + lg, V('std'), 'p', 'std-text', { pid: id }) +
+      ((V('just') || E) ? '<details class="std-just"' + (E ? ' open' : '') + '><summary>' + esc(t('just')) + '</summary>' + F(cp + 'just.' + lg, V('just'), 'p', '', { pid: id }) + '</details>' : '') +
+      '</section>' : '';
 
     panels.push(['dl', pr && pr.downloads && pr.downloads.length || null, pr ? dlHtml(id, pr, E) : '']);
 
@@ -512,8 +503,7 @@
     var tl = panels.map(function (x) {
       var k = x[0], lock = LOCKED[k] && !member;
       return '<button type="button" role="tab" id="' + id + '-tab-' + k + '" aria-controls="' + id + '-panel-' + k + '" aria-selected="' + (k === sel) + '" tabindex="' + (k === sel ? 0 : -1) + '" data-tab="' + k + '"' +
-        (k === 'std' ? ' class="tab-std"' : lock ? ' class="tab-locked"' : '') + '>' +
-        (k === 'std' ? '<span class="star" aria-hidden="true">★</span>' : '') + (lock ? '<span class="lock-ico" aria-hidden="true"></span>' : '') +
+        (lock ? ' class="tab-locked"' : '') + '>' + (lock ? '<span class="lock-ico" aria-hidden="true"></span>' : '') +
         esc(t('t_' + k)) + (x[1] && !lock ? '<span class="count">' + x[1] + '</span>' : '') + '</button>';
     }).join('');
     var tp = panels.map(function (x) {
@@ -524,17 +514,16 @@
     // pager
     var i = S.order.indexOf(id), prev = S.order[i - 1], next = S.order[i + 1];
     var pg = '<nav class="pager" aria-label="pager">' +
-      (prev ? '<a class="pg prev" href="#' + prev + '"><span class="pg-k">← ' + esc(t('prev')) + '</span><span class="pg-t" lang="fr">' + S.num[prev] + '. ' + esc(S.byId[prev].name) + '</span></a>' : '<span></span>') +
-      (next ? '<a class="pg next" href="#' + next + '"><span class="pg-k">' + esc(t('next')) + ' →</span><span class="pg-t" lang="fr">' + S.num[next] + '. ' + esc(S.byId[next].name) + '</span></a>'
+      (prev ? '<a class="pg prev" href="#' + prev + '"><span class="pg-k">← ' + esc(t('prev')) + '</span><span class="pg-t" lang="fr">' + esc(S.byId[prev].name) + '</span></a>' : '<span></span>') +
+      (next ? '<a class="pg next" href="#' + next + '"><span class="pg-k">' + esc(t('next')) + ' →</span><span class="pg-t" lang="fr">' + esc(S.byId[next].name) + '</span></a>'
         : '<a class="pg next" href="#decisions"><span class="pg-k">' + esc(t('next')) + ' →</span><span class="pg-t">' + esc(L((S.site.decisions || {}).title) || t('decisions')) + '</span></a>') + '</nav>';
 
     return (E ? settingsHtml(p) : '') +
       '<section class="view item wiki" data-view="' + id + '">' +
       '<p class="crumb"><a href="#">' + esc(t('home')) + '</a> <span aria-hidden="true">/</span> <span lang="fr">' + esc(p.name) + '</span></p>' +
-      '<header class="wiki-head"><div class="piece-head"><span class="num">' + (S.num[id] || '') + '</span>' + F(cp + 'h2.' + lg, V('h2'), 'h2', '', { raw: 1, single: 1, attr: ' tabindex="-1"' }) + '</div>' +
-      '<p class="wiki-sub">' + esc(t('sub').replace('{n}', S.num[id] || '')) + ' · ' + chip(p.status) + '</p>' + relHtml(id) + '</header>' +
+      '<header class="wiki-head"><div class="piece-head">' + F(cp + 'h2.' + lg, V('h2'), 'h2', '', { raw: 1, single: 1, attr: ' tabindex="-1"' }) + '</div>' + relHtml(id) + '</header>' +
       infobox +
-      '<div class="wiki-body">' + F(cp + 'lead.' + lg, V('lead'), 'p', 'lead-p', { pid: id, done: done }) + descHtml +
+      '<div class="wiki-body">' + F(cp + 'lead.' + lg, V('lead'), 'p', 'lead-p', { pid: id, done: done }) + descHtml + stdHero +
       '<div class="tabs wiki-tabs" role="tablist">' + tl + '</div>' + tp + '</div>' + pg + '</section>';
   }
 
@@ -579,21 +568,125 @@
     return narr + out;
   }
 
+  // evidence photos are organised in groups; older content kept a flat "figs" list
+  function groupsOf(pr) {
+    if (pr && Array.isArray(pr.groups)) return pr.groups;
+    if (pr && pr.figs && pr.figs.length) return [{ title: { ca: '' }, desc: { ca: '' }, figs: pr.figs }];
+    return [];
+  }
   function evidHtml(id, pr, E) {
-    var lg = S.lang;
-    var out = F('priv.evid.' + lg, E ? (pr.evid || {})[lg] : L(pr.evid), 'p', '', { pid: id });
-    var figs = pr.figs || [];
-    if (!figs.length && !E && !L(pr.evid)) out = '<p class="muted">' + esc(t('no_evid')) + '</p>';
-    if (figs.length || E) {
-      out += '<div class="figs">' + figs.map(function (f, i) {
-        var src = f.path ? '<img data-priv="' + esc(f.path) + '" alt="' + esc(f.alt || '') + '" loading="lazy">' : '<span class="img-ph" aria-hidden="true"></span>';
-        return '<figure' + (pr.wide ? ' class="wide"' : '') + '>' + src +
-          F('priv.figs.' + i + '.cap.' + lg, E ? (f.cap || {})[lg] : L(f.cap), 'figcaption', '', { raw: 1 }) +
-          (E ? '<span class="fig-tools"><input type="text" data-path="priv.figs.' + i + '.alt" value="' + esc(f.alt || '') + '" placeholder="' + esc(t('alt')) + '" aria-label="' + esc(t('alt')) + '">' + listBtns('priv.figs', i, figs.length) + '</span>' : '') + '</figure>';
-      }).join('') + '</div>';
-    }
-    if (E) out += '<button type="button" class="add-btn" data-act="add-fig">+ ' + esc(t('add_img')) + '</button>';
+    var lg = S.lang, groups = groupsOf(pr);
+    var intro = E ? (pr.evid || {})[lg] : L(pr.evid);
+    var out = (intro || E) ? F('priv.evid.' + lg, intro, 'p', 'gal-intro', { pid: id }) : '';
+    if (!groups.length && !E && !intro) return '<p class="muted">' + esc(t('no_evid')) + '</p>';
+    groups.forEach(function (g, gi) {
+      var base = 'priv.groups.' + gi, figs = g.figs || [];
+      var title = E ? (g.title || {})[lg] : L(g.title), desc = E ? (g.desc || {})[lg] : L(g.desc);
+      out += '<section class="gal-group' + (E ? ' ed-group' : '') + '">' +
+        (E ? '<div class="gal-head">' + F(base + '.title.' + lg, title, 'h3', 'gal-title', { raw: 1, single: 1, ph: t('group_title') }) + listBtns('priv.groups', gi, groups.length) + '</div>'
+          : (title ? '<h3 class="gal-title">' + clean(title) + '</h3>' : '')) +
+        ((desc || E) ? F(base + '.desc.' + lg, desc, 'p', 'gal-desc', { raw: 1, ph: t('group_desc') }) : '') +
+        '<div class="gallery">' + figs.map(function (f, i) {
+          var thumb = f.thumb || f.path;
+          var cap = E ? (f.cap || {})[lg] : L(f.cap);
+          var img = thumb ? '<img data-priv="' + esc(thumb) + '" alt="' + esc(f.alt || plain(cap) || '') + '" loading="lazy">' : '<span class="img-ph" aria-hidden="true"></span>';
+          if (!E) return '<figure class="gal-item"><button type="button" class="gal-open" data-act="lightbox" data-pid="' + id + '" data-g="' + gi + '" data-i="' + i + '" aria-label="' + esc(plain(cap) || f.alt || t('open_photo')) + '">' + img + '</button>' +
+            (cap ? '<figcaption>' + clean(cap) + '</figcaption>' : '') + '</figure>';
+          var moveOpts = groups.length > 1 ? '<select class="gal-move" data-g="' + gi + '" data-i="' + i + '" aria-label="' + esc(t('move_to')) + '"><option value="">' + esc(t('move_to')) + '…</option>' +
+            groups.map(function (o, oi) { return oi === gi ? '' : '<option value="' + oi + '">' + esc(plain(L(o.title)) || (t('group') + ' ' + (oi + 1))) + '</option>'; }).join('') + '</select>' : '';
+          return '<figure class="gal-item">' + img + F(base + '.figs.' + i + '.cap.' + lg, cap, 'figcaption', '', { raw: 1, ph: t('caption') }) +
+            '<span class="fig-tools"><input type="text" data-path="' + base + '.figs.' + i + '.alt" value="' + esc(f.alt || '') + '" placeholder="' + esc(t('alt')) + '" aria-label="' + esc(t('alt')) + '">' +
+            moveOpts + listBtns(base + '.figs', i, figs.length) + '</span></figure>';
+        }).join('') + '</div>' +
+        (E ? '<button type="button" class="add-btn" data-act="add-photos" data-g="' + gi + '">+ ' + esc(t('add_photos')) + '</button>' : '') + '</section>';
+    });
+    if (E) out += addBtn('priv.groups', 'group', 'add_group');
     return out;
+  }
+
+  /* ------------------------------------------------------------------ photo viewer */
+  var LB = null;
+  function lightbox(pid, gi, i) {
+    var g = groupsOf(S.priv[pid] || {})[gi]; if (!g) return;
+    var figs = (g.figs || []).filter(function (f) { return f.path; });
+    if (!figs.length) return;
+    if (!LB) {
+      LB = document.createElement('dialog'); LB.className = 'lightbox';
+      LB.innerHTML = '<button type="button" class="lb-close" data-lb="close">×</button><button type="button" class="lb-nav lb-prev" data-lb="prev">‹</button>' +
+        '<figure><img alt=""><figcaption></figcaption></figure><button type="button" class="lb-nav lb-next" data-lb="next">›</button><p class="lb-count"></p>';
+      document.body.appendChild(LB);
+      LB.addEventListener('click', function (e) {
+        var b = e.target.closest('[data-lb]');
+        if (b) { var a = b.getAttribute('data-lb'); if (a === 'close') LB.close(); else LB.go(a === 'next' ? 1 : -1); }
+        else if (e.target === LB) LB.close();
+      });
+      LB.addEventListener('keydown', function (e) { if (e.key === 'ArrowRight') LB.go(1); else if (e.key === 'ArrowLeft') LB.go(-1); });
+    }
+    var cur = Math.max(0, figs.indexOf((g.figs || [])[i]));
+    function show() {
+      var f = figs[cur], img = LB.querySelector('img');
+      img.removeAttribute('src'); img.alt = f.alt || plain(L(f.cap)) || '';
+      LB.querySelector('figcaption').innerHTML = clean(L(f.cap));
+      LB.querySelector('.lb-count').textContent = (cur + 1) + ' / ' + figs.length;
+      LB.querySelector('.lb-close').setAttribute('aria-label', t('close'));
+      LB.querySelector('.lb-prev').setAttribute('aria-label', t('prev'));
+      LB.querySelector('.lb-next').setAttribute('aria-label', t('next'));
+      Array.prototype.forEach.call(LB.querySelectorAll('.lb-nav'), function (b) { b.hidden = figs.length < 2; });
+      signedUrls([f.path]).then(function () { if (figs[cur] === f && S.urls[f.path]) img.src = S.urls[f.path].url; }).catch(fail);
+    }
+    LB.go = function (d) { cur = (cur + d + figs.length) % figs.length; show(); };
+    show();
+    if (!LB.open) LB.showModal();
+  }
+
+  /* ------------------------------------------------------------------ images are shrunk in the browser before upload (saves storage and traffic) */
+  function shrink(file, maxEdge, quality) {
+    if (!/^image\/(jpeg|png|webp|bmp)$/i.test(file.type || '') || !window.createImageBitmap) return Promise.resolve(null);
+    return createImageBitmap(file, { imageOrientation: 'from-image' }).then(function (bmp) {
+      var k = Math.min(1, maxEdge / Math.max(bmp.width, bmp.height));
+      var w = Math.round(bmp.width * k), h = Math.round(bmp.height * k);
+      var cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+      var cx = cv.getContext('2d'); cx.fillStyle = '#fff'; cx.fillRect(0, 0, w, h); cx.drawImage(bmp, 0, 0, w, h);
+      if (bmp.close) bmp.close();
+      return new Promise(function (res) { cv.toBlob(function (b) { res(b ? { blob: b, w: w, h: h } : null); }, 'image/jpeg', quality); });
+    }).catch(function () { return null; });
+  }
+  function putBlob(bucket, blob, path, type) {
+    return sb.storage.from(bucket).upload(path, blob, { contentType: type || blob.type || undefined, upsert: false }).then(function (r) {
+      q(r);
+      return bucket === PUBLIC_BUCKET ? sb.storage.from(bucket).getPublicUrl(path).data.publicUrl : path;
+    });
+  }
+  function baseName(file, folder) {
+    return folder + '/' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5) + '-' + (slug(file.name.replace(/\.[^.]+$/, '')) || 'file');
+  }
+  // one photo for the evidence gallery: a large version (2000 px) and a thumbnail (600 px)
+  function uploadPhoto(file, folder) {
+    var base = baseName(file, folder);
+    return Promise.all([shrink(file, 2000, 0.85), shrink(file, 600, 0.8)]).then(function (r) {
+      var big = r[0], small = r[1];
+      if (!big || !small) {
+        var ext = (file.name.match(/\.[a-z0-9]+$/i) || [''])[0].toLowerCase();
+        return putBlob(PRIVATE_BUCKET, file, base + ext, file.type).then(function (p) { return { path: p }; });
+      }
+      return putBlob(PRIVATE_BUCKET, big.blob, base + '.jpg', 'image/jpeg').then(function (p) {
+        return putBlob(PRIVATE_BUCKET, small.blob, base + '.thumb.jpg', 'image/jpeg').then(function (tp) { return { path: p, thumb: tp, w: big.w, h: big.h }; });
+      });
+    });
+  }
+  // files no longer referenced by any page are removed from storage when saving
+  function privPaths(pr) {
+    var out = [];
+    if (!pr) return out;
+    groupsOf(pr).forEach(function (g) { (g.figs || []).forEach(function (f) { if (f.path) out.push(f.path); if (f.thumb) out.push(f.thumb); }); });
+    (pr.downloads || []).forEach(function (d) { if (d.path) out.push(d.path); });
+    return out;
+  }
+  function orphansAfterSave(pid, newPriv) {
+    var keep = {};
+    privPaths(newPriv).forEach(function (p) { keep[p] = 1; });
+    Object.keys(S.priv).forEach(function (k) { if (k !== pid) privPaths(S.priv[k]).forEach(function (p) { keep[p] = 1; }); });
+    return privPaths(S.priv[pid]).filter(function (p) { return !keep[p]; });
   }
 
   function dlHtml(id, pr, E) {
@@ -611,15 +704,13 @@
 
   function settingsHtml(p) {
     var opts = '<option value="">' + esc(t('f_top')) + '</option>' + S.order.filter(function (x) { return x !== p.id; }).map(function (x) {
-      return '<option value="' + x + '"' + (p.parent_id === x ? ' selected' : '') + '>' + S.num[x] + ' ' + esc(S.byId[x].name) + '</option>';
+      return '<option value="' + x + '"' + (p.parent_id === x ? ' selected' : '') + '>' + esc(S.byId[x].name) + '</option>';
     }).join('');
     return '<section class="settings" aria-label="' + esc(t('page_settings')) + '"><h3>' + esc(t('page_settings')) + '</h3><div class="set-grid">' +
       '<label>' + esc(t('f_id')) + '<input type="text" value="' + esc(p.id) + '" disabled></label>' +
       '<label>' + esc(t('f_name')) + '<input type="text" data-path="page.name" value="' + esc(p.name) + '"></label>' +
       '<label>' + esc(t('f_parent')) + '<select data-path="page.parent_id">' + opts + '</select></label>' +
       '<label>' + esc(t('f_sort')) + '<input type="number" data-path="page.sort" value="' + (p.sort || 0) + '"></label>' +
-      '<label>' + esc(t('f_status')) + '<select data-path="page.status"><option value="proposed"' + (p.status === 'proposed' ? ' selected' : '') + '>' + esc(t('proposed')) + '</option>' +
-      '<option value="pending"' + (p.status === 'pending' ? ' selected' : '') + '>' + esc(t('pending')) + '</option></select></label>' +
       '<label class="wide">' + esc(t('f_related')) + '<input type="text" data-csv="1" data-path="page.related" value="' + esc((p.related || []).join(', ')) + '"></label>' +
       '</div><button type="button" class="btn-danger" data-act="delete-page">' + esc(t('delete_page')) + '</button></section>';
   }
@@ -675,13 +766,23 @@
       '<h3>' + esc(t('squads')) + '</h3><ul class="squads">' + S.squads.map(function (s) {
         return '<li>' + esc(s.name) + ' <button type="button" class="mini del" data-act="del-squad" data-id="' + s.id + '" aria-label="' + esc(t('remove')) + '">×</button></li>';
       }).join('') + '</ul><form class="form inline" id="f-squad"><input name="name" maxlength="80" required aria-label="' + esc(t('esquadra')) + '"><button class="btn" type="submit">' + esc(t('add')) + '</button></form>' +
+      '<h3>' + esc(t('storage_t')) + '</h3><p id="storage-usage" class="muted">' + esc(t('loading')) + '</p>' +
       '<h3>' + esc(t('import_t')) + '</h3><p class="muted">' + esc(t('import_p')) + '</p>' +
       '<form class="form" id="f-import"><label class="fld"><span>seed.json</span><input type="file" name="seed" accept=".json,application/json" required></label>' +
       '<label class="fld"><span>private-images</span><input type="file" name="imgs" accept="image/*" multiple></label>' +
       '<p class="form-msg" role="status"></p><p class="form-actions"><button class="btn" type="submit">' + esc(t('import_go')) + '</button>' +
       ' <button type="button" class="btn-ghost" data-act="backup">' + esc(t('backup')) + '</button></p></form></section>';
   }
+  function loadUsage() {
+    sb.rpc('storage_usage').then(function (r) {
+      var d = q(r), el = document.getElementById('storage-usage'); if (!el || !d) return;
+      var mb = function (b) { return (b / 1048576).toFixed(b < 10485760 ? 1 : 0).replace('.', ','); };
+      el.innerHTML = esc(t('storage_p').replace('{used}', mb(d.bytes) + ' MB').replace('{files}', d.files)) +
+        '<span class="meter"><span style="width:' + Math.min(100, d.bytes / 10737418.24).toFixed(1) + '%"></span></span>';
+    }).catch(function () {});
+  }
   function loadMembers() {
+    loadUsage();
     sb.from('profiles').select('*').order('created_at', { ascending: false }).then(function (r) {
       var rows = q(r) || [], box = document.getElementById('members');
       if (!box) return;
@@ -704,7 +805,7 @@
   }
   function newPageView() {
     if (!isAdmin()) return '<section class="view narrow"><h2 class="page-title" tabindex="-1">' + esc(t('new_page')) + '</h2>' + lockedHtml() + '</section>';
-    var opts = '<option value="">' + esc(t('f_top')) + '</option>' + S.order.map(function (x) { return '<option value="' + x + '">' + S.num[x] + ' ' + esc(S.byId[x].name) + '</option>'; }).join('');
+    var opts = '<option value="">' + esc(t('f_top')) + '</option>' + S.order.map(function (x) { return '<option value="' + x + '">' + esc(S.byId[x].name) + '</option>'; }).join('');
     return '<section class="view narrow"><h2 class="page-title" tabindex="-1">' + esc(t('new_page')) + '</h2><form class="form" id="f-newpage">' +
       field('pname', t('f_name'), 'text', '', ' required maxlength="80"') +
       field('h2', t('f_title') + ' (' + LANG_NAMES[S.lang] + ')', 'text', '', ' maxlength="120"') +
@@ -739,8 +840,11 @@
       var row = { id: pg.id, parent_id: pg.parent_id || null, sort: pg.sort || 0, name: plain(pg.name) || pg.id, ib: plain(pg.ib), status: pg.status,
         image: pg.image || '', card: pg.card || '', related: pg.related || [], content: pg.content };
       if (!row.content.diagram) delete row.content.diagram;
+      var orphans = orphansAfterSave(pg.id, S.draft.priv);
       job = sb.from('pages').update(row).eq('id', pg.id).then(q).then(function () {
         return sb.from('page_private').upsert({ page_id: pg.id, content: S.draft.priv }).then(q);
+      }).then(function () {
+        if (orphans.length) return sb.storage.from(PRIVATE_BUCKET).remove(orphans).catch(function (e) { console.warn(e); });
       });
     } else {
       var rows = ['home', 'decisions', 'fonts'].map(function (k) { return { key: k, value: S.draft.site[k] }; });
@@ -780,7 +884,7 @@
       pickFile('image/*').then(function (files) {
         if (!files.length) return;
         toast(t('uploading'));
-        return upload(PUBLIC_BUCKET, files[0], 'inline').then(function (url) {
+        return upload(PUBLIC_BUCKET, files[0], 'inline', 1600).then(function (url) {
           target.focus();
           if (savedRange) { var s = window.getSelection(); s.removeAllRanges(); s.addRange(savedRange); }
           document.execCommand('insertImage', false, url);
@@ -825,6 +929,7 @@
         var rows = (seed.private || []).map(function (r) {
           var c = clone(r.content);
           (c.figs || []).forEach(function (f) { if (!f.path && f.file) f.path = 'evid/' + f.file; });
+          if (c.figs) { c.groups = c.figs.length ? [{ title: { ca: '' }, desc: { ca: '' }, figs: c.figs }] : []; delete c.figs; delete c.wide; }
           return { page_id: r.page_id, content: c };
         });
         return sb.from('page_private').upsert(rows).then(q);
@@ -871,22 +976,31 @@
         pickFile('image/*').then(function (files) {
           if (!files.length) return;
           syncDraft(); toast(t('uploading'));
-          return upload(PUBLIC_BUCKET, files[0], 'img').then(function (url) { setPath(S.draft, target, url); S.dirty = true; keepScroll(render); });
+          return upload(PUBLIC_BUCKET, files[0], 'img', 1600).then(function (url) { setPath(S.draft, target, url); S.dirty = true; keepScroll(render); });
         }).catch(fail);
         return;
       }
-      if (act === 'add-fig') {
+      if (act === 'add-photos') {
+        var gi = parseInt(el.getAttribute('data-g'), 10);
         pickFile('image/*', true).then(function (files) {
           if (!files.length) return;
-          syncDraft(); toast(t('uploading'));
-          var pid = S.draft.page.id;
-          return Promise.all(files.map(function (f) { return upload(PRIVATE_BUCKET, f, 'evid/' + pid); })).then(function (paths) {
-            paths.forEach(function (p, i) { S.draft.priv.figs.push({ path: p, alt: files[i].name.replace(/\.[^.]+$/, ''), cap: { ca: '' } }); });
-            S.dirty = true; keepScroll(render);
+          syncDraft();
+          var pid = S.draft.page.id, done = 0, chain = Promise.resolve();
+          files.forEach(function (f) {
+            chain = chain.then(function () {
+              toast(t('uploading') + ' ' + (done + 1) + ' / ' + files.length);
+              return uploadPhoto(f, 'evid/' + pid).then(function (r) {
+                done++;
+                S.draft.priv.groups[gi].figs.push({ path: r.path, thumb: r.thumb, w: r.w, h: r.h, alt: f.name.replace(/\.[^.]+$/, ''), cap: { ca: '' } });
+                S.dirty = true;
+              });
+            });
           });
-        }).catch(fail);
+          return chain.then(function () { toast(t('saved_photos').replace('{n}', done)); keepScroll(render); });
+        }).catch(function (e) { fail(e); keepScroll(render); });
         return;
       }
+      if (act === 'lightbox') { lightbox(el.getAttribute('data-pid'), parseInt(el.getAttribute('data-g'), 10), parseInt(el.getAttribute('data-i'), 10)); return; }
       if (act === 'add-file') {
         pickFile('', true).then(function (files) {
           if (!files.length) return;
@@ -990,6 +1104,14 @@
     if (S.edit && (e.ctrlKey || e.metaKey) && e.key === 's' && S.draft) { e.preventDefault(); save(); }
   });
   main.addEventListener('input', function () { if (S.edit) S.dirty = true; });
+  main.addEventListener('change', function (e) {
+    var sel = e.target.closest && e.target.closest('.gal-move');
+    if (!sel || sel.value === '' || !S.draft) return;
+    syncDraft();
+    var gs = S.draft.priv.groups, from = parseInt(sel.getAttribute('data-g'), 10), i = parseInt(sel.getAttribute('data-i'), 10), to = parseInt(sel.value, 10);
+    gs[to].figs.push(gs[from].figs.splice(i, 1)[0]);
+    S.dirty = true; keepScroll(render);
+  });
   main.addEventListener('paste', function (e) {
     if (!e.target.closest || !e.target.closest('[contenteditable]')) return;
     e.preventDefault();
@@ -1052,7 +1174,7 @@
       var row = { id: id, parent_id: f.parent.value || null, sort: parseInt(f.sort.value, 10) || 0, name: name2, ib: name2, status: 'pending', image: '', card: '', related: [],
         content: { h2: h2, lead: { ca: '' }, desc: { ca: [''] }, parts: { ca: [] }, info: { ca: [] }, std: { ca: '' }, just: { ca: '' }, gaps: { ca: [] } } };
       sb.from('pages').insert(row).then(q).then(function () {
-        return sb.from('page_private').upsert({ page_id: id, content: { narr: { ca: '' }, regs: [], evid: { ca: '' }, figs: [], downloads: [] } }).then(q);
+        return sb.from('page_private').upsert({ page_id: id, content: { narr: { ca: '' }, regs: [], evid: { ca: '' }, groups: [], downloads: [] } }).then(q);
       }).then(function () { return loadPublic(); }).then(loadPrivate).then(function () {
         S.edit = true; S.draft = null; location.hash = id;
       }).catch(function (er) { msg(f, t('error') + ' ' + er.message, true); });
@@ -1110,18 +1232,17 @@
     ['lead1', 'lead2', 'lead3', 'crit'].forEach(function (k) { add('home', t('home'), null, L(h[k])); });
     ['decisions', 'fonts'].forEach(function (k) { var b = S.site[k] || {}; add(k, plain(L(b.title)), null, L(b.html)); });
     S.order.forEach(function (id) {
-      var p = S.byId[id], c = p.content || {}, title = S.num[id] + ' · ' + plain(L(c.h2) || p.name);
+      var p = S.byId[id], c = p.content || {}, title = plain(L(c.h2) || p.name);
       add(id, title, null, L(c.lead)); LA(c.desc).forEach(function (x) { add(id, title, null, x); });
       LA(c.parts).forEach(function (r) { add(id, title, 'parts', r[0] + ': ' + r[1]); });
       LA(c.info).forEach(function (r) { add(id, title, null, r[0] + ': ' + r[1]); });
-      add(id, title, 'std', L(c.std)); add(id, title, 'std', L(c.just));
-      LA(c.gaps).forEach(function (x) { add(id, title, 'gaps', x); });
+      add(id, title, null, L(c.std)); add(id, title, null, L(c.just));
       var pr = S.priv[id];
       if (pr) {
         add(id, title, 'reg', L(pr.narr));
         (pr.regs || []).forEach(function (r) { (r.parts || []).forEach(function (x) { add(id, title, 'reg', r.year + ' ' + r.name + ' — ' + (S.lang === 'fr' ? x.fr : L(x.tr) || x.fr)); }); });
         add(id, title, 'evid', L(pr.evid));
-        (pr.figs || []).forEach(function (f) { add(id, title, 'evid', L(f.cap)); });
+        groupsOf(pr).forEach(function (g) { add(id, title, 'evid', L(g.title) + ' ' + L(g.desc)); (g.figs || []).forEach(function (f) { add(id, title, 'evid', L(f.cap)); }); });
         (pr.downloads || []).forEach(function (d) { add(id, title, 'dl', L(d.title) + ' ' + L(d.desc)); });
       }
     });

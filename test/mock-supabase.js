@@ -106,6 +106,7 @@
           return { path: p, signedUrl: u, error: u ? null : 'not found' };
         }), error: null });
       },
+      remove: function (paths) { log.push('remove ' + paths.join(',')); window.__REMOVED = (window.__REMOVED || []).concat(paths); return Promise.resolve({ data: [], error: null }); },
       createSignedUrl: function (p) { return Promise.resolve({ data: member() ? { signedUrl: storage[name + '/' + p] || '#' } : null, error: member() ? null : { message: 'Object not found' } }); }
     };
   }
@@ -113,6 +114,10 @@
 
   var client = {
     from: function (t) { return new Q(t); },
+    rpc: function (name) {
+      if (name === 'storage_usage') return Promise.resolve({ data: admin() ? { bytes: 5242880, files: Object.keys(storage).length + 7 } : null, error: null });
+      return Promise.resolve({ data: null, error: { message: 'unknown function' } });
+    },
     storage: { from: bucket },
     auth: {
       getSession: function () { return Promise.resolve({ data: { session: session }, error: null }); },

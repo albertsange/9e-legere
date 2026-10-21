@@ -211,3 +211,14 @@ insert into public.squads (name) values
   ('5e Escouade - Catalonia'), ('6e Escouade - England'), ('7e Escouade - Catalonia 2'), ('8e Escouade - Russia')
 on conflict (name) do nothing;
 revoke execute on function public.handle_new_user(), public.handle_user_email(), public.stamp_edit(), public.add_private_row() from public, anon, authenticated;
+
+-- ---------------------------------------------------------------- storage usage (shown to administrators)
+create or replace function public.storage_usage() returns json
+language sql stable security definer set search_path = public, storage as $$
+  select case when public.is_admin() then
+    json_build_object('bytes', coalesce(sum((o.metadata->>'size')::bigint), 0), 'files', count(*))
+  end
+  from storage.objects o;
+$$;
+revoke all on function public.storage_usage() from public, anon;
+grant execute on function public.storage_usage() to authenticated;

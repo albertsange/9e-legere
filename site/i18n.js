@@ -25,7 +25,7 @@ window.I18N = (function () {
     sub: U("Peça {n} de l'uniforme del 9e Léger", "Item {n} of the 9e Léger uniform", "Capo {n} dell'uniforme del 9e Léger", "Pièce {n} de l'uniforme du 9e Léger", "Stück {n} der Uniform des 9e Léger"),
     cap: U("Detall de la làmina de referència (1809).", "Detail of the reference plate (1809).", "Dettaglio della tavola di riferimento (1809).", "Détail de la planche de référence (1809).", "Ausschnitt der Referenztafel (1809)."),
     ib_std: U("Estàndard del 9e:", "9e standard:", "Standard del 9e:", "Standard du 9e :", "Standard des 9e:"),
-    t_parts: U("Parts", "Parts", "Parti", "Parties", "Teile"),
+    t_parts: U("Informació", "Information", "Informazioni", "Informations", "Informationen"),
     t_reg: U("Regulacions", "Regulations", "Regolamenti", "Règlements", "Vorschriften"),
     t_evid: U("Evidències", "Evidence", "Evidenze", "Preuves", "Belege"),
     t_std: U("Estàndard del 9e", "9e standard", "Standard del 9e", "Standard du 9e", "Standard des 9e"),
@@ -155,6 +155,17 @@ window.I18N = (function () {
     tb_clear: U("Treu el format", "Clear formatting", "Rimuovi formattazione", "Effacer la mise en forme", "Formatierung entfernen"),
     empty_db_t: U("La base de dades encara és buida", "The database is still empty", "Il database è ancora vuoto", "La base de données est encore vide", "Die Datenbank ist noch leer"),
     empty_db_p: U("Fes la importació inicial a Gestió (seed.json i les imatges de «private-images») per carregar el contingut de la guia.", "Run the initial import in Administration (seed.json and the images in “private-images”) to load the guide content.", "Esegui l'importazione iniziale in Gestione (seed.json e le immagini di «private-images») per caricare il contenuto della guida.", "Lancez l'import initial dans Administration (seed.json et les images de « private-images ») pour charger le contenu du guide.", "Führen Sie in der Verwaltung den Erstimport durch (seed.json und die Bilder aus „private-images“), um den Inhalt zu laden."),
+    group: U("Grup", "Group", "Gruppo", "Groupe", "Gruppe"),
+    group_title: U("Títol del grup de fotos", "Photo group title", "Titolo del gruppo di foto", "Titre du groupe de photos", "Titel der Fotogruppe"),
+    group_desc: U("Descripció del grup (opcional)", "Group description (optional)", "Descrizione del gruppo (facoltativa)", "Description du groupe (facultative)", "Beschreibung der Gruppe (optional)"),
+    add_group: U("Afegeix un grup de fotos", "Add a photo group", "Aggiungi un gruppo di foto", "Ajouter un groupe de photos", "Fotogruppe hinzufügen"),
+    add_photos: U("Afegeix fotos", "Add photos", "Aggiungi foto", "Ajouter des photos", "Fotos hinzufügen"),
+    move_to: U("Mou a", "Move to", "Sposta in", "Déplacer vers", "Verschieben nach"),
+    caption: U("Peu de foto", "Caption", "Didascalia", "Légende", "Bildunterschrift"),
+    open_photo: U("Obre la foto", "Open photo", "Apri la foto", "Ouvrir la photo", "Foto öffnen"),
+    saved_photos: U("{n} fotos pujades. Recorda desar els canvis.", "{n} photos uploaded. Remember to save the changes.", "{n} foto caricate. Ricorda di salvare le modifiche.", "{n} photos envoyées. N'oubliez pas d'enregistrer.", "{n} Fotos hochgeladen. Bitte Änderungen speichern."),
+    storage_t: U("Espai de fotos i fitxers", "Photo and file storage", "Spazio per foto e file", "Espace photos et fichiers", "Speicher für Fotos und Dateien"),
+    storage_p: U("{used} utilitzats d'1 GB ({files} fitxers).", "{used} used of 1 GB ({files} files).", "{used} usati su 1 GB ({files} file).", "{used} utilisés sur 1 Go ({files} fichiers).", "{used} von 1 GB belegt ({files} Dateien)."),
     empty_hint: U("(buit — fes clic per escriure)", "(empty — click to type)", "(vuoto — clicca per scrivere)", "(vide — cliquez pour écrire)", "(leer — zum Schreiben klicken)")
   };
 })();

@@ -2,7 +2,7 @@
 import json, os, sys, threading, http.server, functools, time
 from playwright.sync_api import sync_playwright
 
-ROOT = "/home/claude/web9e"
+ROOT = os.environ.get("ROOT9E", "/home/claude/web9e")
 SHOTS = sys.argv[1] if len(sys.argv) > 1 else "/tmp/shots"
 os.makedirs(SHOTS, exist_ok=True)
 PORT = 8765
@@ -13,7 +13,7 @@ class Quiet(handler.func):
 srv = http.server.ThreadingHTTPServer(("127.0.0.1", PORT), functools.partial(Quiet, directory=ROOT))
 threading.Thread(target=srv.serve_forever, daemon=True).start()
 
-seed = open(f"{ROOT}/seed.json", encoding="utf-8").read()
+seed = open(os.environ.get("SEED9E", f"{ROOT}/seed.json"), encoding="utf-8").read()
 mock = open(f"{ROOT}/test/mock-supabase.js", encoding="utf-8").read()
 SUPA = "window.__SEED = " + seed + ";\n" + mock
 
@@ -48,6 +48,7 @@ with sync_playwright() as p:
     # 1 anonymous visitor -------------------------------------------------
     page.goto(base); wait(600)
     check("home renders the 9 main items", page.locator(".hlist > li").count() == 9, page.locator(".hlist > li").count())
+    check("home and menu have no numbers or badges", page.locator(".hlist .num, .hlist .chip, #menu-body .dot, #menu-body .legend").count() == 0)
     check("side menu lists all 17 pages", page.locator("#menu-body .menu-items a").count() == 17)
     check("login button shown when logged out", page.locator("#acct [data-act=login]").count() == 1)
     page.screenshot(path=f"{SHOTS}/01_home_anon.png")
@@ -59,9 +60,10 @@ with sync_playwright() as p:
     check("locked panel with login button", page.locator("#shako-panel-reg .locked [data-act=login]").count() == 1)
     check("regulation text absent from DOM", "Règlement" not in page.content() and "Décret" not in page.content())
     page.screenshot(path=f"{SHOTS}/02_locked.png")
-    page.click("#shako-tab-std"); wait(100)
-    check("standard tab readable with refs", page.locator("#shako-panel-std .ref").count() > 0)
-    page.locator("#shako-panel-std .ref").first.dispatch_event("click"); wait(100)
+    check("standard shown after the description, with no tab", page.locator(".std-hero").count() == 1 and page.locator("#shako-tab-std").count() == 0)
+    check("no missing-data tab, no numbers, no badges", page.locator("#shako-tab-gaps").count() == 0 and page.locator(".piece-head .num, .chip, .wiki-sub").count() == 0)
+    check("first tab is called Informació", page.locator("#shako-tab-parts").inner_text().startswith("Informació"))
+    page.locator(".std-hero .ref").first.dispatch_event("click"); wait(100)
     check("ref click while locked opens the locked regulations tab", page.locator("#shako-tab-reg").get_attribute("aria-selected") == "true")
     check("autolinks present in text", page.locator(".wiki-body a.wl").count() > 0)
     page.click("#shako-panel-reg [data-act=login]"); wait(100)
@@ -88,10 +90,13 @@ with sync_playwright() as p:
     page.click("#shako-tab-reg"); wait(100)
     check("regulations visible", page.locator("#shako-panel-reg details.reg").count() == 4, page.locator("#shako-panel-reg details.reg").count())
     page.click("#shako-tab-evid"); wait(500)
-    src = page.locator("#shako-panel-evid img").first.get_attribute("src") or ""
-    check("evidence image loaded through signed link", "hersent49" in src, src)
+    src = page.locator("#shako-panel-evid .gallery img").first.get_attribute("src") or ""
+    check("evidence gallery loads images through signed links", "hersent49" in src, src)
+    page.locator("#shako-panel-evid .gal-open").first.click(); wait(400)
+    check("photo opens in the viewer", page.locator("dialog.lightbox[open] img").count() == 1 and "hersent49" in (page.locator("dialog.lightbox img").get_attribute("src") or ""))
+    page.keyboard.press("Escape"); wait(150)
     page.screenshot(path=f"{SHOTS}/03_member_evid.png")
-    page.click("#shako-tab-std"); page.locator("#shako-panel-std .ref").first.dispatch_event("click"); wait(300)
+    page.locator(".std-hero .ref").first.dispatch_event("click"); wait(300)
     check("ref opens regulation row", page.locator("#shako-panel-reg details.reg[open]").count() >= 1)
     page.select_option("#lang-select", "en"); wait(300)
     check("language switch re-renders in English", page.locator(".wiki-head h2").inner_text().strip() != "" and page.locator("#shako-tab-reg").inner_text().startswith("Regulations"))
@@ -151,6 +156,29 @@ with sync_playwright() as p:
     check("other languages untouched", "PROVA-EDICIO" not in sh["content"]["lead"]["en"])
     check("back to read mode after save", page.locator("#editbar").is_hidden() and page.locator(".ed").count() == 0)
 
+    # evidence groups: add a group, upload photos, caption, move, save
+    page.goto(base + "#shako"); wait(300)
+    page.click("[data-act=toggle-edit]"); wait(300)
+    page.click("#shako-tab-evid"); wait(100)
+    check("old photos migrated into one group", S("window.__app.S.draft.priv.groups.length") == 1 and S("window.__app.S.draft.priv.groups[0].figs.length") == 1)
+    page.click('[data-act=add][data-list="priv.groups"]'); wait(200)
+    page.locator('[data-path="priv.groups.1.title.ca"]').click(); page.keyboard.type("Shako model 1806")
+    with page.expect_file_chooser() as fc:
+        page.locator('[data-act=add-photos][data-g="1"]').click()
+    fc.value.set_files([f"{ROOT}/img/card_shako.jpg", f"{ROOT}/img/det_shako.jpg"]); wait(1500)
+    check("two photos uploaded with thumbnails", S("window.__app.S.draft.priv.groups[1].figs.filter(f => f.thumb && f.thumb.endsWith('.thumb.jpg')).length") == 2, S("JSON.stringify(window.__app.S.draft.priv.groups[1].figs)"))
+    page.locator('[data-path="priv.groups.1.figs.0.cap.ca"]').click(); page.keyboard.type("Vista frontal")
+    page.locator('.gal-move').first.select_option("1"); wait(200)
+    check("photo moved to the other group", S("window.__app.S.draft.priv.groups[0].figs.length") == 0 and S("window.__app.S.draft.priv.groups[1].figs.length") == 3)
+    page.click("#editbar [data-act=save]"); wait(700)
+    g = S("window.__DB.page_private.find(p=>p.page_id==='shako').content")
+    check("groups saved, flat list gone", "figs" not in g and g["groups"][1]["title"]["ca"] == "Shako model 1806" and len(g["groups"][1]["figs"]) == 3)
+    check("caption saved", any(f["cap"].get("ca") == "Vista frontal" for f in g["groups"][1]["figs"]))
+    check("shared old image not deleted from storage", "evid/hersent49.jpg" not in (S("window.__REMOVED || []") or []))
+    page.click("#shako-tab-evid"); wait(500)
+    check("gallery shows the new group heading", "Shako model 1806" in page.locator("#shako-panel-evid").inner_text())
+    page.screenshot(path=f"{SHOTS}/09_gallery.png", full_page=False)
+
     # new page
     page.goto(base + "#nova"); wait(300)
     page.fill("#f-newpage [name=pname]", "Havresac de prova")
@@ -158,7 +186,7 @@ with sync_playwright() as p:
     page.select_option("#f-newpage [name=parent]", "giberne")
     page.click("#f-newpage button[type=submit]"); wait(700)
     check("new page created and opened in edit mode", "havresac-de-prova" in page.url and page.locator(".settings").count() == 1)
-    check("new page numbered under Giberne", page.locator(".piece-head .num").inner_text().startswith("7."), page.locator(".piece-head .num").inner_text())
+    check("new page placed under Giberne", page.locator(".rel").inner_text().find("Giberne") > -1)
     page.locator('[data-path="page.content.lead.ca"]').click(); page.keyboard.type("Motxilla de pell.")
     page.click("#editbar [data-act=save]"); wait(600)
     check("new page content saved", S("window.__DB.pages.find(p=>p.id==='havresac-de-prova').content.lead.ca") == "Motxilla de pell.")
@@ -197,6 +225,7 @@ with sync_playwright() as p:
     # administration
     page.goto(base + "#gestio"); wait(600)
     check("members listed", page.locator("#members tbody tr").count() >= 3, page.locator("#members tbody tr").count())
+    check("storage usage shown", "MB" in page.locator("#storage-usage").inner_text())
     row = page.locator('#members tr', has_text="pending@test.org")
     row.locator("[name=status]").select_option("approved"); row.locator("[data-act=save-member]").click(); wait(300)
     check("admin approves member", S("window.__DB.profiles.find(p=>p.id==='u-pending').status") == "approved")
