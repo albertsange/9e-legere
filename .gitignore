@@ -1,0 +1,5 @@
+# Members-only content must never be committed
+seed.json
+private-images/
+*.zip
+.DS_Store
