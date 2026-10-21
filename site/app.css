@@ -169,3 +169,10 @@ span.ed,b.ed,strong.ed{display:inline-block}
 /* storage meter */
 .meter{display:block;height:.5rem;max-width:24rem;margin-top:.45rem;background:var(--quote-bg);border-radius:3px;overflow:hidden}
 .meter span{display:block;height:100%;background:var(--bleu)}
+
+/* item search */
+.s-piece .s-snip{display:flex;align-items:baseline;gap:.45rem;flex-wrap:wrap}
+.s-piece strong{color:var(--ink);font-weight:600}
+.s-fr{font-style:italic;color:var(--muted);font-size:.9em}
+.s-par{margin-left:auto;font-family:var(--label);letter-spacing:.04em;font-size:.78rem;color:var(--muted)}
+.s-via{color:var(--muted);font-size:.85em}

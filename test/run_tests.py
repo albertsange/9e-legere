@@ -47,6 +47,8 @@ with sync_playwright() as p:
 
     # 1 anonymous visitor -------------------------------------------------
     page.goto(base); wait(600)
+    check("English is the default language", S("document.documentElement.lang") == "en" and page.input_value("#lang-select") == "en" and "Search" in (page.get_attribute("#q", "placeholder") or ""))
+    page.select_option("#lang-select", "ca"); wait(300)
     check("home renders the 9 main items", page.locator(".hlist > li").count() == 9, page.locator(".hlist > li").count())
     check("home and menu have no numbers or badges", page.locator(".hlist .num, .hlist .chip, #menu-body .dot, #menu-body .legend").count() == 0)
     check("side menu lists all 17 pages", page.locator("#menu-body .menu-items a").count() == 17)
@@ -100,9 +102,21 @@ with sync_playwright() as p:
     check("ref opens regulation row", page.locator("#shako-panel-reg details.reg[open]").count() >= 1)
     page.select_option("#lang-select", "en"); wait(300)
     check("language switch re-renders in English", page.locator(".wiki-head h2").inner_text().strip() != "" and page.locator("#shako-tab-reg").inner_text().startswith("Regulations"))
-    page.fill("#q", "plaque"); wait(300)
-    check("search returns results", page.locator("#s-results .s-item").count() > 0)
-    page.fill("#q", ""); page.select_option("#lang-select", "ca"); wait(200)
+    page.select_option("#lang-select", "ca"); wait(200)
+    page.fill("#q", "armilla"); wait(300)
+    first = page.locator("#s-results .s-item").first
+    check("search finds a piece from a word in another language (armilla → veste)", first.get_attribute("href") == "#veste", first.get_attribute("href"))
+    check("search lists only pieces, no text snippets", page.locator("#s-results .s-item").count() <= 8 and page.locator("#s-results mark").count() == 0)
+    page.press("#q", "Enter"); wait(300)
+    check("Enter opens the piece page", page.url.endswith("#veste"))
+    page.fill("#q", "sabre"); wait(300)
+    check("search by synonym (sabre → briquet)", page.locator("#s-results .s-item").first.get_attribute("href") == "#briquet")
+    page.fill("#q", "shakko"); wait(300)
+    check("misspelling shows suggestions", "potser" in page.locator("#s-results .s-group").first.inner_text().lower() and page.locator('#s-results a[href="#shako"]').count() == 1)
+    page.fill("#q", "zzqqxx"); wait(300)
+    check("no match offers the list of pieces", page.locator("#s-results .s-item").count() == 17)
+    page.locator('#s-results a[href="#col"]').dispatch_event("mousedown"); wait(300)
+    check("clicking a suggestion opens the page", page.url.endswith("#col"))
     page.goto(base + "#gestio"); wait(300)
     check("member cannot open administration", page.locator("#members").count() == 0)
     page.goto(base + "#compte"); wait(300)
@@ -153,7 +167,8 @@ with sync_playwright() as p:
     check("new paragraph saved", sh["content"]["desc"]["ca"][-1] == "Paràgraf nou de prova.", sh["content"]["desc"]["ca"][-1])
     pr = S("window.__DB.page_private.find(p=>p.page_id==='shako').content")
     check("new regulation saved", pr["regs"][-1]["year"] == "1810" and pr["regs"][-1]["parts"][0]["tr"]["ca"] == "Text català.", pr["regs"][-1])
-    check("other languages untouched", "PROVA-EDICIO" not in sh["content"]["lead"]["en"])
+    check("edited text translated into the other languages", sh["content"]["lead"]["en"].startswith("[en] ") and "PROVA-EDICIO" in sh["content"]["lead"]["en"] and sh["content"]["lead"]["de"].startswith("[de] "))
+    check("regulation translation not written into French", "fr" not in pr["regs"][-1]["parts"][0]["tr"] and pr["regs"][-1]["parts"][0]["tr"]["en"] == "[en] Text català.")
     check("back to read mode after save", page.locator("#editbar").is_hidden() and page.locator(".ed").count() == 0)
 
     # evidence groups: add a group, upload photos, caption, move, save
@@ -193,17 +208,17 @@ with sync_playwright() as p:
     check("new page appears in menu", page.locator('#menu-body a[data-sec="havresac-de-prova"]').count() == 1)
     page.screenshot(path=f"{SHOTS}/06_new_page.png")
 
-    # translate in place: the new page only has Catalan text
+    # editing in another language: the change is saved and translated into the rest
+    check("new page title translated at creation", S("window.__DB.pages.find(p=>p.id==='havresac-de-prova').content.h2.en") == "[en] Havresac de prova")
+    check("new page text translated on save", S("window.__DB.pages.find(p=>p.id==='havresac-de-prova').content.lead.it") == "[it] Motxilla de pell.")
     page.select_option("#lang-select", "it"); wait(200)
     page.click("[data-act=toggle-edit]"); wait(300)
-    pre = page.locator('[data-path="page.content.lead.it"]').inner_text()
-    check("missing Italian text prefilled from Catalan", pre == "Motxilla de pell.", pre)
     page.locator('[data-path="page.content.h2.it"]').click(); page.keyboard.press("Control+A"); page.keyboard.type("Zaino di prova")
+    calls = S("window.__TRANSLATE_CALLS")
     page.click("#editbar [data-act=save]"); wait(600)
     pp = S("window.__DB.pages.find(p=>p.id==='havresac-de-prova').content")
-    check("Italian title saved", pp["h2"].get("it") == "Zaino di prova", pp["h2"])
-    check("untouched prefilled text not stored", "it" not in pp["lead"], pp["lead"])
-    check("Italian page shows Catalan fallback", "Motxilla de pell." in page.locator(".lead-p").inner_text())
+    check("Italian title saved and translated into Catalan", pp["h2"].get("it") == "Zaino di prova" and pp["h2"].get("ca") == "[ca] Zaino di prova", pp["h2"])
+    check("one translation call per save", S("window.__TRANSLATE_CALLS") == calls + 1)
     page.select_option("#lang-select", "ca"); wait(200)
 
     # home and decisions are editable

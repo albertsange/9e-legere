@@ -119,6 +119,16 @@
       return Promise.resolve({ data: null, error: { message: 'unknown function' } });
     },
     storage: { from: bucket },
+    functions: {
+      invoke: function (name, opts) {
+        log.push('invoke ' + name);
+        if (name !== 'translate' || !admin()) return Promise.resolve({ data: null, error: { message: 'forbidden' } });
+        var b = opts.body, out = {};
+        window.__TRANSLATE_CALLS = (window.__TRANSLATE_CALLS || 0) + 1;
+        b.targets.forEach(function (k) { out[k] = b.texts.map(function (x) { return x ? '[' + k + '] ' + x : ''; }); });
+        return Promise.resolve({ data: { translations: out }, error: null });
+      }
+    },
     auth: {
       getSession: function () { return Promise.resolve({ data: { session: session }, error: null }); },
       onAuthStateChange: function (f) { listeners.push(f); return { data: { subscription: { unsubscribe: function () {} } } }; },

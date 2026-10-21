@@ -6,7 +6,7 @@ window.I18N = (function () {
     home: U("Inici", "Home", "Inizio", "Accueil", "Start"),
     index: U("Índex de peces", "Index of items", "Indice dei capi", "Index des pièces", "Verzeichnis der Stücke"),
     lang: U("Idioma", "Language", "Lingua", "Langue", "Sprache"),
-    search: U("Cerca a tota la guia…", "Search the whole guide…", "Cerca in tutta la guida…", "Rechercher dans tout le guide…", "Im ganzen Leitfaden suchen…"),
+    search: U("Cerca una peça…", "Search for an item…", "Cerca un capo…", "Rechercher une pièce…", "Stück suchen…"),
     none: U("Cap resultat", "No results", "Nessun risultato", "Aucun résultat", "Keine Ergebnisse"),
     loading: U("Carregant…", "Loading…", "Caricamento…", "Chargement…", "Wird geladen…"),
     load_err: U("No s'ha pogut carregar la guia. Torna-ho a provar més tard.", "The guide could not be loaded. Please try again later.", "Impossibile caricare la guida. Riprova più tardi.", "Le guide n'a pas pu être chargé. Réessayez plus tard.", "Der Leitfaden konnte nicht geladen werden. Bitte später erneut versuchen."),
@@ -111,7 +111,7 @@ window.I18N = (function () {
     // editing
     edit: U("Edita", "Edit", "Modifica", "Modifier", "Bearbeiten"),
     editing: U("Mode edició", "Edit mode", "Modalità modifica", "Mode édition", "Bearbeitungsmodus"),
-    editing_lang: U("Estàs editant la versió en català.", "You are editing the English version.", "Stai modificando la versione italiana.", "Vous modifiez la version française.", "Sie bearbeiten die deutsche Fassung."),
+    editing_lang: U("Edites en català; en desar, els canvis es tradueixen als altres idiomes.", "You are editing in English; on saving, changes are translated into the other languages.", "Stai modificando in italiano; al salvataggio le modifiche vengono tradotte nelle altre lingue.", "Vous modifiez en français ; à l'enregistrement, les modifications sont traduites dans les autres langues.", "Sie bearbeiten auf Deutsch; beim Speichern werden die Änderungen in die anderen Sprachen übersetzt."),
     discard: U("Descarta els canvis", "Discard changes", "Scarta le modifiche", "Annuler les modifications", "Änderungen verwerfen"),
     unsaved: U("Tens canvis sense desar. Vols sortir igualment?", "You have unsaved changes. Leave anyway?", "Hai modifiche non salvate. Uscire comunque?", "Vous avez des modifications non enregistrées. Quitter quand même ?", "Ungespeicherte Änderungen. Trotzdem verlassen?"),
     new_page: U("Nova pàgina", "New page", "Nuova pagina", "Nouvelle page", "Neue Seite"),
@@ -166,6 +166,12 @@ window.I18N = (function () {
     saved_photos: U("{n} fotos pujades. Recorda desar els canvis.", "{n} photos uploaded. Remember to save the changes.", "{n} foto caricate. Ricorda di salvare le modifiche.", "{n} photos envoyées. N'oubliez pas d'enregistrer.", "{n} Fotos hochgeladen. Bitte Änderungen speichern."),
     storage_t: U("Espai de fotos i fitxers", "Photo and file storage", "Spazio per foto e file", "Espace photos et fichiers", "Speicher für Fotos und Dateien"),
     storage_p: U("{used} utilitzats d'1 GB ({files} fitxers).", "{used} used of 1 GB ({files} files).", "{used} usati su 1 GB ({files} file).", "{used} utilisés sur 1 Go ({files} fichiers).", "{used} von 1 GB belegt ({files} Dateien)."),
+    pieces_found: U("Peces", "Items", "Capi", "Pièces", "Stücke"),
+    did_you_mean: U("Potser busques:", "Did you mean:", "Forse cercavi:", "Vouliez-vous dire :", "Meinten Sie:"),
+    all_pieces: U("totes les peces", "all items", "tutti i capi", "toutes les pièces", "alle Stücke"),
+    f_keywords: U("Paraules de cerca (separades per comes, qualsevol idioma)", "Search words (comma-separated, any language)", "Parole di ricerca (separate da virgole, qualsiasi lingua)", "Mots de recherche (séparés par des virgules, toute langue)", "Suchbegriffe (durch Kommas getrennt, jede Sprache)"),
+    translating: U("Traduint als altres idiomes…", "Translating into the other languages…", "Traduzione nelle altre lingue…", "Traduction dans les autres langues…", "Übersetzung in die anderen Sprachen…"),
+    translate_fail: U("Desat, però no s'ha pogut traduir als altres idiomes.", "Saved, but the text could not be translated into the other languages.", "Salvato, ma non è stato possibile tradurre nelle altre lingue.", "Enregistré, mais la traduction dans les autres langues a échoué.", "Gespeichert, aber die Übersetzung in die anderen Sprachen ist fehlgeschlagen."),
     empty_hint: U("(buit — fes clic per escriure)", "(empty — click to type)", "(vuoto — clicca per scrivere)", "(vide — cliquez pour écrire)", "(leer — zum Schreiben klicken)")
   };
 })();
