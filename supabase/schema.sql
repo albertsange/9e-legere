@@ -222,3 +222,6 @@ language sql stable security definer set search_path = public, storage as $$
 $$;
 revoke all on function public.storage_usage() from public, anon;
 grant execute on function public.storage_usage() to authenticated;
+
+-- 2026-10-21: general staff entry for the sign-up squad list
+insert into public.squads (name) values ('État Major') on conflict (name) do nothing;

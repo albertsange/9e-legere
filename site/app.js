@@ -1414,7 +1414,12 @@
   });
 
   /* ------------------------------------------------------------------ start */
-  try { var sl = localStorage.getItem('9e-lang'); if (LANGS.indexOf(sl) > -1) S.lang = sl; } catch (er) { /* ignore */ }
+  // language: the visitor's saved choice, else the browser's preferred language if supported, else English
+  (function () {
+    try { var sl = localStorage.getItem('9e-lang'); if (LANGS.indexOf(sl) > -1) { S.lang = sl; return; } } catch (er) { /* ignore */ }
+    var prefs = (navigator.languages && navigator.languages.length) ? navigator.languages : [navigator.language || ''];
+    for (var i = 0; i < prefs.length; i++) { var c = String(prefs[i] || '').toLowerCase().split('-')[0]; if (LANGS.indexOf(c) > -1) { S.lang = c; return; } }
+  })();
   window.addEventListener('hashchange', route);
 
   function afterAuth() {

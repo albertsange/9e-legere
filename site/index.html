@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IM+Fell+French+Canon+SC&family=Alegreya:ital,wght@0,400;0,500;0,700;1,400&family=Alegreya+Sans+SC:wght@500;700&display=swap">
-<script>(function(){var l="en";try{var s=localStorage.getItem("9e-lang");if(["ca","en","it","fr","de"].indexOf(s)>-1)l=s;}catch(e){}document.documentElement.dataset.lang=l;document.documentElement.lang=l;})();</script>
+<script>(function(){var L=["ca","en","it","fr","de"],l=null;try{var s=localStorage.getItem("9e-lang");if(L.indexOf(s)>-1)l=s;}catch(e){}if(!l){var p=navigator.languages&&navigator.languages.length?navigator.languages:[navigator.language||""];for(var i=0;i<p.length&&!l;i++){var c=String(p[i]||"").toLowerCase().split("-")[0];if(L.indexOf(c)>-1)l=c;}}l=l||"en";document.documentElement.dataset.lang=l;document.documentElement.lang=l;})();</script>
 <link rel="stylesheet" href="style.css">
 <link rel="stylesheet" href="app.css">
 </head>
