@@ -410,6 +410,7 @@
       if (on) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
     });
     fillPrivateImages();
+    fillEditMeta();
     if (id === 'gestio' && isAdmin()) loadMembers();
     document.title = (S.byId[id] ? (S.byId[id].name + ' · ') : '') + 'Uniformitat del 9e Léger';
   }
@@ -449,6 +450,45 @@
       (isAdmin() ? '<a class="tlink" href="#nova">+ ' + esc(t('new_page')) + '</a>' : '') + '</p></section>';
   }
   function flatItems(ids) { var out = []; ids.forEach(function (x) { out.push(x); out = out.concat(flatItems(S.children[x] || [])); }); return out; }
+  /* ------------------------------------------------------------------ edit history: last editor under the title, full list in a dialog */
+  S.edits = {};
+  function editMeta(id) { return '<div class="edit-meta" id="edit-meta" data-pid="' + esc(id) + '" hidden></div>'; }
+  function fmtDate(iso, withTime) {
+    try { return new Intl.DateTimeFormat(S.lang, withTime ? { dateStyle: 'medium', timeStyle: 'short' } : { dateStyle: 'medium' }).format(new Date(iso)); } catch (e) { return String(iso).slice(0, 10); }
+  }
+  function loadEdits(pid) {
+    if (S.edits[pid]) return Promise.resolve(S.edits[pid]);
+    return sb.from('page_edits').select('editor_name,edited_at,fields').eq('page_id', pid).order('edited_at', { ascending: false }).limit(200)
+      .then(function (r) { S.edits[pid] = q(r) || []; return S.edits[pid]; });
+  }
+  function fillEditMeta() {
+    var box = document.getElementById('edit-meta'); if (!box || !sb) return;
+    var pid = box.getAttribute('data-pid');
+    loadEdits(pid).then(function (rows) {
+      if (!rows.length || !document.body.contains(box)) return;
+      var last = rows[0], names = [];
+      rows.forEach(function (r) { if (names.indexOf(r.editor_name) < 0) names.push(r.editor_name); });
+      box.innerHTML = '<span>' + esc(t('edited_by').replace('{who}', last.editor_name).replace('{date}', fmtDate(last.edited_at))) +
+        (names.length > 1 ? ' · ' + esc(t('n_editors').replace('{n}', names.length)) : '') + '</span>' +
+        '<button type="button" class="link" data-act="edit-history" data-pid="' + esc(pid) + '">' + esc(t('edit_history')) + '</button>';
+      box.hidden = false;
+    }).catch(function (e) { console.warn(e); });
+  }
+  function fieldLabel(f) { var k = 'fld_' + f; return I[k] ? t(k) : f; }
+  function showEditHistory(pid) {
+    var rows = S.edits[pid] || [];
+    var dlg = document.getElementById('hist-dlg');
+    if (!dlg) { dlg = document.createElement('dialog'); dlg.id = 'hist-dlg'; dlg.className = 'dlg hist-dlg'; document.body.appendChild(dlg);
+      dlg.addEventListener('click', function (e) { if (e.target === dlg || e.target.closest('[data-hist-close]')) dlg.close(); }); }
+    var names = {}; rows.forEach(function (r) { names[r.editor_name] = (names[r.editor_name] || 0) + 1; });
+    dlg.innerHTML = '<div class="hist-head"><h2>' + esc(t('edit_history')) + '</h2><button type="button" class="lb-close" data-hist-close="1" aria-label="' + esc(t('close')) + '">×</button></div>' +
+      '<p class="hist-who">' + Object.keys(names).map(function (n) { return '<span class="hist-chip">' + esc(n) + ' <b>' + names[n] + '</b></span>'; }).join('') + '</p>' +
+      '<ol class="hist-list">' + rows.map(function (r) {
+        return '<li><time datetime="' + esc(r.edited_at) + '">' + esc(fmtDate(r.edited_at, true)) + '</time><strong>' + esc(r.editor_name) + '</strong>' +
+          '<span class="hist-fields">' + (r.fields || []).map(function (f) { return esc(fieldLabel(f)); }).join(', ') + '</span></li>';
+      }).join('') + '</ol>';
+    dlg.showModal();
+  }
   function homeRow(id) {
     var p = S.byId[id], c = p.content || {}, kids = [];
     return '<li class="hrow"><a class="hrow-main" href="#' + id + '">' + (p.card || p.image ? '<img src="' + imgSrc(p.card || p.image) + '" alt="" loading="lazy" width="96" height="72">' : '<span class="img-ph small" aria-hidden="true"></span>') +
@@ -475,7 +515,7 @@
     var V = function (k) { return E ? (c[k] || {})[lg] : L(c[k]); };
     var kids = S.children[id] || [], items = kids.filter(function (x) { return !isSection(x); }), subs = kids.filter(isSection);
     return (E ? settingsHtml(p) : '') + '<section class="view section-view" data-view="' + id + '">' + crumbHtml(id) +
-      '<div class="piece-head">' + F(cp + 'h2.' + lg, V('h2'), 'h2', 'page-title', { raw: 1, single: 1, attr: ' tabindex="-1"' }) + penBtn() + '</div>' +
+      '<div class="piece-head">' + F(cp + 'h2.' + lg, V('h2'), 'h2', 'page-title', { raw: 1, single: 1, attr: ' tabindex="-1"' }) + penBtn() + '</div>' + editMeta(id) +
       F(cp + 'lead.' + lg, V('lead'), 'p', 'lead', { raw: 1 }) +
       (items.length ? '<ul class="hlist">' + flatItems(items).map(homeRow).join('') + '</ul>' : '') +
       subs.map(function (sid) {
@@ -586,7 +626,7 @@
     return (E ? settingsHtml(p) : '') +
       '<section class="view item wiki" data-view="' + id + '">' +
       crumbHtml(id) +
-      '<header class="wiki-head"><div class="piece-head">' + F(cp + 'h2.' + lg, V('h2'), 'h2', '', { raw: 1, single: 1, attr: ' tabindex="-1"' }) + penBtn() + '</div>' + relHtml(id) + '</header>' +
+      '<header class="wiki-head"><div class="piece-head">' + F(cp + 'h2.' + lg, V('h2'), 'h2', '', { raw: 1, single: 1, attr: ' tabindex="-1"' }) + penBtn() + '</div>' + editMeta(id) + relHtml(id) + '</header>' +
       infobox +
       '<div class="wiki-body">' + F(cp + 'lead.' + lg, V('lead'), 'p', 'lead-p', { pid: id, done: done }) + descHtml + stdHero +
       '<div class="tabs wiki-tabs" role="tablist">' + tl + '</div>' + tp + '</div></section>';
@@ -940,7 +980,7 @@
       job = sb.from('site').upsert(rows).then(q);
     }
     return job.then(function () { return loadPublic(); }).then(loadPrivate).then(function () {
-      S.dirty = false; S.draft = null; S.edit = false; searchIndex = null; toast(warn || t('saved'), !!warn); render();
+      S.dirty = false; S.draft = null; S.edit = false; searchIndex = null; S.edits = {}; toast(warn || t('saved'), !!warn); render();
     }).catch(function (e) { prefillLang(); fail(e); }).then(function () { if (btn) btn.disabled = false; });
   }
 
@@ -1170,6 +1210,7 @@
         sb.from('pages').update({ parent_id: newPar }).eq('id', kid).then(q).then(function () { return loadPublic(); }).then(function () { keepScroll(render); }).catch(fail);
         return;
       }
+      if (act === 'edit-history') { showEditHistory(el.getAttribute('data-pid')); return; }
       if (act === 'sub-new') { if (!leaveEditOk()) return; S.newParent = el.getAttribute('data-id'); S.edit = false; S.draft = null; S.dirty = false; location.hash = 'nova'; return; }
       if (act === 'lang-open') { var lp = document.getElementById('lang-pop'); lp.hidden = !lp.hidden; el.setAttribute('aria-expanded', String(!lp.hidden)); return; }
       if (act === 'lang-set') { document.getElementById('lang-pop').hidden = true; setLang(el.getAttribute('data-lang')); return; }

@@ -213,3 +213,19 @@ span.ed,b.ed,strong.ed{display:inline-block}
 .lang-pop[hidden]{display:none}
 .lang-pop button{display:flex;align-items:center;gap:.55rem;font:inherit;font-size:.92rem;color:var(--ink);background:none;border:0;border-radius:3px;padding:.4rem .55rem;cursor:pointer;text-align:left}
 .lang-pop button:hover{background:var(--paper)}
+
+/* edit history */
+.edit-meta{display:flex;flex-wrap:wrap;align-items:baseline;gap:.3rem .8rem;margin:.2rem 0 .6rem;font-size:.85rem;color:var(--muted)}
+.edit-meta .link{font-size:.85rem}
+.hist-dlg{max-width:34rem;width:calc(100% - 2rem)}
+.hist-head{display:flex;align-items:center;justify-content:space-between;gap:1rem}
+.hist-head h2{margin:0;font-size:1.2rem;color:var(--bleu)}
+.hist-head .lb-close{position:static;width:2rem;height:2rem;border:1px solid var(--line);border-radius:50%;background:var(--sheet);color:var(--ink);font-size:1.2rem;cursor:pointer}
+.hist-who{display:flex;flex-wrap:wrap;gap:.4rem;margin:.6rem 0}
+.hist-chip{border:1px solid var(--line);border-radius:999px;padding:.15rem .6rem;font-size:.85rem;background:var(--paper)}
+.hist-chip b{color:var(--bleu)}
+.hist-list{list-style:none;margin:0;padding:0;max-height:60vh;overflow:auto}
+.hist-list li{display:grid;grid-template-columns:auto 1fr;gap:.1rem .8rem;padding:.55rem 0;border-top:1px solid var(--line)}
+.hist-list time{font-size:.85rem;color:var(--muted)}
+.hist-list strong{color:var(--ink)}
+.hist-fields{grid-column:1/-1;font-size:.88rem;color:var(--muted)}
