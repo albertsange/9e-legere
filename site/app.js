@@ -69,11 +69,11 @@
 
   /* ------------------------------------------------------------------ automatic links between item pages */
   var TERMS = {
-    ca: { shako: ['shakos', 'shako'], cordon: ['cordons', 'cordon', 'cordó'], plaque: ['plaque de shako', 'placa 1807', 'plaque'], plumet: ['plomalls', 'plomall', 'plumet'], cocarde: ['escarapel·la', 'cocarde'], pompon: ['pompoms', 'pompom', 'pompon'], col: ['cols', 'col'], veste: ['veste', 'gilet'], pantalon: ['pantaló', 'pantalon', 'calçons'], guetres: ['polaines', 'polaina', 'guêtres'], habit: ['habit-veste', 'habit'], boutons: ['botons', 'boutons'], epaulettes: ['epaulettes', 'epaulette', 'épaulettes'], giberne: ['giberna', 'giberne'], briquet: ['sabre-briquet', 'briquet'], dragonne: ['dragonne', 'dragona'], buffleterie: ['buffleteria', 'buffleterie', 'porte-giberne', 'baudrier'] },
-    en: { shako: ['shakos', 'shako'], cordon: ['cordon', 'shako cords'], plaque: ['shako plate', '1807 plate', 'plaque'], plumet: ['plumes', 'plume', 'plumet'], cocarde: ['cockade', 'cocarde'], pompon: ['pompons', 'pompon'], col: ['stocks', 'stock'], veste: ['waistcoat', 'veste', 'gilet'], pantalon: ['trousers', 'pantalon'], guetres: ['gaiters', 'guêtres'], habit: ['habit-veste', 'coat', 'habit'], boutons: ['buttons', 'boutons'], epaulettes: ['epaulettes', 'epaulette', 'épaulettes'], giberne: ['cartridge box', 'giberne'], briquet: ['sabre-briquet', 'briquet'], dragonne: ['sword knot', 'dragonne'], buffleterie: ['buff equipment', 'buffleterie', 'porte-giberne', 'baudrier'] },
-    it: { shako: ['shako'], cordon: ['cordoni', 'cordone', 'cordon'], plaque: ['placca 1807', 'placca dello shako', 'plaque'], plumet: ['pennacchi', 'pennacchio', 'plumet'], cocarde: ['coccarda', 'cocarde'], pompon: ['pompon'], col: ['colletti', 'colletto'], veste: ['panciotto', 'veste', 'gilet'], pantalon: ['pantaloni', 'pantalone', 'pantalon'], guetres: ['ghette', 'guêtres'], habit: ['habit-veste', 'abito', 'habit'], boutons: ['bottoni', 'boutons'], epaulettes: ['spalline', 'spallina', 'épaulettes'], giberne: ['giberna', 'giberne'], briquet: ['sabre-briquet', 'briquet'], dragonne: ['dragona', 'dragonne'], buffleterie: ['cuoiame', 'buffleterie', 'porte-giberne', 'baudrier'] },
-    fr: { shako: ['shakos', 'shako'], cordon: ['cordons', 'cordon'], plaque: ['plaque de shako', 'plaque 1807', 'plaque losangée'], plumet: ['plumets', 'plumet'], cocarde: ['cocarde'], pompon: ['pompons', 'pompon', 'houppe'], col: ['cols', 'col'], veste: ['veste', 'gilet'], pantalon: ['pantalon'], guetres: ['guêtres', 'guêtre'], habit: ['habit-veste', 'habit'], boutons: ['boutons'], epaulettes: ['épaulettes', 'épaulette'], giberne: ['giberne'], briquet: ['sabre-briquet', 'briquet'], dragonne: ['dragonne'], buffleterie: ['buffleterie', 'porte-giberne', 'baudrier'] },
-    de: { shako: ['Tschakos', 'Tschako'], cordon: ['Tschakoschnur', 'Schnüre', 'Schnur'], plaque: ['Tschakoschild', 'Rautenschild', 'Schild 1807'], plumet: ['Federbüsche', 'Federbusch'], cocarde: ['Kokarde'], pompon: ['Pompons', 'Pompon'], col: ['Halsbinden', 'Halsbinde'], veste: ['Weste'], pantalon: ['Hose'], guetres: ['Gamaschen', 'Gamasche'], habit: ['Habit-veste', 'Rock'], boutons: ['Knöpfe'], epaulettes: ['Epauletten', 'Epaulette'], giberne: ['Patronentasche'], briquet: ['Sabre-briquet', 'Briquet'], dragonne: ['Troddel'], buffleterie: ['Lederzeug', 'Porte-giberne', 'Baudrier'] }
+    ca: { shako: ['shakos', 'shako'], cordon: ['cordons', 'cordon', 'cordó'], plaque: ['plaque de shako', 'placa 1807', 'plaque'], plumet: ['plomalls', 'plomall', 'plumet'], cocarde: ['escarapel·la', 'cocarde'], pompon: ['pompoms', 'pompom', 'pompon'], col: ['cols', 'col'], veste: ['veste', 'gilet'], pantalon: ['pantaló', 'pantalon', 'calçons'], guetres: ['polaines', 'polaina', 'guêtres'], habit: ['habit-veste', 'habit'], boutons: ['botons', 'boutons'], epaulettes: ['epaulettes', 'epaulette', 'épaulettes'], giberne: ['giberna', 'giberne'], briquet: ['sabre-briquet', 'briquet'], dragonne: ['dragonne', 'dragona'], buffleterie: ['buffleteria', 'buffleterie', 'porte-giberne', 'baudrier'], 'havresac': ["motxilles", "motxilla", "havresac"], 'sac-distribution': ["sac de distribució", "sac à distribution"], 'bonnet-police': ["bonnet de police"], 'capote': ["capots", "capot", "capote"], 'fiole': ["flascó d'oli", "fiole"], 'chemise': ["camises", "camisa"], 'souliers': ["sabates", "sabata", "souliers"], 'bas': ["mitges", "bas de laine", "bas de fil"], 'mouchoirs': ["mocadors", "mocador"], 'bonnet-nuit': ["bonnet de nuit", "gorro de dormir"], 'culotte-toile': ["calçons de tela"], 'sac-poudre': ["sac de pólvores", "sac à poudre"], 'peignes': ["pintes", "pinta"], 'brosses': ["raspalls", "raspall"], 'pinceau': ["pinzell"], 'trousse': ["trousse", "necesser"], 'ruban-queue': ["cinta de la cua", "ruban de queue"], 'tire-bouton': ["tire-bouton"], 'alene': ["alena", "alêne"], 'tire-bourre': ["tire-bourre"], 'livret': ["llibreta de comptes", "livret"], 'monte-ressort': ["monte-ressort"], 'tourne-vis': ["tornavís", "tourne-vis"], 'epinglette': ["épinglette", "agulla de neteja"] },
+    en: { shako: ['shakos', 'shako'], cordon: ['cordon', 'shako cords'], plaque: ['shako plate', '1807 plate', 'plaque'], plumet: ['plumes', 'plume', 'plumet'], cocarde: ['cockade', 'cocarde'], pompon: ['pompons', 'pompon'], col: ['stocks', 'stock'], veste: ['waistcoat', 'veste', 'gilet'], pantalon: ['trousers', 'pantalon'], guetres: ['gaiters', 'guêtres'], habit: ['habit-veste', 'coat', 'habit'], boutons: ['buttons', 'boutons'], epaulettes: ['epaulettes', 'epaulette', 'épaulettes'], giberne: ['cartridge box', 'giberne'], briquet: ['sabre-briquet', 'briquet'], dragonne: ['sword knot', 'dragonne'], buffleterie: ['buff equipment', 'buffleterie', 'porte-giberne', 'baudrier'], 'havresac': ["knapsacks", "knapsack", "havresac"], 'sac-distribution': ["distribution bag"], 'bonnet-police': ["forage cap", "bonnet de police"], 'capote': ["greatcoats", "greatcoat"], 'fiole': ["oil flask"], 'chemise': ["shirts", "shirt"], 'souliers': ["shoes"], 'bas': ["stockings"], 'mouchoirs': ["handkerchiefs", "handkerchief"], 'bonnet-nuit': ["nightcap"], 'culotte-toile': ["linen breeches"], 'sac-poudre': ["powder bag"], 'peignes': ["combs", "comb"], 'brosses': ["brushes"], 'pinceau': ["pinceau"], 'trousse': ["housewife", "trousse"], 'ruban-queue': ["queue ribbon"], 'tire-bouton': ["button hook"], 'alene': ["awl"], 'tire-bourre': ["tire-bourre"], 'livret': ["account book"], 'monte-ressort': ["mainspring vice", "monte-ressort"], 'tourne-vis': ["turnscrew"], 'epinglette': ["vent pick"] },
+    it: { shako: ['shako'], cordon: ['cordoni', 'cordone', 'cordon'], plaque: ['placca 1807', 'placca dello shako', 'plaque'], plumet: ['pennacchi', 'pennacchio', 'plumet'], cocarde: ['coccarda', 'cocarde'], pompon: ['pompon'], col: ['colletti', 'colletto'], veste: ['panciotto', 'veste', 'gilet'], pantalon: ['pantaloni', 'pantalone', 'pantalon'], guetres: ['ghette', 'guêtres'], habit: ['habit-veste', 'abito', 'habit'], boutons: ['bottoni', 'boutons'], epaulettes: ['spalline', 'spallina', 'épaulettes'], giberne: ['giberna', 'giberne'], briquet: ['sabre-briquet', 'briquet'], dragonne: ['dragona', 'dragonne'], buffleterie: ['cuoiame', 'buffleterie', 'porte-giberne', 'baudrier'], 'havresac': ["zaini", "zaino"], 'sac-distribution': ["sacco da distribuzione"], 'bonnet-police': ["bonnet de police"], 'capote': ["cappotti", "cappotto"], 'fiole': ["fiaschetta d'olio"], 'chemise': ["camicie", "camicia"], 'souliers': ["scarpe"], 'bas': ["calze"], 'mouchoirs': ["fazzoletti", "fazzoletto"], 'bonnet-nuit': ["berretto da notte"], 'culotte-toile': ["calzoni di tela"], 'sac-poudre': ["sacchetto della cipria"], 'peignes': ["pettini", "pettine"], 'brosses': ["spazzole", "spazzola"], 'pinceau': ["pennello"], 'trousse': ["trousse"], 'ruban-queue': ["nastro del codino"], 'tire-bouton': ["tire-bouton"], 'alene': ["lesina"], 'tire-bourre': ["tire-bourre"], 'livret': ["libretto dei conti"], 'monte-ressort': ["monte-ressort"], 'tourne-vis': ["cacciavite"], 'epinglette': ["épinglette"] },
+    fr: { shako: ['shakos', 'shako'], cordon: ['cordons', 'cordon'], plaque: ['plaque de shako', 'plaque 1807', 'plaque losangée'], plumet: ['plumets', 'plumet'], cocarde: ['cocarde'], pompon: ['pompons', 'pompon', 'houppe'], col: ['cols', 'col'], veste: ['veste', 'gilet'], pantalon: ['pantalon'], guetres: ['guêtres', 'guêtre'], habit: ['habit-veste', 'habit'], boutons: ['boutons'], epaulettes: ['épaulettes', 'épaulette'], giberne: ['giberne'], briquet: ['sabre-briquet', 'briquet'], dragonne: ['dragonne'], buffleterie: ['buffleterie', 'porte-giberne', 'baudrier'], 'havresac': ["havresac", "havre-sac", "sac de peau"], 'sac-distribution': ["sacs à distribution", "sac à distribution"], 'bonnet-police': ["bonnets de police", "bonnet de police"], 'capote': ["capotes", "capote"], 'fiole': ["fiole à l'huile"], 'chemise': ["chemises", "chemise"], 'souliers': ["souliers"], 'bas': ["bas de laine", "bas de fil"], 'mouchoirs': ["mouchoirs"], 'bonnet-nuit': ["bonnet de nuit"], 'culotte-toile': ["culottes de toile", "culotte de toile"], 'sac-poudre': ["sac à poudre"], 'peignes': ["peignes", "peigne à retaper", "peigne à décrasser"], 'brosses': ["brosses"], 'pinceau': ["pinceau"], 'trousse': ["trousse"], 'ruban-queue': ["ruban de queue"], 'tire-bouton': ["tire-bouton"], 'alene': ["alêne"], 'tire-bourre': ["tire-bourre"], 'livret': ["livret de compte"], 'monte-ressort': ["monte-ressorts", "monte-ressort"], 'tourne-vis': ["tourne-vis"], 'epinglette': ["épinglettes", "épinglette"] },
+    de: { shako: ['Tschakos', 'Tschako'], cordon: ['Tschakoschnur', 'Schnüre', 'Schnur'], plaque: ['Tschakoschild', 'Rautenschild', 'Schild 1807'], plumet: ['Federbüsche', 'Federbusch'], cocarde: ['Kokarde'], pompon: ['Pompons', 'Pompon'], col: ['Halsbinden', 'Halsbinde'], veste: ['Weste'], pantalon: ['Hose'], guetres: ['Gamaschen', 'Gamasche'], habit: ['Habit-veste', 'Rock'], boutons: ['Knöpfe'], epaulettes: ['Epauletten', 'Epaulette'], giberne: ['Patronentasche'], briquet: ['Sabre-briquet', 'Briquet'], dragonne: ['Troddel'], buffleterie: ['Lederzeug', 'Porte-giberne', 'Baudrier'], 'havresac': ["Tornister"], 'sac-distribution': ["Verpflegungssack"], 'bonnet-police': ["Lagermütze"], 'capote': ["Kapotte", "Mantel"], 'fiole': ["Ölfläschchen"], 'chemise': ["Hemden", "Hemd"], 'souliers': ["Schuhe"], 'bas': ["Strümpfe"], 'mouchoirs': ["Taschentücher"], 'bonnet-nuit': ["Nachtmütze"], 'culotte-toile': ["Leinenhose"], 'sac-poudre': ["Puderbeutel"], 'peignes': ["Kämme", "Kamm"], 'brosses': ["Bürsten"], 'pinceau': ["Pinsel"], 'trousse': ["Nähzeug"], 'ruban-queue': ["Zopfband"], 'tire-bouton': ["Knopfzieher"], 'alene': ["Ahle"], 'tire-bourre': ["Kugelzieher"], 'livret': ["Rechnungsbuch"], 'monte-ressort': ["Federspanner"], 'tourne-vis': ["Schraubenzieher"], 'epinglette': ["Räumnadel"] }
   };
   var linkRx = {};
   function buildLinkRx() {
@@ -82,6 +82,7 @@
       var pairs = [];
       var m = TERMS[k];
       S.pages.forEach(function (p) {
+        if (p.content && p.content.kind === 'section') return;
         var terms = m[p.id] ? m[p.id].slice() : [];
         if (!m[p.id] && p.name && p.name.length > 3) terms.push(p.name);
         terms.forEach(function (term) { pairs.push([term, p.id]); });
@@ -168,8 +169,11 @@
         walk(id, n);
       });
     })('', '');
+    S.allOrder = S.order;
+    S.order = S.allOrder.filter(function (id) { return !isSection(id); });
     buildLinkRx();
   }
+  function isSection(id) { var p = S.byId[id]; return !!(p && p.content && p.content.kind === 'section'); }
   function parentOf(id) { var p = S.byId[id]; return p && p.parent_id && S.byId[p.parent_id] ? p.parent_id : null; }
 
   function loadPublic() {
@@ -372,7 +376,7 @@
     else if (id === 'gestio') html = adminView();
     else if (id === 'nova') html = newPageView();
     else if (id === 'contrasenya') html = newPasswordView();
-    else if (S.byId[id]) html = pageView(id);
+    else if (S.byId[id]) html = isSection(id) ? sectionView(id) : pageView(id);
     else html = '<section class="view"><h2 class="page-title" tabindex="-1">' + esc(t('not_found')) + '</h2><p><a href="#">' + esc(t('home')) + '</a></p></section>';
     main.innerHTML = html;
     Array.prototype.forEach.call(document.querySelectorAll('#menu-body a[data-sec]'), function (a) {
@@ -391,13 +395,14 @@
     var h = site.home || {};
     var P = function (k) { return 'site.home.' + k + '.' + S.lang; };
     var V = function (k) { return S.edit ? (h[k] || {})[S.lang] : L(h[k]); };
-    function row(id) {
-      var p = S.byId[id], c = p.content || {}, kids = S.children[id] || [];
-      return '<li class="hrow"><a class="hrow-main" href="#' + id + '">' + (p.card || p.image ? '<img src="' + imgSrc(p.card || p.image) + '" alt="" loading="lazy" width="96" height="72">' : '<span class="img-ph small" aria-hidden="true"></span>') +
-        '<span class="hrow-t"><span class="hrow-title">' + clean(L(c.h2) || p.name) + '</span>' +
-        '<span class="hrow-fr" lang="fr">' + esc(p.ib || '') + '</span></span></a>' +
-        (kids.length ? '<p class="hrow-kids">' + kids.map(tlink).join('') + '</p>' : '') + '</li>';
+    var row = homeRow;
+    function secCard(id) {
+      var p = S.byId[id], c = p.content || {}, kids = (S.children[id] || []), items = sectionItems(id);
+      return '<li class="hsec-card"><a class="hsec-main" href="#' + id + '"><span class="hsec-title">' + clean(L(c.h2) || p.name) + '</span>' +
+        '<span class="hsec-lead">' + esc(plain(L(c.lead))) + '</span><span class="hsec-n">' + esc(t('n_items').replace('{n}', items.length)) + '</span></a>' +
+        (kids.length ? '<p class="hsec-kids">' + kids.map(tlink).join('') + '</p>' : '') + '</li>';
     }
+    var tops = S.children[''], secs = tops.filter(isSection), loose = tops.filter(function (x) { return !isSection(x); });
     var plate = h.plate || 'img/lamina_9e_1809.png';
     return '<section class="view home" data-view="home">' +
       '<header class="top compact"><div>' +
@@ -411,10 +416,48 @@
       F(P('platecap'), V('platecap'), 'figcaption', '', { raw: 1 }) +
       (S.edit ? '<button type="button" class="btn-small" data-act="img" data-target="site.home.plate">' + esc(t('change_img')) + '</button>' : '') + '</figure></header>' +
       (isAdmin() && !S.pages.length ? '<div class="locked empty-db"><div><strong>' + esc(t('empty_db_t')) + '</strong><p>' + esc(t('empty_db_p')) + '</p><p class="locked-actions"><a class="btn" href="#gestio">' + esc(t('admin')) + '</a></p></div></div>' : '') +
-      '<div class="grid-head"><h2>' + esc(t('pieces')) + '</h2><p class="muted">' + esc(t('pieces_hint')) + '</p></div>' +
-      '<ul class="hlist">' + S.children[''].map(row).join('') + '</ul>' +
+      (secs.length ? '<div class="grid-head"><h2>' + esc(t('sections_h')) + '</h2><p class="muted">' + esc(t('sections_hint')) + '</p></div>' +
+        '<ul class="hsec">' + secs.map(secCard).join('') + '</ul>' : '') +
+      (loose.length ? '<div class="grid-head"><h2>' + esc(t('pieces')) + '</h2><p class="muted">' + esc(t('pieces_hint')) + '</p></div>' +
+        '<ul class="hlist">' + loose.map(row).join('') + '</ul>' : '') +
       '<p class="home-more"><a class="tlink" href="#decisions">' + esc(L((S.site.decisions || {}).title) || t('decisions')) + '</a><a class="tlink" href="#fonts">' + esc(L((S.site.fonts || {}).title) || t('sources')) + '</a>' +
       (isAdmin() ? '<a class="tlink" href="#nova">+ ' + esc(t('new_page')) + '</a>' : '') + '</p></section>';
+  }
+  function homeRow(id) {
+    var p = S.byId[id], c = p.content || {}, kids = (S.children[id] || []).filter(function (x) { return !isSection(x); });
+    return '<li class="hrow"><a class="hrow-main" href="#' + id + '">' + (p.card || p.image ? '<img src="' + imgSrc(p.card || p.image) + '" alt="" loading="lazy" width="96" height="72">' : '<span class="img-ph small" aria-hidden="true"></span>') +
+      '<span class="hrow-t"><span class="hrow-title">' + clean(L(c.h2) || p.name) + '</span>' +
+      '<span class="hrow-fr" lang="fr">' + esc(p.ib || '') + '</span></span></a>' +
+      (kids.length ? '<p class="hrow-kids">' + kids.map(tlink).join('') + '</p>' : '') + '</li>';
+  }
+  // all item pages under a section, sub-sections included
+  function sectionItems(id) {
+    var out = [];
+    (S.children[id] || []).forEach(function (x) { if (isSection(x)) out = out.concat(sectionItems(x)); else { out.push(x); out = out.concat(S.children[x] || []); } });
+    return out;
+  }
+  function crumbHtml(id) {
+    var chain = [], par = parentOf(id);
+    while (par) { chain.unshift(par); par = parentOf(par); }
+    return '<p class="crumb"><a href="#">' + esc(t('home')) + '</a>' + chain.map(function (x) {
+      return ' <span aria-hidden="true">/</span> <a href="#' + x + '">' + esc(plain(L((S.byId[x].content || {}).h2)) || S.byId[x].name) + '</a>';
+    }).join('') + ' <span aria-hidden="true">/</span> <span>' + esc(isSection(id) ? (plain(L((S.byId[id].content || {}).h2)) || S.byId[id].name) : S.byId[id].name) + '</span></p>';
+  }
+  function sectionView(id) {
+    var E = S.edit && S.draft && S.draft.page;
+    var p = E ? S.draft.page : S.byId[id], c = p.content || {}, lg = S.lang, cp = 'page.content.';
+    var V = function (k) { return E ? (c[k] || {})[lg] : L(c[k]); };
+    var kids = S.children[id] || [], items = kids.filter(function (x) { return !isSection(x); }), subs = kids.filter(isSection);
+    return (E ? settingsHtml(p) : '') + '<section class="view section-view" data-view="' + id + '">' + crumbHtml(id) +
+      F(cp + 'h2.' + lg, V('h2'), 'h2', 'page-title', { raw: 1, single: 1, attr: ' tabindex="-1"' }) +
+      F(cp + 'lead.' + lg, V('lead'), 'p', 'lead', { raw: 1 }) +
+      (items.length ? '<ul class="hlist">' + items.map(homeRow).join('') + '</ul>' : '') +
+      subs.map(function (sid) {
+        var sc = S.byId[sid].content || {};
+        return '<div class="grid-head sub-sec"><h3><a href="#' + sid + '">' + clean(L(sc.h2) || S.byId[sid].name) + '</a></h3>' +
+          (L(sc.lead) ? '<p class="muted">' + esc(plain(L(sc.lead))) + '</p>' : '') + '</div>' +
+          '<ul class="hlist">' + (S.children[sid] || []).filter(function (x) { return !isSection(x); }).map(homeRow).join('') + '</ul>';
+      }).join('') + '</section>';
   }
   function blockView(key) {
     var site = S.edit && S.draft && S.draft.site ? S.draft.site : S.site;
@@ -433,6 +476,7 @@
   }
   function relHtml(id) {
     var rows = [], par = parentOf(id);
+    if (par && isSection(par)) par = null;
     if (par) {
       rows.push(['part_of', [par]]);
       var sib = (S.children[par] || []).filter(function (x) { return x !== id; });
@@ -522,7 +566,7 @@
 
     return (E ? settingsHtml(p) : '') +
       '<section class="view item wiki" data-view="' + id + '">' +
-      '<p class="crumb"><a href="#">' + esc(t('home')) + '</a> <span aria-hidden="true">/</span> <span lang="fr">' + esc(p.name) + '</span></p>' +
+      crumbHtml(id) +
       '<header class="wiki-head"><div class="piece-head">' + F(cp + 'h2.' + lg, V('h2'), 'h2', '', { raw: 1, single: 1, attr: ' tabindex="-1"' }) + '</div>' + relHtml(id) + '</header>' +
       infobox +
       '<div class="wiki-body">' + F(cp + 'lead.' + lg, V('lead'), 'p', 'lead-p', { pid: id, done: done }) + descHtml + stdHero +
@@ -705,7 +749,7 @@
   }
 
   function settingsHtml(p) {
-    var opts = '<option value="">' + esc(t('f_top')) + '</option>' + S.order.filter(function (x) { return x !== p.id; }).map(function (x) {
+    var opts = '<option value="">' + esc(t('f_top')) + '</option>' + S.allOrder.filter(function (x) { return x !== p.id; }).map(function (x) {
       return '<option value="' + x + '"' + (p.parent_id === x ? ' selected' : '') + '>' + esc(S.byId[x].name) + '</option>';
     }).join('');
     return '<section class="settings" aria-label="' + esc(t('page_settings')) + '"><h3>' + esc(t('page_settings')) + '</h3><div class="set-grid">' +
@@ -808,7 +852,7 @@
   }
   function newPageView() {
     if (!isAdmin()) return '<section class="view narrow"><h2 class="page-title" tabindex="-1">' + esc(t('new_page')) + '</h2>' + lockedHtml() + '</section>';
-    var opts = '<option value="">' + esc(t('f_top')) + '</option>' + S.order.map(function (x) { return '<option value="' + x + '">' + esc(S.byId[x].name) + '</option>'; }).join('');
+    var opts = '<option value="">' + esc(t('f_top')) + '</option>' + S.allOrder.map(function (x) { return '<option value="' + x + '">' + esc(S.byId[x].name) + '</option>'; }).join('');
     return '<section class="view narrow"><h2 class="page-title" tabindex="-1">' + esc(t('new_page')) + '</h2><form class="form" id="f-newpage">' +
       field('pname', t('f_name'), 'text', '', ' required maxlength="80"') +
       field('h2', t('f_title') + ' (' + LANG_NAMES[S.lang] + ')', 'text', '', ' maxlength="120"') +
