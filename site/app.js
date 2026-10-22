@@ -244,10 +244,11 @@
     return sb.from('profiles').select('*').eq('id', S.session.user.id).maybeSingle().then(function (r) { S.profile = q(r); });
   }
   function loadPrivate() {
-    S.priv = {};
+    S.priv = {}; S.insp = [];
     if (!isMember()) return Promise.resolve();
-    return sb.from('page_private').select('*').then(function (r) {
-      (q(r) || []).forEach(function (row) { S.priv[row.page_id] = row.content || {}; });
+    return Promise.all([sb.from('page_private').select('*'), sb.from('inspections').select('*').order('sort')]).then(function (r) {
+      (q(r[0]) || []).forEach(function (row) { S.priv[row.page_id] = row.content || {}; });
+      S.insp = (r[1] && !r[1].error && r[1].data) || [];
     });
   }
   function signedUrls(paths) {
@@ -307,7 +308,8 @@
     document.getElementById('menu-body').innerHTML =
       '<ol class="extra top-link"><li><a href="#" data-sec="home"><span class="n">⌂</span><span>' + esc(t('home')) + '</span></a></li></ol>' +
       '<p>' + esc(t('index')) + '</p><ol class="menu-items">' + S.children[''].map(nav).join('') + '</ol>' +
-      '<ol class="extra"><li><a href="#decisions" data-sec="decisions"><span class="n">·</span><span>' + esc(L((S.site.decisions || {}).title) || t('decisions')) + '</span></a></li>' +
+      '<ol class="extra"><li><a href="#regulacions" data-sec="regulacions"><span class="n">§</span><span>' + esc(L((S.site.regs || {}).title) || t('regs_page')) + '</span></a></li>' +
+      '<li><a href="#decisions" data-sec="decisions"><span class="n">·</span><span>' + esc(L((S.site.decisions || {}).title) || t('decisions')) + '</span></a></li>' +
       '<li><a href="#fonts" data-sec="fonts"><span class="n">·</span><span>' + esc(L((S.site.fonts || {}).title) || t('sources')) + '</span></a></li>' +
       (isAdmin() ? '<li><a href="#nova" data-sec="nova"><span class="n">+</span><span>' + esc(t('new_page')) + '</span></a></li>' : '') + '</ol>';
 
@@ -337,10 +339,11 @@
   }
 
   /* ------------------------------------------------------------------ routing */
-  function routeId() { return decodeURIComponent((location.hash || '').replace(/^#/, '')) || 'home'; }
-  var SPECIAL = { home: 1, decisions: 1, fonts: 1, registre: 1, compte: 1, gestio: 1, nova: 1, contrasenya: 1 };
+  function routeId() { return (decodeURIComponent((location.hash || '').replace(/^#/, '')) || 'home').split('~')[0]; }
+  function routeAnchor() { var h = decodeURIComponent((location.hash || '').replace(/^#/, '')); return h.indexOf('~') > -1 ? h.slice(h.indexOf('~') + 1) : ''; }
+  var SPECIAL = { home: 1, decisions: 1, fonts: 1, regulacions: 1, registre: 1, compte: 1, gestio: 1, nova: 1, contrasenya: 1 };
 
-  function draftKeyFor(id) { if (SPECIAL[id] && id !== 'home' && id !== 'decisions' && id !== 'fonts') return null; return S.byId[id] || id === 'home' || id === 'decisions' || id === 'fonts' ? id : null; }
+  function draftKeyFor(id) { var blk = { home: 1, decisions: 1, fonts: 1, regulacions: 1 }; if (SPECIAL[id] && !blk[id]) return null; return S.byId[id] || blk[id] ? id : null; }
   function makeDraft(id) {
     S.draftKey = id; S.dirty = false; S.prefilled = [];
     if (S.byId[id]) {
@@ -357,6 +360,7 @@
       var s = S.draft.site;
       s.home = s.home || {}; ['eyebrow', 'h1', 'lead1', 'lead2', 'lead3', 'crit', 'platecap'].forEach(function (k) { s.home[k] = s.home[k] || { ca: '' }; });
       ['decisions', 'fonts'].forEach(function (k) { s[k] = s[k] || {}; s[k].title = s[k].title || { ca: '' }; s[k].html = s[k].html || { ca: '' }; });
+      s.regs = s.regs || {}; ['title', 'intro_r', 'intro_i'].forEach(function (k) { s.regs[k] = s.regs[k] || { ca: '' }; });
     }
     prefillLang();
   }
@@ -413,7 +417,7 @@
 
   var lastRoute = null;
   function route() {
-    var id = routeId();
+    var id = routeId(), anc = routeAnchor();
     if (lastRoute && id !== lastRoute && S.edit && S.dirty && !window.confirm(t('unsaved'))) {
       history.replaceState(null, '', '#' + (lastRoute === 'home' ? '' : lastRoute));
       return;
@@ -426,6 +430,8 @@
       window.scrollTo(0, 0);
       var h = main.querySelector('h1,h2'); if (h) h.focus({ preventScroll: true });
     }
+    var target = anc && document.getElementById(anc);
+    if (target) { if (target.tagName === 'DETAILS') target.open = true; window.scrollTo(0, target.getBoundingClientRect().top + window.scrollY - 90); }
   }
 
   // labelled diagrams kept as SVG files (content.dg) are fetched once and inlined so their language labels follow the page
@@ -450,6 +456,7 @@
     var html;
     if (id === 'home') html = homeView();
     else if (id === 'decisions' || id === 'fonts') html = blockView(id);
+    else if (id === 'regulacions') html = regsAllView();
     else if (id === 'registre') html = registerView();
     else if (id === 'compte') html = accountView();
     else if (id === 'gestio') html = adminView();
@@ -495,7 +502,7 @@
       return '<span class="about-tab' + (LOCKED[k] ? ' priv' : '') + '">' + esc(t('t_' + k)) + (LOCKED[k] ? lock : '') + '</span>';
     }).join('') + '</p>';
     var decLink = '<p class="about-link"><a class="tlink" href="#decisions">' + esc(L((S.site.decisions || {}).title) || t('decisions')) + '</a></p>';
-    var srcLink = '<p class="about-link"><a class="tlink" href="#fonts">' + esc(L((S.site.fonts || {}).title) || t('sources')) + '</a></p>';
+    var srcLink = '<p class="about-link"><a class="tlink" href="#fonts">' + esc(L((S.site.fonts || {}).title) || t('sources')) + '</a> <a class="tlink" href="#regulacions">' + esc(L((S.site.regs || {}).title) || t('regs_page')) + '</a></p>';
     var chips = '<p class="about-tabs">' + chip('proposed') + chip('pending') + '<span class="chip gaps">' + esc(t('t_gaps')) + '</span></p>';
     return '<section class="view home" data-view="home">' +
       '<header class="home-hero">' +
@@ -607,6 +614,82 @@
       '<div class="table-wrap block-' + key + '">' + F('site.' + key + '.html.' + S.lang, body, 'div', 'block-html', { raw: 1 }) + '</div>' +
       (S.edit && key === 'decisions' ? '<button type="button" class="add-btn" data-act="addrow">+ ' + esc(t('add_row')) + '</button>' : '') +
       '</section>';
+  }
+
+  /* ------------------------------------------------------------------ view: all regulations and the inspections */
+  function regsAllView() {
+    var site = S.edit && S.draft && S.draft.site ? S.draft.site : S.site;
+    var b = site.regs || {}, lg = S.lang;
+    var V = function (k) { return S.edit ? (b[k] || {})[lg] : L(b[k]); };
+    var title = V('title') || (S.edit ? '' : t('regs_page'));
+    var out = '<section class="view regs-all" data-view="regulacions"><p class="crumb"><a href="#">' + esc(t('home')) + '</a> <span aria-hidden="true">/</span> ' + esc(plain(L(b.title)) || t('regs_page')) + '</p>' +
+      '<div class="piece-head">' + F('site.regs.title.' + lg, title, 'h2', 'page-title', { raw: 1, single: 1, attr: ' tabindex="-1"' }) + penBtn() + '</div>';
+    var member = isMember();
+    // 1. regulations: every text quoted on the item pages, merged by year and regulation
+    out += '<section class="ra-part" aria-labelledby="ra-r"><h3 id="ra-r">' + esc(t('regs_h')) + '</h3>' + F('site.regs.intro_r.' + lg, V('intro_r'), 'p', 'ra-intro', { raw: 1 });
+    if (!member) out += lockedHtml();
+    else {
+      var groups = {}, keys = [];
+      S.allOrder.forEach(function (pid) {
+        ((S.priv[pid] || {}).regs || []).forEach(function (r) {
+          if (r.insp) return;
+          var key = (r.year || '') + '|' + plain(r.name || '');
+          if (!groups[key]) { groups[key] = { year: r.year || '', name: r.name || '', parts: [], byText: {} }; keys.push(key); }
+          var g = groups[key];
+          (r.parts || []).forEach(function (x) {
+            var tk = plain(x.label || '') + '|' + plain(x.fr || '');
+            if (!plain(x.fr || '') && !L(x.tr)) return;
+            if (!g.byText[tk]) { g.byText[tk] = { label: x.label, fr: x.fr, tr: x.tr, pages: [] }; g.parts.push(g.byText[tk]); }
+            if (g.byText[tk].pages.indexOf(pid) < 0) g.byText[tk].pages.push(pid);
+          });
+        });
+      });
+      keys.sort(function (a, b) { var ga = groups[a], gb = groups[b]; return (ga.year > gb.year) - (ga.year < gb.year) || (plain(ga.name) > plain(gb.name)) - (plain(ga.name) < plain(gb.name)); });
+      out += '<div class="regs" id="ra-regs"><div class="regs-head"><span>' + esc(t('n_regs').replace('{n}', keys.length)) + '</span><span></span>' +
+        '<button type="button" class="regs-toggle" data-target="ra-regs" aria-expanded="false"><span class="when-closed">' + esc(t('open_all')) + '</span><span class="when-open">' + esc(t('close_all')) + '</span></button></div>';
+      keys.forEach(function (key, i) {
+        var g = groups[key];
+        var pgs = [];
+        g.parts.forEach(function (x) { x.pages.forEach(function (p) { if (pgs.indexOf(p) < 0) pgs.push(p); }); });
+        var body = g.parts.map(function (x) {
+          var lb = x.label ? '<b>' + clean(x.label) + '.</b> ' : '';
+          return '<div class="reg-body"><div class="orig"><p lang="fr">' + lb + clean(x.fr) + '</p></div><div class="tr"><p>' + lb + clean(lg === 'fr' ? '' : L(x.tr)) + '</p></div></div>' +
+            '<p class="reg-pages">' + esc(t('regs_in')) + ' ' + x.pages.map(tlink).join(' ') + '</p>';
+        }).join('');
+        out += '<details class="reg yr" id="ra-' + i + '"><summary><span class="reg-date"><b class="yr-y">' + esc(g.year) + '</b> — <span lang="fr">' + clean(g.name) + '</span></span>' +
+          '<span class="yr-count">' + pgs.length + '</span><span class="chev" aria-hidden="true"></span></summary>' + body + '</details>';
+      });
+      out += '</div>';
+    }
+    out += '</section>';
+    // 2. inspections: readable transcriptions
+    out += '<section class="ra-part" aria-labelledby="ra-i"><h3 id="ra-i">' + esc(t('insp_h')) + '</h3>' + F('site.regs.intro_i.' + lg, V('intro_i'), 'p', 'ra-intro', { raw: 1 });
+    if (!member) out += lockedHtml();
+    else if (!(S.insp || []).length) out += '<p class="muted">' + esc(t('insp_none')) + '</p>';
+    else out += S.insp.map(function (row) { return inspHtml(row.id, row.content || {}); }).join('');
+    out += '</section></section>';
+    return out;
+  }
+  function inspHtml(id, c) {
+    var lg = S.lang;
+    var sheets = (c.sheets || []).map(function (sh) {
+      var head = L(sh.head) || [], ncol = head.length || 7;
+      var rows = (sh.rows || []).map(function (r) {
+        if (r[0] === '§') return '<tr class="insp-grp"><th colspan="' + ncol + '" scope="rowgroup">' + esc(L((c.groups || {})[r[1]]) || r[1]) + '</th></tr>';
+        return '<tr><th scope="row" lang="fr">' + esc(r[0]) + '</th>' + r.slice(1).map(function (v) { return '<td>' + (v ? esc(v) : '<span class="muted" aria-label="—">″</span>') + '</td>'; }).join('') + '</tr>';
+      }).join('');
+      return '<section class="insp-sheet"><h5 lang="fr">' + esc(sh.title) + '</h5><p class="insp-unit" lang="fr">' + esc(sh.unit || '') + '</p>' +
+        '<div class="cmp-wrap"><table class="cmp insp-table"><thead><tr>' + head.map(function (h) { return '<th scope="col">' + esc(h) + '</th>'; }).join('') + '</tr></thead><tbody>' + rows + '</tbody></table></div>' +
+        (sh.obs ? '<div class="reg-body insp-obs"><div class="orig"><span class="lbl">' + esc(t('insp_obs')) + '</span><p lang="fr">' + esc(sh.obs) + '</p></div><div class="tr"><span class="lbl">' + esc(t('tr_text')) + '</span><p>' + esc(lg === 'fr' ? '' : L(c.obs_tr)) + '</p></div></div>' : '') +
+        (sh.sig ? '<p class="insp-sig" lang="fr">' + esc(sh.sig) + '</p>' : '') + '</section>';
+    }).join('');
+    var notes = LA(c.notes);
+    return '<article class="insp" id="insp-' + esc(id) + '"><h4><span class="yr-y">' + esc(c.year || '') + '</span> — <span lang="fr">' + esc(c.title || '') + '</span></h4>' +
+      '<p class="insp-meta" lang="fr">' + esc([c.date, c.place].filter(Boolean).join(', ')) + '</p>' +
+      (L(c.summary) ? '<p>' + esc(L(c.summary)) + '</p>' : '') +
+      (notes.length ? '<div class="insp-notes"><h5>' + esc(t('insp_notes')) + '</h5><ul>' + notes.map(function (n) { return '<li>' + esc(n) + '</li>'; }).join('') + '</ul></div>' : '') +
+      '<h5 class="insp-tr-h">' + esc(t('insp_tr')) + '</h5>' + sheets +
+      ((c.pages || []).length ? '<p class="reg-pages">' + esc(t('regs_in')) + ' ' + c.pages.map(tlink).join(' ') + '</p>' : '') + '</article>';
   }
   function tlink(id) {
     var p = S.byId[id]; if (!p) return '';
@@ -811,7 +894,7 @@
     var regs = pr.regs || [];
     var out = '<div class="regs" id="' + id + '-reg"><div class="regs-head"><span>' + esc(t('regs_head')) + '</span><span></span>' +
       (E ? '' : '<button type="button" class="regs-toggle" data-target="' + id + '-reg" aria-expanded="false"><span class="when-closed">' + esc(t('open_all')) + '</span><span class="when-open">' + esc(t('close_all')) + '</span></button>') + '</div>';
-    var EE = E;
+    var EE = E, inspOut = '';
     regs.forEach(function (r, n) {
       var E = EE && !!r._new;
       var parts = r.parts || [];
@@ -833,9 +916,12 @@
           '<span class="yr-count">' + (parts.length > 1 ? parts.length : '') + '</span>' + (EE ? listBtns(pp + 'regs', n) : '') + '<span class="chev" aria-hidden="true"></span></summary>';
       var body = '<div class="reg-body"><div class="orig"><span class="lbl">' + esc(t('fr_text')) + '</span>' + fr + '</div>' +
         '<div class="tr"><span class="lbl">' + esc(t('tr_text')) + '</span>' + tr + '</div></div>' + (E ? addBtn(base + '.parts', 'regpart', 'add_text') : '');
-      out += E ? '<div class="reg yr ed-reg" id="' + id + '-reg-r' + (n + 1) + '">' + head + body + '</div>'
-        : '<details id="' + id + '-reg-r' + (n + 1) + '" class="reg yr">' + head + body + '</details>';
+      var link = r.insp && !EE ? '<p class="insp-link"><a class="tlink" href="#regulacions~insp-' + esc(r.insp) + '">' + esc(t('insp_open')) + '</a></p>' : '';
+      var html1 = E ? '<div class="reg yr ed-reg" id="' + id + '-reg-r' + (n + 1) + '">' + head + body + '</div>'
+        : '<details id="' + id + '-reg-r' + (n + 1) + '" class="reg yr' + (r.insp ? ' insp-reg' : '') + '">' + head + body + link + '</details>';
+      if (r.insp && !EE) inspOut += html1; else out += html1;
     });
+    if (inspOut) out += '<div class="regs-sub">' + esc(t('insp_h')) + '</div>' + inspOut;
     out += '</div>' + (EE ? addBtn(pp + 'regs', 'reg', 'add_reg') : '');
     var note = E ? ((pr.note || {})[lg]) : L(pr.note);
     if (note || E) out += F(pp + 'note.' + lg, note, 'p', 'regs-note', { raw: 1, ph: t('note') });
@@ -1146,7 +1232,7 @@
         if (orphans.length) return sb.storage.from(PRIVATE_BUCKET).remove(orphans).catch(function (e) { console.warn(e); });
       });
     } else {
-      var rows = ['home', 'decisions', 'fonts'].map(function (k) { return { key: k, value: S.draft.site[k] }; });
+      var rows = ['home', 'decisions', 'fonts', 'regs'].map(function (k) { return { key: k, value: S.draft.site[k] }; });
       job = sb.from('site').upsert(rows).then(q);
     }
     return job.then(function () { return loadPublic(); }).then(loadPrivate).then(function () {

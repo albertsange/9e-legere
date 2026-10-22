@@ -367,3 +367,23 @@ body.editing .infobox{position:static;max-height:none;overflow:visible}
 .notif.unread{background:var(--quote-bg)}.notif.unread span::before{content:"";display:inline-block;width:.5rem;height:.5rem;border-radius:50%;background:var(--ecarlate);margin-right:.4rem}
 .notif:hover{outline:1px solid var(--line)}
 .bell-pop .muted{padding:.5rem .6rem;margin:0}
+/* regulations and inspections page */
+.regs-all .ra-part{margin:1.6rem 0 2.2rem}
+.regs-all .ra-part > h3{font-family:var(--label);letter-spacing:.05em;color:var(--bleu);border-bottom:1px solid var(--line);padding-bottom:.3rem;margin:0 0 .6rem}
+.ra-intro{max-width:46rem;color:var(--muted)}
+.reg-pages{font-size:.85rem;color:var(--muted);margin:.2rem .9rem .8rem;display:flex;flex-wrap:wrap;gap:.3rem .6rem;align-items:baseline}
+.regs-sub{padding:.45rem .9rem;background:var(--quote-bg);border-top:1px solid var(--line);font-family:var(--label);letter-spacing:.05em;font-size:.85rem;color:var(--muted)}
+.insp-link{margin:.2rem .9rem .8rem}
+.insp{border:1px solid var(--line);border-radius:3px;background:var(--sheet);padding:1rem 1.1rem;margin:1rem 0}
+.insp h4{margin:0 0 .2rem;font-size:1.15rem}
+.insp h4 .yr-y{color:var(--bleu)}
+.insp h5{font-family:var(--label);letter-spacing:.05em;font-size:.95rem;margin:1.2rem 0 .4rem;color:var(--bleu)}
+.insp-meta,.insp-unit{color:var(--muted);margin:0 0 .6rem;font-size:.95rem}
+.insp-notes ul{margin:.3rem 0 0;padding-left:1.2rem}
+.insp-notes li{margin:.25rem 0;max-width:52rem}
+.insp-table td{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+.insp-table thead th{font-size:.78rem;vertical-align:bottom}
+.insp-table tbody th{white-space:normal;min-width:11rem}
+.insp-table .insp-grp th{background:var(--quote-bg);color:var(--bleu);font-style:italic}
+.insp-obs{border:1px dashed var(--line);margin:.8rem 0}
+.insp-sig{font-style:italic;color:var(--muted);font-size:.9rem;margin:.6rem 0 0}

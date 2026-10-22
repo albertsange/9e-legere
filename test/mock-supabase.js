@@ -15,13 +15,14 @@
       (c.figs || []).forEach(function (f) { f.path = 'evid/' + f.file; });
       return { page_id: r.page_id, content: c };
     }),
+    inspections: (seed.inspections || []).map(function (r) { return JSON.parse(JSON.stringify(r)); }),
     site: Object.keys(seed.site).map(function (k) { return { key: k, value: JSON.parse(JSON.stringify(seed.site[k])) }; }),
     squads: [{ id: 1, name: 'Esquadra A' }, { id: 2, name: 'Esquadra B' }],
     page_edits: [{ id: 1, page_id: 'shako', editor_name: 'La Tour', edited_at: '2026-10-21T15:00:00Z', fields: ['desc', 'std'] }, { id: 2, page_id: 'shako', editor_name: 'Bonaparte', edited_at: '2026-10-20T10:00:00Z', fields: ['info'] }],
     comments: [], notifications: [],
     profiles: USERS.map(function (u) { var p = JSON.parse(JSON.stringify(u.profile)); p.id = u.id; p.email = u.email; p.created_at = new Date().toISOString(); return p; })
   };
-  var KEY = { page_edits: 'id', pages: 'id', page_private: 'page_id', site: 'key', squads: 'id', profiles: 'id', comments: 'id', notifications: 'id' };
+  var KEY = { inspections: 'id', page_edits: 'id', pages: 'id', page_private: 'page_id', site: 'key', squads: 'id', profiles: 'id', comments: 'id', notifications: 'id' };
   var storage = {}; // path -> url
   var session = null, listeners = [];
   var log = window.__MOCKLOG = [];
