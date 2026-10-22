@@ -469,24 +469,37 @@
     }
     var tops = S.children[''], secs = tops.filter(isSection), loose = tops.filter(function (x) { return !isSection(x); });
     var plate = h.plate || 'img/lamina_9e_1809.png';
+    function ab(n, extra) {
+      return '<article class="about-card"><span class="about-n" aria-hidden="true">' + ('0' + n) + '</span>' +
+        F(P('ab' + n + '_t'), V('ab' + n + '_t'), 'h3', '', { raw: 1, single: 1 }) + F(P('ab' + n + '_p'), V('ab' + n + '_p'), 'p', '', { raw: 1 }) + (extra || '') + '</article>';
+    }
+    var lock = '<span class="lock" aria-hidden="true">🔒</span>';
+    var tabsStrip = '<p class="about-tabs">' + ['t_sum', 't_parts', 't_reg', 't_evid', 't_dl'].map(function (k, i) {
+      return '<span class="about-tab' + (i > 2 ? ' priv' : '') + '">' + esc(t(k)) + (i > 2 ? lock : '') + '</span>';
+    }).join('') + '</p>';
+    var decLink = '<p class="about-link"><a class="tlink" href="#decisions">' + esc(L((S.site.decisions || {}).title) || t('decisions')) + '</a></p>';
+    var srcLink = '<p class="about-link"><a class="tlink" href="#fonts">' + esc(L((S.site.fonts || {}).title) || t('sources')) + '</a></p>';
+    var chips = '<p class="about-tabs">' + chip('proposed') + chip('pending') + '<span class="chip gaps">' + esc(t('t_gaps')) + '</span></p>';
     return '<section class="view home" data-view="home">' +
-      '<header class="top compact"><div>' +
+      '<header class="home-hero">' +
       F(P('eyebrow'), V('eyebrow'), 'div', 'eyebrow', { raw: 1, single: 1 }) +
       '<div class="piece-head">' + F(P('h1'), V('h1'), 'h1', '', { raw: 1, single: 1, attr: ' tabindex="-1"' }) + penBtn() + '</div>' +
-      F(P('lead1'), V('lead1'), 'p', 'lead', { raw: 1 }) +
-      '<details class="intro-more"' + (S.edit ? ' open' : '') + '><summary>' + esc(t('intro_more')) + '</summary>' +
-      F(P('lead2'), V('lead2'), 'p', '', { raw: 1 }) + F(P('lead3'), V('lead3'), 'p', '', { raw: 1 }) + F(P('crit'), V('crit'), 'p', 'criteri', { raw: 1 }) +
-      '</details></div>' +
-      '<figure class="plate small"><img src="' + imgSrc(plate) + '" alt="9e Léger soldier, 1809">' +
-      F(P('platecap'), V('platecap'), 'figcaption', '', { raw: 1 }) +
-      (S.edit ? '<button type="button" class="btn-small" data-act="img" data-target="site.home.plate">' + esc(t('change_img')) + '</button>' : '') + '</figure></header>' +
-      (isAdmin() && !S.pages.length ? '<div class="locked empty-db"><div><strong>' + esc(t('empty_db_t')) + '</strong><p>' + esc(t('empty_db_p')) + '</p><p class="locked-actions"><a class="btn" href="#gestio">' + esc(t('admin')) + '</a></p></div></div>' : '') +
-      (secs.length ? '<div class="grid-head"><h2>' + esc(t('sections_h')) + '</h2><p class="muted">' + esc(t('sections_hint')) + '</p></div>' +
+      F(P('lead1'), V('lead1'), 'p', 'lead', { raw: 1 }) + '</header>' +
+      (isAdmin() && !S.pages.length ? '<div class="locked empty-db"><div><strong>' + esc(t('empty_db_t')) + '</strong><p>' + esc(t('empty_db_p')) + '</p><p class="locked-actions"><a class="btn" href="#gestio">' + esc(t('admin')) + '</a></p></div></div>' :
+      (secs.length ? '<div class="grid-head first"><h2>' + esc(t('sections_h')) + '</h2><p class="muted">' + esc(t('sections_hint')) + '</p></div>' +
         '<ul class="hsec">' + secs.map(secCard).join('') + '</ul>' : '') +
       (loose.length ? '<div class="grid-head"><h2>' + esc(t('pieces')) + '</h2><p class="muted">' + esc(t('pieces_hint')) + '</p></div>' +
-        '<ul class="hlist">' + loose.map(row).join('') + '</ul>' : '') +
-      '<p class="home-more"><a class="tlink" href="#decisions">' + esc(L((S.site.decisions || {}).title) || t('decisions')) + '</a><a class="tlink" href="#fonts">' + esc(L((S.site.fonts || {}).title) || t('sources')) + '</a>' +
-      (isAdmin() ? '<a class="tlink" href="#nova">+ ' + esc(t('new_page')) + '</a>' : '') + '</p></section>';
+        '<ul class="hlist">' + loose.map(row).join('') + '</ul>' : '')) +
+      '<section class="about" aria-labelledby="about-h">' +
+      F(P('about_h'), V('about_h'), 'h2', 'about-h', { raw: 1, single: 1, attr: ' id="about-h"' }) +
+      '<div class="about-grid">' +
+      ab(1, tabsStrip) +
+      '<figure class="about-card about-plate"><img src="' + imgSrc(plate) + '" alt="9e Léger soldier, 1809" loading="lazy">' +
+      F(P('platecap'), V('platecap'), 'figcaption', '', { raw: 1 }) +
+      (S.edit ? '<button type="button" class="btn-small" data-act="img" data-target="site.home.plate">' + esc(t('change_img')) + '</button>' : '') + '</figure>' +
+      ab(2, srcLink) + ab(3) + ab(4, chips + decLink) + ab(5) +
+      '</div></section>' +
+      (isAdmin() ? '<p class="home-more"><a class="tlink" href="#nova">+ ' + esc(t('new_page')) + '</a></p>' : '') + '</section>';
   }
   function flatItems(ids) { var out = []; ids.forEach(function (x) { out.push(x); out = out.concat(flatItems(S.children[x] || [])); }); return out; }
   /* ------------------------------------------------------------------ edit history: last editor under the title, full list in a dialog */
