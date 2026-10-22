@@ -427,6 +427,16 @@
     }
   }
 
+  // labelled diagrams kept as SVG files (content.dg) are fetched once and inlined so their language labels follow the page
+  var DG = {};
+  function loadDiagrams() {
+    Array.prototype.forEach.call(main.querySelectorAll('figure[data-dg]'), function (fig) {
+      var src = fig.getAttribute('data-dg');
+      var put = function (t) { if (fig.isConnected) fig.innerHTML = clean(t); };
+      if (DG[src]) { put(DG[src]); return; }
+      fetch(src + '?v=' + (window.ASSET_V || '')).then(function (r) { return r.ok ? r.text() : ''; }).then(function (t) { if (t) { DG[src] = t; put(t); } }).catch(function () {});
+    });
+  }
   function render() {
     if (!S.ready) return;
     var id = routeId();
@@ -447,6 +457,7 @@
     else if (S.byId[id]) html = isSection(id) ? sectionView(id) : pageView(id);
     else html = '<section class="view"><h2 class="page-title" tabindex="-1">' + esc(t('not_found')) + '</h2><p><a href="#">' + esc(t('home')) + '</a></p></section>';
     main.innerHTML = html;
+    loadDiagrams();
     Array.prototype.forEach.call(document.querySelectorAll('#menu-body a[data-sec]'), function (a) {
       var on = a.getAttribute('data-sec') === id;
       a.classList.toggle('active', on);
@@ -721,17 +732,18 @@
     // infographic: numbered points on the item image, one per part shown in it
     var hot = c.hot || [];
     var hasHot = hot.some(function (h) { return h; });
-    var infog = (p.image && (hasHot || E)) ? '<figure class="infog' + (E && S.hotPick != null ? ' picking' : '') + '"><div class="infog-img"><img src="' + imgSrc(p.image) + '" alt="" data-act="' + (E ? 'hot-set' : '') + '">' +
+    var hasDg = !!(c.diagram || c.dg);
+    var dgHtml = c.diagram ? '<figure class="diagram">' + clean(c.diagram) + '</figure>' : (c.dg ? '<figure class="diagram" data-dg="' + esc(c.dg) + '"></figure>' : '');
+    var infog = (!hasDg && p.image && (hasHot || E)) ? '<figure class="infog' + (E && S.hotPick != null ? ' picking' : '') + '"><div class="infog-img"><img src="' + imgSrc(p.image) + '" alt="" data-act="' + (E ? 'hot-set' : '') + '">' +
       hot.map(function (h, i) { return h && parts[i] ? '<span class="hot" style="left:' + h[0] + '%;top:' + h[1] + '%">' + (i + 1) + '</span>' : ''; }).join('') + '</div>' +
       (E ? '<figcaption class="muted">' + esc(S.hotPick != null ? t('hot_click') : t('hot_hint')) + '</figcaption>' : '') + '</figure>' : '';
-    var partsHtml = '<div class="parts-wrap' + (infog ? ' with-infog' : '') + '">' + infog + '<dl class="parts">' + parts.map(function (r, i) {
-      var num = (hot[i] || E) && infog ? '<span class="hot-n' + (hot[i] ? '' : ' off') + '">' + (i + 1) + '</span>' : '';
-      var pick = E && p.image ? '<button type="button" class="mini hot-btn' + (S.hotPick === i ? ' on' : '') + '" data-act="hot-pick" data-i="' + i + '" title="' + esc(t('hot_pick')) + '" aria-label="' + esc(t('hot_pick')) + '">📍</button>' +
+    var partsHtml = (E ? '' : dgHtml) + '<div class="parts-wrap' + (infog ? ' with-infog' : '') + '">' + infog + '<dl class="parts">' + parts.map(function (r, i) {
+      var num = infog && (hot[i] || E) ? '<span class="hot-n' + (hot[i] ? '' : ' off') + '">' + (i + 1) + '</span>' : '';
+      var pick = E && p.image && !hasDg ? '<button type="button" class="mini hot-btn' + (S.hotPick === i ? ' on' : '') + '" data-act="hot-pick" data-i="' + i + '" title="' + esc(t('hot_pick')) + '" aria-label="' + esc(t('hot_pick')) + '">📍</button>' +
         (hot[i] ? '<button type="button" class="mini" data-act="hot-del" data-i="' + i + '" title="' + esc(t('hot_del')) + '" aria-label="' + esc(t('hot_del')) + '">✕</button>' : '') : '';
       return '<div' + rowAttr(cp + 'parts.' + lg, i) + '><dt>' + dragH(cp + 'parts.' + lg, i) + num + F(cp + 'parts.' + lg + '.' + i + '.0', r[0], 'span', '', { raw: 1, single: 1 }) + '</dt><dd>' +
         F(cp + 'parts.' + lg + '.' + i + '.1', r[1], 'span', '', { pid: id }) + pick + listBtns(cp + 'parts.' + lg, i) + '</dd></div>';
     }).join('') + '</dl></div>' + addBtn(cp + 'parts.' + lg, 'pair', 'add_row');
-    if (c.diagram && !E) partsHtml += '<figure class="diagram">' + clean(c.diagram) + '</figure>';
     if (E) partsHtml += '<details class="ed-svg"><summary>' + esc(t('diagram_src')) + '</summary><textarea data-path="page.content.diagram" rows="8">' + esc(c.diagram || '') + '</textarea></details>';
     panels.push(['parts', null, partsHtml]);
 

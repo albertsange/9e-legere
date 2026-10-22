@@ -332,3 +332,4 @@ body.editing .infobox{position:static;max-height:none;overflow:visible}
 .hot-btn.on{background:var(--ecarlate);color:#fff}
 .infog figcaption{font-size:.85rem;margin-top:.4rem}
 @media (max-width:760px){.parts-wrap.with-infog{grid-template-columns:1fr}.infog{position:static;max-width:320px;margin:0 auto}}
+.item .diagram{margin-bottom:1.2rem}
