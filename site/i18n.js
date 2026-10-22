@@ -84,6 +84,17 @@ window.I18N = (function () {
     error: U("S'ha produït un error:", "An error occurred:", "Si è verificato un errore:", "Une erreur s'est produite :", "Ein Fehler ist aufgetreten:"),
 
     // account
+    saving: U("Desant els canvis", "Saving changes", "Salvataggio delle modifiche", "Enregistrement des modifications", "Änderungen werden gespeichert"),
+    deleting: U("Esborrant", "Deleting", "Eliminazione", "Suppression", "Wird gelöscht"),
+    up_image: U("Pujant la imatge", "Uploading image", "Caricamento dell'immagine", "Envoi de l'image", "Bild wird hochgeladen"),
+    up_photos: U("Pujant imatges", "Uploading images", "Caricamento delle immagini", "Envoi des images", "Bilder werden hochgeladen"),
+    up_files: U("Pujant fitxers", "Uploading files", "Caricamento dei file", "Envoi des fichiers", "Dateien werden hochgeladen"),
+    importing: U("Important dades", "Importing data", "Importazione dei dati", "Importation des données", "Daten werden importiert"),
+    creating_page: U("Creant la pàgina", "Creating page", "Creazione della pagina", "Création de la page", "Seite wird erstellt"),
+    busy_done: U("Fet", "Done", "Fatto", "Terminé", "Fertig"),
+    busy_failed: U("Error", "Failed", "Errore", "Échec", "Fehler"),
+    busy_leave: U("Encara hi ha una pujada o actualització en curs. Si surts ara, es pot perdre. Vols sortir igualment?", "An upload or update is still in progress. Leaving now may lose it. Leave anyway?", "È ancora in corso un caricamento o un aggiornamento. Uscendo ora potrebbe andare perso. Uscire comunque?", "Un envoi ou une mise à jour est encore en cours. En partant maintenant, il peut être perdu. Partir quand même ?", "Ein Hochladen oder eine Aktualisierung läuft noch. Wenn Sie jetzt gehen, kann es verloren gehen. Trotzdem verlassen?"),
+    busy_wait: U("Espera que acabi la pujada abans de desar.", "Please wait for the upload to finish before saving.", "Attendi la fine del caricamento prima di salvare.", "Attendez la fin de l'envoi avant d'enregistrer.", "Bitte warten Sie, bis das Hochladen abgeschlossen ist, bevor Sie speichern."),
     dark_mode: U("Mode fosc", "Dark mode", "Modalità scura", "Mode sombre", "Dunkelmodus"),
     account: U("El meu compte", "My account", "Il mio account", "Mon compte", "Mein Konto"),
     status: U("Estat", "Status", "Stato", "Statut", "Status"),

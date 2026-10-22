@@ -240,3 +240,24 @@ span.ed,b.ed,strong.ed{display:inline-block}
 /* the info box only sticks while it fits on screen; in edit mode it scrolls with the page */
 @media (min-width:861px){.infobox{max-height:calc(100vh - 6rem);overflow:auto}}
 body.editing .infobox{position:static;max-height:none;overflow:visible}
+
+/* progress banner */
+.busy{position:fixed;top:calc(.75rem + env(safe-area-inset-top));right:.75rem;z-index:95;display:grid;gap:.4rem;width:min(20rem,calc(100vw - 1.5rem))}
+.busy[hidden]{display:none}
+.busy-row{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:.35rem .6rem;background:var(--sheet);color:var(--ink);border:1px solid var(--line);border-left:4px solid var(--bleu);border-radius:4px;box-shadow:0 8px 24px rgba(0,0,0,.18);padding:.6rem .75rem;font-size:.92rem}
+.busy-row.ok{border-left-color:var(--chasseur)}
+.busy-row.bad{border-left-color:var(--ecarlate)}
+.busy-lbl{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.busy-n{font-family:var(--label);color:var(--muted);font-variant-numeric:tabular-nums}
+.busy-spin{width:1rem;height:1rem;border-radius:50%;border:2px solid var(--line);border-top-color:var(--bleu);animation:busy-spin .8s linear infinite}
+.busy-ico{width:1rem;text-align:center;font-weight:700}
+.busy-row.ok .busy-ico{color:var(--chasseur)}
+.busy-row.bad .busy-ico{color:var(--ecarlate)}
+.busy-bar{grid-column:1/-1;height:4px;border-radius:2px;background:var(--line);overflow:hidden;position:relative}
+.busy-bar i{display:block;height:100%;background:var(--bleu);transition:width .25s}
+.busy-row.ok .busy-bar i{background:var(--chasseur)}
+.busy-row.bad .busy-bar i{background:var(--ecarlate)}
+.busy-bar.ind i{position:absolute;animation:busy-slide 1.2s ease-in-out infinite}
+@keyframes busy-spin{to{transform:rotate(360deg)}}
+@keyframes busy-slide{0%{left:-35%}100%{left:100%}}
+@media (prefers-reduced-motion:reduce){.busy-spin,.busy-bar.ind i{animation-duration:3s}}
