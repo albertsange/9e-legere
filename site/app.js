@@ -14,7 +14,7 @@
     de: '<svg class="flag" viewBox="0 0 5 3" aria-hidden="true"><rect width="5" height="1" fill="#000"/><rect y="1" width="5" height="1" fill="#dd0000"/><rect y="2" width="5" height="1" fill="#ffce00"/></svg>'
   };
   var LANG_NAMES = { ca: 'Català', en: 'English', it: 'Italiano', fr: 'Français', de: 'Deutsch' };
-  var LOCKED = { reg: 1, evid: 1, dl: 1 };
+  var LOCKED = { reg: 1, evid: 1, model9: 1, dl: 1 };
   var PUBLIC_BUCKET = 'public-media', PRIVATE_BUCKET = 'private-media';
 
   var sb = window.__SB || (window.supabase && CFG.SUPABASE_URL && CFG.SUPABASE_URL.indexOf('YOUR-') < 0
@@ -738,14 +738,18 @@
     panels.push(['dl', pr && pr.downloads && pr.downloads.length || null, pr ? dlHtml(id, pr, E) : '']);
     // the summary tab (lead, description and 9e standard) is the one open by default
     if (V2) {
+      // the 9e standard is its own members-only tab, just before Downloads
       var st = c.std_status || (p.status === 'pending' ? 'pending' : 'proposed');
-      var stdBox = '<section class="std-hero v2 st-' + st + '" aria-label="' + esc(t('what_9e')) + '"><h3 class="std-title">' + esc(t('what_9e')) +
-        (E ? '<select data-path="page.content.std_status" aria-label="' + esc(t('status')) + '">' + ['decided', 'proposed', 'pending'].map(function (k) { return '<option value="' + k + '"' + (k === st ? ' selected' : '') + '>' + esc(t('sst_' + k)) + '</option>'; }).join('') + '</select>' : stChip(st)) + '</h3>' +
-        F(cp + 'std.' + lg, V('std'), 'p', 'std-text', { pid: id }) +
-        ((V('just') || E) ? '<details class="std-just"' + (E ? ' open' : '') + '><summary>' + esc(t('just')) + '</summary>' + F(cp + 'just.' + lg, V('just'), 'p', '', { pid: id }) + '</details>' : '') +
-        (st === 'pending' && !E ? '<p class="std-link"><a class="tlink" href="#decisions">' + esc(L((S.site.decisions || {}).title) || t('decisions')) + '</a></p>' : '') + '</section>';
+      var m9 = '<div class="model9">' +
+        '<p class="m9-state"><strong>' + esc(t('std_state')) + ':</strong> ' +
+        (E ? '<select data-path="page.content.std_status" aria-label="' + esc(t('std_state')) + '">' + ['decided', 'proposed', 'pending'].map(function (k) { return '<option value="' + k + '"' + (k === st ? ' selected' : '') + '>' + esc(t('sst_' + k)) + '</option>'; }).join('') + '</select>' : esc(t('sst_' + st))) + '</p>' +
+        F(cp + 'std.' + lg, V('std'), 'p', '', { pid: id }) +
+        ((V('just') || E) ? '<h3 class="sum-h">' + esc(t('just')) + '</h3>' + F(cp + 'just.' + lg, V('just'), 'p', '', { pid: id }) : '') +
+        (st === 'pending' && !E ? '<p><a class="tlink" href="#decisions">' + esc(L((S.site.decisions || {}).title) || t('decisions')) + '</a></p>' : '') + '</div>';
+      var dlIdx = panels.map(function (x) { return x[0]; }).indexOf('dl');
+      panels.splice(dlIdx < 0 ? panels.length : dlIdx, 0, ['model9', null, m9]);
       var addImg = E ? '<div class="fig-add"><button type="button" class="btn fig-add-btn" data-act="fig-add">📷 ' + esc(t('add_img_here')) + '</button><span class="muted">' + esc(t('add_img_hint')) + '</span></div>' : '';
-      panels.unshift(['sum', null, F(cp + 'lead.' + lg, V('lead'), 'p', 'lead-p', { pid: id, done: done }) + stdBox +
+      panels.unshift(['sum', null, F(cp + 'lead.' + lg, V('lead'), 'p', 'lead-p', { pid: id, done: done }) +
         '<h3 class="sum-h">' + esc(t('desc_h')) + '</h3>' + addImg + '<div class="desc-flow">' + descHtml + '</div>' + versionsHtml(id, c, E)]);
     } else panels.unshift(['sum', null, F(cp + 'lead.' + lg, V('lead'), 'p', 'lead-p', { pid: id, done: done }) + descHtml + stdHero]);
 
