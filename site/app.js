@@ -629,35 +629,44 @@
     out += '<section class="ra-part" aria-labelledby="ra-r"><h3 id="ra-r">' + esc(t('regs_h')) + '</h3>' + F('site.regs.intro_r.' + lg, V('intro_r'), 'p', 'ra-intro', { raw: 1 });
     if (!member) out += lockedHtml();
     else {
-      var groups = {}, keys = [];
+      // one block per year; inside it, one entry per regulation (names compared without accents, case or plural s)
+      var norm = function (x) { return plain(x || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\b(\w+?)s\b/g, '$1').replace(/[^a-z0-9]+/g, ' ').trim(); };
+      var years = {}, ylist = [];
       S.allOrder.forEach(function (pid) {
         ((S.priv[pid] || {}).regs || []).forEach(function (r) {
           if (r.insp) return;
-          var key = (r.year || '') + '|' + plain(r.name || '');
-          if (!groups[key]) { groups[key] = { year: r.year || '', name: r.name || '', parts: [], byText: {} }; keys.push(key); }
-          var g = groups[key];
+          var y = r.year || '?';
+          if (!years[y]) { years[y] = { regs: {}, order: [] }; ylist.push(y); }
+          var Y = years[y], key = norm(r.name);
+          if (!Y.regs[key]) { Y.regs[key] = { name: r.name || '', parts: [], byText: {} }; Y.order.push(key); }
+          var g = Y.regs[key];
           (r.parts || []).forEach(function (x) {
-            var tk = plain(x.label || '') + '|' + plain(x.fr || '');
             if (!plain(x.fr || '') && !L(x.tr)) return;
+            var tk = norm(x.label) + '|' + norm(x.fr);
             if (!g.byText[tk]) { g.byText[tk] = { label: x.label, fr: x.fr, tr: x.tr, pages: [] }; g.parts.push(g.byText[tk]); }
             if (g.byText[tk].pages.indexOf(pid) < 0) g.byText[tk].pages.push(pid);
           });
         });
       });
-      keys.sort(function (a, b) { var ga = groups[a], gb = groups[b]; return (ga.year > gb.year) - (ga.year < gb.year) || (plain(ga.name) > plain(gb.name)) - (plain(ga.name) < plain(gb.name)); });
-      out += '<div class="regs" id="ra-regs"><div class="regs-head"><span>' + esc(t('n_regs').replace('{n}', keys.length)) + '</span><span></span>' +
+      ylist.sort();
+      var ntexts = 0;
+      ylist.forEach(function (y) { years[y].order.forEach(function (k) { ntexts += years[y].regs[k].parts.length; }); });
+      out += '<div class="regs" id="ra-regs"><div class="regs-head"><span>' + esc(t('n_regs').replace('{n}', ntexts)) + '</span><span></span>' +
         '<button type="button" class="regs-toggle" data-target="ra-regs" aria-expanded="false"><span class="when-closed">' + esc(t('open_all')) + '</span><span class="when-open">' + esc(t('close_all')) + '</span></button></div>';
-      keys.forEach(function (key, i) {
-        var g = groups[key];
-        var pgs = [];
-        g.parts.forEach(function (x) { x.pages.forEach(function (p) { if (pgs.indexOf(p) < 0) pgs.push(p); }); });
-        var body = g.parts.map(function (x) {
-          var lb = x.label ? '<b>' + clean(x.label) + '.</b> ' : '';
-          return '<div class="reg-body"><div class="orig"><p lang="fr">' + lb + clean(x.fr) + '</p></div><div class="tr"><p>' + lb + clean(lg === 'fr' ? '' : L(x.tr)) + '</p></div></div>' +
-            '<p class="reg-pages">' + esc(t('regs_in')) + ' ' + x.pages.map(tlink).join(' ') + '</p>';
+      ylist.forEach(function (y) {
+        var Y = years[y];
+        Y.order.sort(function (a, b) { return plain(Y.regs[a].name).localeCompare(plain(Y.regs[b].name), 'fr'); });
+        var names = Y.order.map(function (k) { return plain(Y.regs[k].name); });
+        var body = Y.order.map(function (k) {
+          var g = Y.regs[k];
+          return '<div class="ra-reg"><h4 lang="fr">' + clean(g.name) + '</h4>' + g.parts.map(function (x) {
+            var lb = x.label ? '<b>' + clean(x.label) + '.</b> ' : '';
+            return '<div class="reg-body"><div class="orig"><p lang="fr">' + lb + clean(x.fr) + '</p></div><div class="tr"><p>' + lb + clean(lg === 'fr' ? '' : L(x.tr)) + '</p></div></div>' +
+              '<p class="reg-pages">' + esc(t('regs_in')) + ' ' + x.pages.map(tlink).join(' ') + '</p>';
+          }).join('') + '</div>';
         }).join('');
-        out += '<details class="reg yr" id="ra-' + i + '"><summary><span class="reg-date"><b class="yr-y">' + esc(g.year) + '</b> — <span lang="fr">' + clean(g.name) + '</span></span>' +
-          '<span class="yr-count">' + pgs.length + '</span><span class="chev" aria-hidden="true"></span></summary>' + body + '</details>';
+        out += '<details class="reg yr" id="ra-' + esc(y) + '"><summary><span class="reg-date"><b class="yr-y">' + esc(y) + '</b> — <span lang="fr">' + esc(names.join(' · ')) + '</span></span>' +
+          '<span class="yr-count">' + Y.order.length + '</span><span class="chev" aria-hidden="true"></span></summary>' + body + '</details>';
       });
       out += '</div>';
     }

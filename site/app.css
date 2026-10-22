@@ -387,3 +387,6 @@ body.editing .infobox{position:static;max-height:none;overflow:visible}
 .insp-table .insp-grp th{background:var(--quote-bg);color:var(--bleu);font-style:italic}
 .insp-obs{border:1px dashed var(--line);margin:.8rem 0}
 .insp-sig{font-style:italic;color:var(--muted);font-size:.9rem;margin:.6rem 0 0}
+.ra-reg{border-top:1px dashed var(--line)}
+.ra-reg > h4{font-family:var(--label);letter-spacing:.04em;font-size:.95rem;color:var(--bleu);margin:0;padding:.7rem .9rem .2rem}
+.ra-reg .reg-body{border-top:0}
