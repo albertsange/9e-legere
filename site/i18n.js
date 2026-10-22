@@ -84,6 +84,7 @@ window.I18N = (function () {
     error: U("S'ha produït un error:", "An error occurred:", "Si è verificato un errore:", "Une erreur s'est produite :", "Ein Fehler ist aufgetreten:"),
 
     // account
+    dark_mode: U("Mode fosc", "Dark mode", "Modalità scura", "Mode sombre", "Dunkelmodus"),
     account: U("El meu compte", "My account", "Il mio account", "Mon compte", "Mein Konto"),
     status: U("Estat", "Status", "Stato", "Statut", "Status"),
     st_pending: U("Pendent d'aprovació", "Awaiting approval", "In attesa di approvazione", "En attente d'approbation", "Wartet auf Freigabe"),

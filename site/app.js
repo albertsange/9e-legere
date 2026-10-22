@@ -249,6 +249,11 @@
   }
 
   /* ------------------------------------------------------------------ chrome: menu, account, language */
+  function isDark() {
+    var th = document.documentElement.dataset.theme;
+    if (th === 'dark' || th === 'light') return th === 'dark';
+    return !!(window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches);
+  }
   function renderChrome() {
     document.documentElement.lang = S.lang;
     document.documentElement.dataset.lang = S.lang;
@@ -274,14 +279,16 @@
       '<li><a href="#fonts" data-sec="fonts"><span class="n">·</span><span>' + esc(L((S.site.fonts || {}).title) || t('sources')) + '</span></a></li>' +
       (isAdmin() ? '<li><a href="#nova" data-sec="nova"><span class="n">+</span><span>' + esc(t('new_page')) + '</span></a></li>' : '') + '</ol>';
 
-    var acct = document.getElementById('acct');
+    var acct = document.getElementById('acct'), dark = isDark();
     if (!S.session) {
-      acct.innerHTML = '<button type="button" class="btn-ghost" data-act="login">' + esc(t('login')) + '</button>';
+      acct.innerHTML = '<button type="button" class="btn-ghost theme-ico" data-act="theme" role="switch" aria-checked="' + dark + '" aria-label="' + esc(t('dark_mode')) + '" title="' + esc(t('dark_mode')) + '">' + (dark ? '☀' : '☾') + '</button>' +
+        '<button type="button" class="btn-ghost" data-act="login">' + esc(t('login')) + '</button>';
     } else {
       var who = S.profile ? (S.profile.nom_guerre || S.profile.first_name || S.session.user.email) : S.session.user.email;
       acct.innerHTML = '<details class="acct-menu"><summary class="btn-ghost"><span class="acct-ico" aria-hidden="true"></span>' + esc(who) + '</summary><div class="acct-pop">' +
         '<a href="#compte">' + esc(t('account')) + '</a>' +
         (isAdmin() ? '<a href="#gestio">' + esc(t('admin')) + '</a>' : '') +
+        '<button type="button" class="theme-tog" data-act="theme" role="switch" aria-checked="' + dark + '"><span>' + esc(t('dark_mode')) + '</span><span class="sw" aria-hidden="true"></span></button>' +
         '<button type="button" data-act="logout">' + esc(t('logout')) + '</button></div></details>';
     }
     var bar = document.getElementById('editbar');
@@ -1149,6 +1156,15 @@
       var act = el.getAttribute('data-act');
       if (act === 'login') { e.preventDefault(); openLogin(); return; }
       if (act === 'close-dlg') { closeLogin(); return; }
+      if (act === 'theme') {
+        e.preventDefault();
+        var nt = isDark() ? 'light' : 'dark', open = !!el.closest('.acct-menu[open]');
+        document.documentElement.dataset.theme = nt;
+        try { localStorage.setItem('9e-theme', nt); } catch (er) {}
+        renderChrome();
+        if (open) { var m = document.querySelector('.acct-menu'); if (m) m.open = true; }
+        return;
+      }
       if (act === 'logout') { e.preventDefault(); if (!leaveEditOk()) return; S.edit = false; sb.auth.signOut().catch(fail); return; }
       if (act === 'toggle-edit') {
         if (S.edit && !leaveEditOk()) return;
