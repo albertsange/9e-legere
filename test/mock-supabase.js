@@ -18,9 +18,10 @@
     site: Object.keys(seed.site).map(function (k) { return { key: k, value: JSON.parse(JSON.stringify(seed.site[k])) }; }),
     squads: [{ id: 1, name: 'Esquadra A' }, { id: 2, name: 'Esquadra B' }],
     page_edits: [{ id: 1, page_id: 'shako', editor_name: 'La Tour', edited_at: '2026-10-21T15:00:00Z', fields: ['desc', 'std'] }, { id: 2, page_id: 'shako', editor_name: 'Bonaparte', edited_at: '2026-10-20T10:00:00Z', fields: ['info'] }],
+    comments: [], notifications: [],
     profiles: USERS.map(function (u) { var p = JSON.parse(JSON.stringify(u.profile)); p.id = u.id; p.email = u.email; p.created_at = new Date().toISOString(); return p; })
   };
-  var KEY = { page_edits: 'id', pages: 'id', page_private: 'page_id', site: 'key', squads: 'id', profiles: 'id' };
+  var KEY = { page_edits: 'id', pages: 'id', page_private: 'page_id', site: 'key', squads: 'id', profiles: 'id', comments: 'id', notifications: 'id' };
   var storage = {}; // path -> url
   var session = null, listeners = [];
   var log = window.__MOCKLOG = [];
@@ -29,34 +30,41 @@
   function member() { var p = me(); return !!(p && p.status === 'approved'); }
   function admin() { var p = me(); return member() && p.role === 'admin'; }
   function canRead(t, row) {
-    if (t === 'page_private') return member();
+    if (t === 'page_private' || t === 'comments') return member();
+    if (t === 'notifications') return session && row.user_id === session.user.id;
     if (t === 'profiles') return session && (row.id === session.user.id || admin());
     return true;
   }
   function canWrite(t, row) {
+    if (t === 'comments') return member();
+    if (t === 'notifications') return session && row.user_id === session.user.id;
     if (t === 'profiles') return session && (row.id === session.user.id || admin());
     return admin();
   }
   function clone(x) { return JSON.parse(JSON.stringify(x)); }
 
-  function Q(table) { this.t = table; this.op = 'select'; this.filters = []; this.ord = null; this.single = false; }
+  function Q(table) { this.t = table; this.op = 'select'; this.filters = []; this.ord = null; this.one = false; }
   Q.prototype.select = function () { if (this.op === 'select') this.op = 'select'; return this; };
   Q.prototype.order = function (c, o) { this.ord = [c, !(o && o.ascending === false)]; return this; };
   Q.prototype.eq = function (c, v) { this.filters.push([c, v]); return this; };
-  Q.prototype.maybeSingle = function () { this.single = true; return this; };
+  Q.prototype.single = function () { this.one = true; return this; };
+  Q.prototype.limit = function () { return this; };
+  Q.prototype.in = function (c, v) { this.filters.push([c, v, 'in']); return this; };
+  Q.prototype.is = function (c, v) { this.filters.push([c, v, 'is']); return this; };
+  Q.prototype.maybeSingle = function () { this.one = true; return this; };
   Q.prototype.update = function (v) { this.op = 'update'; this.val = v; return this; };
   Q.prototype.upsert = function (v) { this.op = 'upsert'; this.val = v; return this; };
   Q.prototype.insert = function (v) { this.op = 'insert'; this.val = v; return this; };
   Q.prototype.delete = function () { this.op = 'delete'; return this; };
   Q.prototype.then = function (res, rej) { var self = this; return new Promise(function (r) { setTimeout(function () { r(self.run()); }, 5); }).then(res, rej); };
-  Q.prototype.match = function (row) { return this.filters.every(function (f) { return String(row[f[0]]) === String(f[1]); }); };
+  Q.prototype.match = function (row) { return this.filters.every(function (f) { return f[2] === 'in' ? f[1].indexOf(row[f[0]]) > -1 : f[2] === 'is' ? row[f[0]] == f[1] : String(row[f[0]]) === String(f[1]); }); };
   Q.prototype.run = function () {
     var t = this.t, rows = db[t], self = this, k = KEY[t];
     log.push(this.op + ' ' + t);
     if (this.op === 'select') {
       var out = rows.filter(function (r) { return self.match(r) && canRead(t, r); }).map(clone);
       if (this.ord) { var c = this.ord[0], asc = this.ord[1]; out.sort(function (a, b) { return (a[c] > b[c] ? 1 : a[c] < b[c] ? -1 : 0) * (asc ? 1 : -1); }); }
-      return { data: this.single ? (out[0] || null) : out, error: null };
+      return { data: this.one ? (out[0] || null) : out, error: null };
     }
     if (this.op === 'update') {
       var n = 0;
@@ -67,6 +75,18 @@
         Object.assign(r, v); n++;
       });
       return { data: null, error: null, count: n };
+    }
+    if (this.op === 'delete' && t === 'comments') {
+      db.comments = rows.filter(function (r) { return !(self.match(r) && (admin() || r.author === session.user.id)) && !db.comments.some(function (x) { return x.id === r.parent_id && self.match(x); }); });
+      return { data: null, error: null };
+    }
+    if (this.op === 'insert' && t === 'comments') {
+      if (!member()) return { data: null, error: { message: 'rls' } };
+      var c = clone(this.val), m = me(); c.id = rows.length + 1; c.author = m.id; c.author_name = m.nom_guerre; c.created_at = new Date().toISOString();
+      if (c.parent_id) { var par = rows.filter(function (r) { return r.id === c.parent_id; })[0]; c.parent_id = par.parent_id || par.id; }
+      rows.push(c);
+      (c.mentions || []).forEach(function (u) { if (u !== c.author) db.notifications.push({ id: db.notifications.length + 1, user_id: u, comment_id: c.id, page_id: c.page_id, actor_name: c.author_name, kind: 'mention', read_at: null, created_at: c.created_at }); });
+      return { data: clone(c), error: null };
     }
     if (this.op === 'delete') {
       if (!admin()) return { data: null, error: null };
@@ -116,6 +136,7 @@
   var client = {
     from: function (t) { return new Q(t); },
     rpc: function (name) {
+      if (name === 'member_directory') return Promise.resolve({ data: member() ? db.profiles.filter(function (p) { return p.status === 'approved'; }).map(function (p) { return { id: p.id, nom_guerre: p.nom_guerre, first_name: p.first_name, last_name: p.last_name }; }) : null, error: null });
       if (name === 'storage_usage') return Promise.resolve({ data: admin() ? { bytes: 5242880, files: Object.keys(storage).length + 7 } : null, error: null });
       return Promise.resolve({ data: null, error: { message: 'unknown function' } });
     },
