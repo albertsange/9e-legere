@@ -196,7 +196,8 @@
     pair: function () { return ['', '']; },
     reg: function () { return { _new: true, year: '', name: '', parts: [{ label: '', fr: '', tr: { ca: '' } }] }; },
     regpart: function () { return { label: '', fr: '', tr: { ca: '' } }; },
-    group: function () { return { title: { ca: '' }, desc: { ca: '' }, figs: [] }; }
+    group: function () { return { title: { ca: '' }, desc: { ca: '' }, figs: [] }; },
+    version: function () { var v = { year: '', title: {}, text: {}, specs: {}, image: '', nine: false }; v.title[S.lang] = ''; v.text[S.lang] = ''; v.specs[S.lang] = []; return v; }
   };
 
   /* ------------------------------------------------------------------ data */
@@ -387,7 +388,9 @@
       var path = el.getAttribute('data-path'), v;
       if (el.isContentEditable && el.hasAttribute('data-paras')) {
         // one box for the whole description, stored as a list of paragraphs
-        v = clean(el.innerHTML).replace(/<\/(p|div)>/gi, '\u0001').replace(/<(p|div)(\s[^>]*)?>/gi, '').replace(/(<br\s*\/?>\s*){2,}/gi, '\u0001')
+        var box = el.cloneNode(true);
+        Array.prototype.forEach.call(box.querySelectorAll('figure[data-fig]'), function (f) { var m = document.createElement('p'); m.textContent = '[[fig:' + f.getAttribute('data-fig') + ']]'; f.parentNode.replaceChild(m, f); });
+        v = clean(box.innerHTML).replace(/<\/(p|div)>/gi, '\u0001').replace(/<(p|div)(\s[^>]*)?>/gi, '').replace(/(<br\s*\/?>\s*){2,}/gi, '\u0001')
           .split('\u0001').map(function (x) { return x.replace(/^(\s|&nbsp;|<br\s*\/?>)+|(\s|&nbsp;|<br\s*\/?>)+$/gi, ''); }).filter(function (x) { return plain(x); });
       } else if (el.isContentEditable) {
         v = clean(el.innerHTML).replace(/(<br\s*\/?>|\s|&nbsp;)+$/i, '');
@@ -610,6 +613,73 @@
     return '<div class="rel">' + rows.map(function (r) { return '<p class="rel-row"><span class="rel-k">' + esc(t(r[0])) + '</span>' + r[1].map(tlink).join('') + '</p>'; }).join('') + '</div>';
   }
 
+  /* ------------------------------------------------------------------ images inside the description and model versions */
+  var FIGRE = /^\[\[fig:([a-z0-9]+)\]\]$/;
+  function figHtml(c, fid, E) {
+    var f = (c.figs || {})[fid]; if (!f || !f.src) return '';
+    if (E) {
+      return '<figure class="fig-r fig-ed" contenteditable="false" data-fig="' + esc(fid) + '"><button type="button" class="fig-x" data-act="fig-del" data-fig="' + esc(fid) + '" aria-label="' + esc(t('remove_img')) + '" title="' + esc(t('remove_img')) + '">✕</button>' +
+        '<img src="' + imgSrc(f.src) + '" alt=""><figcaption class="ed" contenteditable="true" data-single="1" data-path="page.content.figs.' + fid + '.cap.' + S.lang + '" data-ph="' + esc(t('fig_cap_ph')) + '">' + clean((f.cap || {})[S.lang] || '') + '</figcaption></figure>';
+    }
+    var cap = L(f.cap);
+    return '<figure class="fig-r"><a href="' + imgSrc(f.src) + '" target="_blank" rel="noopener"><img src="' + imgSrc(f.src) + '" alt="' + esc(plain(cap)) + '" loading="lazy"></a>' + (cap ? '<figcaption>' + clean(cap) + '</figcaption>' : '') + '</figure>';
+  }
+  // after translation, every language gets the image markers at the same paragraph positions as the edited one
+  function syncFigs(c, lang) {
+    var d = c && c.desc; if (!d || !Array.isArray(d[lang])) return;
+    var pos = [], used = {};
+    d[lang].forEach(function (x, i) { var m = String(x).trim().match(FIGRE); if (m) { pos.push([i, '[[fig:' + m[1] + ']]']); used[m[1]] = 1; } });
+    LANGS.forEach(function (k) {
+      if (k === lang || !Array.isArray(d[k])) return;
+      var a = d[k].filter(function (x) { return String(x).indexOf('[[fig:') < 0; });
+      pos.forEach(function (q2) { a.splice(Math.min(q2[0], a.length), 0, q2[1]); });
+      d[k] = a;
+    });
+    if (c.figs) Object.keys(c.figs).forEach(function (id) { if (!used[id]) delete c.figs[id]; });
+  }
+  function stChip(st) { return '<span class="st-chip st-' + st + '">' + esc(t('sst_' + st)) + '</span>'; }
+  function versionsHtml(id, c, E) {
+    var vs = c.versions || [], lg = S.lang, cp = 'page.content.versions';
+    if (!vs.length && !E) return '';
+    var VS = function (v) { return E ? ((v.specs || {})[lg] || []) : LA(v.specs); };
+    var html = '<h3 class="sum-h">' + esc(t('evol_h')) + '</h3>';
+    if (vs.length) html += '<ol class="vtl">' + vs.map(function (v, i) {
+      return '<li' + (v.nine ? ' class="nine"' : '') + '><a href="#' + id + '-ver-' + i + '" data-act="ver-open" data-i="' + i + '"><span class="vtl-dot" aria-hidden="true"></span><span class="vtl-y">' + esc(v.year || '—') + '</span>' +
+        (v.nine ? '<span class="nine-b">9e</span>' : '') + '</a></li>';
+    }).join('') + '</ol>';
+    html += vs.map(function (v, i) {
+      var sp = VS(v), sPath = cp + '.' + i + '.specs.' + lg;
+      var specs = (sp.length || E) ? '<table class="ver-specs">' + sp.map(function (r, j) {
+        return '<tr' + rowAttr(sPath, j) + '><th scope="row">' + dragH(sPath, j) + F(sPath + '.' + j + '.0', r[0], 'span', '', { raw: 1, single: 1 }) + '</th><td>' + F(sPath + '.' + j + '.1', r[1], 'span', '', { raw: 1 }) + listBtns(sPath, j) + '</td></tr>';
+      }).join('') + '</table>' + addBtn(sPath, 'pair', 'add_row') : '';
+      var img = v.image ? '<figure class="fig-r"><img src="' + imgSrc(v.image) + '" alt="" loading="lazy"></figure>' : '';
+      var body = E
+        ? '<div class="ver-ed"><label>' + esc(t('year')) + ' ' + F(cp + '.' + i + '.year', v.year, 'span', 'ver-year', { raw: 1, single: 1 }) + '</label>' +
+          F(cp + '.' + i + '.title.' + lg, (v.title || {})[lg], 'p', 'ver-title', { raw: 1, single: 1, ph: t('ver_title_ph') }) +
+          '<label class="ver-nine"><input type="checkbox" data-path="' + cp + '.' + i + '.nine"' + (v.nine ? ' checked' : '') + '> ' + esc(t('nine_label')) + '</label>' +
+          '<p><button type="button" class="btn-small" data-act="img" data-target="' + cp + '.' + i + '.image">' + esc(t('change_img')) + '</button>' + listBtns(cp, i) + '</p></div>' +
+          img + F(cp + '.' + i + '.text.' + lg, (v.text || {})[lg], 'div', 'ver-text', { pid: id }) + specs
+        : img + F('', L(v.text), 'div', 'ver-text', { pid: id }) + specs;
+      return '<details class="ver' + (v.nine ? ' nine' : '') + '" id="' + id + '-ver-' + i + '"' + (E || v.nine ? ' open' : '') + '><summary><span class="ver-y">' + esc(v.year || '—') + '</span><span class="ver-t">' + esc(plain(L(v.title))) + '</span>' +
+        (v.nine ? '<span class="nine-b">9e</span>' : '') + '</summary><div class="ver-body">' + body + '</div></details>';
+    }).join('');
+    if (E) html += addBtn(cp, 'version', 'add_version');
+    // comparison of the measurements of every model that has them
+    var withSpecs = vs.filter(function (v) { return LA(v.specs).length; });
+    if (!E && withSpecs.length > 1) {
+      var labels = [];
+      withSpecs.forEach(function (v) { LA(v.specs).forEach(function (r) { if (labels.indexOf(plain(r[0])) < 0) labels.push(plain(r[0])); }); });
+      html += '<h4 class="cmp-h">' + esc(t('compare_h')) + '</h4><div class="cmp-wrap"><table class="cmp"><thead><tr><th></th>' + withSpecs.map(function (v) { return '<th' + (v.nine ? ' class="nine"' : '') + '>' + esc(v.year) + (v.nine ? ' <span class="nine-b">9e</span>' : '') + '</th>'; }).join('') + '</tr></thead><tbody>' +
+        labels.map(function (lb) {
+          return '<tr><th scope="row">' + esc(lb) + '</th>' + withSpecs.map(function (v) {
+            var r = LA(v.specs).filter(function (x) { return plain(x[0]) === lb; })[0];
+            return '<td' + (v.nine ? ' class="nine"' : '') + '>' + (r ? clean(r[1]) : '—') + '</td>';
+          }).join('') + '</tr>';
+        }).join('') + '</tbody></table></div>';
+    }
+    return '<section class="evol">' + html + '</section>';
+  }
+
   /* ------------------------------------------------------------------ view: item page */
   function pageView(id) {
     var E = S.edit && S.draft && S.draft.page;
@@ -640,8 +710,9 @@
     var desc = VA('desc');
     var descHtml = E
       ? '<div class="ed ed-desc" contenteditable="true" data-path="' + cp + 'desc.' + lg + '" data-paras="1" data-ph="' + esc(t('empty_hint')) + '">' +
-        desc.map(function (x) { return '<p>' + clean(x) + '</p>'; }).join('') + '</div>'
-      : desc.map(function (x) { return F('', x, 'p', '', { pid: id, done: done }); }).join('');
+        desc.map(function (x) { var m = String(x).trim().match(FIGRE); return m ? figHtml(c, m[1], true) : '<p>' + clean(x) + '</p>'; }).join('') + '</div>'
+      : desc.map(function (x) { var m = String(x).trim().match(FIGRE); return m ? figHtml(c, m[1], false) : F('', x, 'p', '', { pid: id, done: done }); }).join('');
+    var V2 = Array.isArray(c.versions);
 
     // tabs
     var panels = [];
@@ -666,7 +737,17 @@
 
     panels.push(['dl', pr && pr.downloads && pr.downloads.length || null, pr ? dlHtml(id, pr, E) : '']);
     // the summary tab (lead, description and 9e standard) is the one open by default
-    panels.unshift(['sum', null, F(cp + 'lead.' + lg, V('lead'), 'p', 'lead-p', { pid: id, done: done }) + descHtml + stdHero]);
+    if (V2) {
+      var st = c.std_status || (p.status === 'pending' ? 'pending' : 'proposed');
+      var stdBox = '<section class="std-hero v2 st-' + st + '" aria-label="' + esc(t('what_9e')) + '"><h3 class="std-title">' + esc(t('what_9e')) +
+        (E ? '<select data-path="page.content.std_status" aria-label="' + esc(t('status')) + '">' + ['decided', 'proposed', 'pending'].map(function (k) { return '<option value="' + k + '"' + (k === st ? ' selected' : '') + '>' + esc(t('sst_' + k)) + '</option>'; }).join('') + '</select>' : stChip(st)) + '</h3>' +
+        F(cp + 'std.' + lg, V('std'), 'p', 'std-text', { pid: id }) +
+        ((V('just') || E) ? '<details class="std-just"' + (E ? ' open' : '') + '><summary>' + esc(t('just')) + '</summary>' + F(cp + 'just.' + lg, V('just'), 'p', '', { pid: id }) + '</details>' : '') +
+        (st === 'pending' && !E ? '<p class="std-link"><a class="tlink" href="#decisions">' + esc(L((S.site.decisions || {}).title) || t('decisions')) + '</a></p>' : '') + '</section>';
+      var addImg = E ? '<div class="fig-add"><button type="button" class="btn fig-add-btn" data-act="fig-add">📷 ' + esc(t('add_img_here')) + '</button><span class="muted">' + esc(t('add_img_hint')) + '</span></div>' : '';
+      panels.unshift(['sum', null, F(cp + 'lead.' + lg, V('lead'), 'p', 'lead-p', { pid: id, done: done }) + stdBox +
+        '<h3 class="sum-h">' + esc(t('desc_h')) + '</h3>' + addImg + '<div class="desc-flow">' + descHtml + '</div>' + versionsHtml(id, c, E)]);
+    } else panels.unshift(['sum', null, F(cp + 'lead.' + lg, V('lead'), 'p', 'lead-p', { pid: id, done: done }) + descHtml + stdHero]);
 
     var sel = S.tab[id] && panels.some(function (x) { return x[0] === S.tab[id]; }) ? S.tab[id] : 'sum';
     var tl = panels.map(function (x) {
@@ -1019,7 +1100,7 @@
     var btn = document.querySelector('#editbar [data-act="save"]'); if (btn) btn.disabled = true;
     var orig = S.draft.page ? { page: S.byId[S.draft.page.id], priv: S.priv[S.draft.page.id] } : { site: S.site };
     var warn = null, job = busy(t('saving'));
-    return translateDraft(orig, job).catch(function (e) { console.warn(e); warn = t('translate_fail'); }).then(function () { job.set(t('saving')); return store(btn, warn, job); });
+    return translateDraft(orig, job).catch(function (e) { console.warn(e); warn = t('translate_fail'); }).then(function () { if (S.draft.page) syncFigs(S.draft.page.content, S.lang); job.set(t('saving')); return store(btn, warn, job); });
   }
   function store(btn, warn, bj) {
     var job;
@@ -1249,6 +1330,36 @@
         }).catch(function (e) { fail(e); keepScroll(render); });
         return;
       }
+      if (act === 'ver-open') {
+        e.preventDefault();
+        var vd = document.getElementById(routeId() + '-ver-' + el.getAttribute('data-i'));
+        if (vd) { vd.open = true; vd.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+        return;
+      }
+      if (act === 'fig-del') {
+        e.preventDefault();
+        if (!window.confirm(t('remove_img') + '?')) return;
+        syncDraft();
+        var fid = el.getAttribute('data-fig'), dpath = 'page.content.desc.' + S.lang, darr = getPath(S.draft, dpath) || [];
+        setPath(S.draft, dpath, darr.filter(function (x) { return String(x).trim() !== '[[fig:' + fid + ']]'; }));
+        S.dirty = true; keepScroll(render); return;
+      }
+      if (act === 'fig-add') {
+        var at = S.figAt;
+        pickFile('image/*').then(function (files) {
+          if (!files.length) return;
+          return track(t('up_image'), upload(PUBLIC_BUCKET, files[0], 'img', IMG.page)).then(function (url) {
+            syncDraft();
+            var pc = S.draft.page.content, dpath = 'page.content.desc.' + S.lang, arr = getPath(S.draft, dpath);
+            if (!Array.isArray(arr)) { arr = []; setPath(S.draft, dpath, arr); }
+            var fid = Date.now().toString(36).slice(-5) + Math.random().toString(36).slice(2, 5);
+            pc.figs = pc.figs || {}; pc.figs[fid] = { src: url, cap: {} }; pc.figs[fid].cap[S.lang] = '';
+            arr.splice(at == null ? arr.length : Math.min(at, arr.length), 0, '[[fig:' + fid + ']]');
+            S.figAt = null; S.dirty = true; keepScroll(render);
+          });
+        }).catch(fail);
+        return;
+      }
       if (act === 'lightbox') { lightbox(el.getAttribute('data-pid'), parseInt(el.getAttribute('data-g'), 10), parseInt(el.getAttribute('data-i'), 10)); return; }
       if (act === 'add-file') {
         pickFile('', true).then(function (files) {
@@ -1382,6 +1493,18 @@
   document.getElementById('editbar').addEventListener('mousedown', function (e) {
     var b = e.target.closest('[data-cmd]'); if (!b) return;
     e.preventDefault(); richCmd(b.getAttribute('data-cmd'));
+  });
+  document.addEventListener('selectionchange', function () {
+    var sel = window.getSelection(); if (!sel || !sel.rangeCount) return;
+    var n = sel.anchorNode; if (!n) return;
+    var elx = n.nodeType === 1 ? n : n.parentNode; if (!elx || !elx.closest) return;
+    var box = elx.closest('.ed-desc'); if (!box) return;
+    if (elx.closest('figure')) return;
+    var child = elx; while (child && child.parentNode !== box) child = child.parentNode;
+    if (!child) return;
+    var idx = 0;
+    for (var k = 0; k < box.children.length && box.children[k] !== child; k++) { var ch = box.children[k]; if (ch.tagName === 'FIGURE' || plain(ch.innerHTML)) idx++; }
+    S.figAt = idx;
   });
   window.addEventListener('beforeunload', function (e) { if (isBusy() || (S.edit && S.dirty)) { e.preventDefault(); e.returnValue = ''; } });
 
