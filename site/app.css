@@ -319,3 +319,16 @@ body.editing .infobox{position:static;max-height:none;overflow:visible}
 .cmp .nine{background:color-mix(in srgb,var(--bleu) 8%,transparent)}
 @media (max-width:640px){.fig-r{float:none;width:auto;margin:.5rem 0 1rem}}
 .ver-specs{width:auto;min-width:min(100%,24rem)}.ver-specs th{background:none}
+
+/* infographic on the product sheet */
+.parts-wrap.with-infog{display:grid;grid-template-columns:minmax(200px,320px) minmax(0,1fr);gap:1.5rem;align-items:start}
+.infog{margin:0;position:sticky;top:1rem}
+.infog-img{position:relative;border:1px solid var(--line);border-radius:4px;background:#fff;overflow:hidden}
+.infog-img img{display:block;width:100%;height:auto}
+.infog.picking .infog-img img{cursor:crosshair;outline:3px solid var(--ecarlate);outline-offset:-3px}
+.hot{position:absolute;transform:translate(-50%,-50%);width:1.6rem;height:1.6rem;border-radius:50%;background:var(--ecarlate);color:#fff;font-family:var(--label);font-size:.85rem;display:flex;align-items:center;justify-content:center;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.45);pointer-events:none}
+.hot-n{display:inline-flex;align-items:center;justify-content:center;width:1.35rem;height:1.35rem;border-radius:50%;background:var(--ecarlate);color:#fff;font-family:var(--label);font-size:.75rem;margin-right:.45rem;vertical-align:middle;flex:none}
+.hot-n.off{background:var(--line);color:var(--muted)}
+.hot-btn.on{background:var(--ecarlate);color:#fff}
+.infog figcaption{font-size:.85rem;margin-top:.4rem}
+@media (max-width:760px){.parts-wrap.with-infog{grid-template-columns:1fr}.infog{position:static;max-width:320px;margin:0 auto}}

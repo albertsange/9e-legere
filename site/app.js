@@ -347,8 +347,8 @@
       var pr = clone(S.priv[id] || {});
       pr.narr = pr.narr || { ca: '' }; pr.evid = pr.evid || { ca: '' }; pr.regs = pr.regs || []; pr.groups = groupsOf(pr); delete pr.figs; delete pr.wide; pr.downloads = pr.downloads || [];
       var c = pg.content = pg.content || {};
-      (Array.isArray(c.versions) ? ['h2', 'lead'] : ['h2', 'lead', 'std', 'just']).forEach(function (k) { c[k] = c[k] || { ca: '' }; });
-      if (Array.isArray(c.versions)) ['std', 'just'].forEach(function (k) { pr[k] = pr[k] || { ca: '' }; });
+      ['h2', 'lead'].forEach(function (k) { c[k] = c[k] || { ca: '' }; });
+      ['std', 'just'].forEach(function (k) { pr[k] = pr[k] || { ca: '' }; });
       ['desc', 'parts', 'info', 'gaps'].forEach(function (k) { c[k] = c[k] || { ca: [] }; });
       S.draft = { page: pg, priv: pr };
     } else {
@@ -478,8 +478,8 @@
         F(P('ab' + n + '_t'), V('ab' + n + '_t'), 'h3', '', { raw: 1, single: 1 }) + F(P('ab' + n + '_p'), V('ab' + n + '_p'), 'p', '', { raw: 1 }) + (extra || '') + '</article>';
     }
     var lock = '<span class="lock" aria-hidden="true">🔒</span>';
-    var tabsStrip = '<p class="about-tabs">' + ['t_sum', 't_parts', 't_reg', 't_evid', 't_dl'].map(function (k, i) {
-      return '<span class="about-tab' + (i > 2 ? ' priv' : '') + '">' + esc(t(k)) + (i > 2 ? lock : '') + '</span>';
+    var tabsStrip = '<p class="about-tabs">' + ['sum', 'parts', 'reg', 'evid', 'model9', 'dl'].map(function (k) {
+      return '<span class="about-tab' + (LOCKED[k] ? ' priv' : '') + '">' + esc(t('t_' + k)) + (LOCKED[k] ? lock : '') + '</span>';
     }).join('') + '</p>';
     var decLink = '<p class="about-link"><a class="tlink" href="#decisions">' + esc(L((S.site.decisions || {}).title) || t('decisions')) + '</a></p>';
     var srcLink = '<p class="about-link"><a class="tlink" href="#fonts">' + esc(L((S.site.fonts || {}).title) || t('sources')) + '</a></p>';
@@ -713,15 +713,24 @@
       ? '<div class="ed ed-desc" contenteditable="true" data-path="' + cp + 'desc.' + lg + '" data-paras="1" data-ph="' + esc(t('empty_hint')) + '">' +
         desc.map(function (x) { var m = String(x).trim().match(FIGRE); return m ? figHtml(c, m[1], true) : '<p>' + clean(x) + '</p>'; }).join('') + '</div>'
       : desc.map(function (x) { var m = String(x).trim().match(FIGRE); return m ? figHtml(c, m[1], false) : F('', x, 'p', '', { pid: id, done: done }); }).join('');
-    var V2 = Array.isArray(c.versions);
+    var V2 = true;
 
     // tabs
     var panels = [];
     var parts = VA('parts');
-    var partsHtml = '<dl class="parts">' + parts.map(function (r, i) {
-      return '<div' + rowAttr(cp + 'parts.' + lg, i) + '><dt>' + dragH(cp + 'parts.' + lg, i) + F(cp + 'parts.' + lg + '.' + i + '.0', r[0], 'span', '', { raw: 1, single: 1 }) + '</dt><dd>' +
-        F(cp + 'parts.' + lg + '.' + i + '.1', r[1], 'span', '', { pid: id }) + listBtns(cp + 'parts.' + lg, i) + '</dd></div>';
-    }).join('') + '</dl>' + addBtn(cp + 'parts.' + lg, 'pair', 'add_row');
+    // infographic: numbered points on the item image, one per part shown in it
+    var hot = c.hot || [];
+    var hasHot = hot.some(function (h) { return h; });
+    var infog = (p.image && (hasHot || E)) ? '<figure class="infog' + (E && S.hotPick != null ? ' picking' : '') + '"><div class="infog-img"><img src="' + imgSrc(p.image) + '" alt="" data-act="' + (E ? 'hot-set' : '') + '">' +
+      hot.map(function (h, i) { return h && parts[i] ? '<span class="hot" style="left:' + h[0] + '%;top:' + h[1] + '%">' + (i + 1) + '</span>' : ''; }).join('') + '</div>' +
+      (E ? '<figcaption class="muted">' + esc(S.hotPick != null ? t('hot_click') : t('hot_hint')) + '</figcaption>' : '') + '</figure>' : '';
+    var partsHtml = '<div class="parts-wrap' + (infog ? ' with-infog' : '') + '">' + infog + '<dl class="parts">' + parts.map(function (r, i) {
+      var num = (hot[i] || E) && infog ? '<span class="hot-n' + (hot[i] ? '' : ' off') + '">' + (i + 1) + '</span>' : '';
+      var pick = E && p.image ? '<button type="button" class="mini hot-btn' + (S.hotPick === i ? ' on' : '') + '" data-act="hot-pick" data-i="' + i + '" title="' + esc(t('hot_pick')) + '" aria-label="' + esc(t('hot_pick')) + '">📍</button>' +
+        (hot[i] ? '<button type="button" class="mini" data-act="hot-del" data-i="' + i + '" title="' + esc(t('hot_del')) + '" aria-label="' + esc(t('hot_del')) + '">✕</button>' : '') : '';
+      return '<div' + rowAttr(cp + 'parts.' + lg, i) + '><dt>' + dragH(cp + 'parts.' + lg, i) + num + F(cp + 'parts.' + lg + '.' + i + '.0', r[0], 'span', '', { raw: 1, single: 1 }) + '</dt><dd>' +
+        F(cp + 'parts.' + lg + '.' + i + '.1', r[1], 'span', '', { pid: id }) + pick + listBtns(cp + 'parts.' + lg, i) + '</dd></div>';
+    }).join('') + '</dl></div>' + addBtn(cp + 'parts.' + lg, 'pair', 'add_row');
     if (c.diagram && !E) partsHtml += '<figure class="diagram">' + clean(c.diagram) + '</figure>';
     if (E) partsHtml += '<details class="ed-svg"><summary>' + esc(t('diagram_src')) + '</summary><textarea data-path="page.content.diagram" rows="8">' + esc(c.diagram || '') + '</textarea></details>';
     panels.push(['parts', null, partsHtml]);
@@ -1191,6 +1200,15 @@
     else if (act === 'up' && i > 0) arr.splice(i - 1, 0, arr.splice(i, 1)[0]);
     else if (act === 'down' && i < arr.length - 1) arr.splice(i + 1, 0, arr.splice(i, 1)[0]);
     else if (act === 'move' && tpl !== i && tpl >= 0 && tpl < arr.length) arr.splice(tpl, 0, arr.splice(i, 1)[0]);
+    // the infographic points follow their part when parts are removed or reordered
+    if (/^page\.content\.parts\./.test(listPath) && S.draft.page && Array.isArray(S.draft.page.content.hot)) {
+      var hh = S.draft.page.content.hot;
+      while (hh.length < arr.length + 1) hh.push(null);
+      if (act === 'del') hh.splice(i, 1);
+      else if (act === 'up' && i > 0) hh.splice(i - 1, 0, hh.splice(i, 1)[0]);
+      else if (act === 'down') hh.splice(i + 1, 0, hh.splice(i, 1)[0]);
+      else if (act === 'move' && tpl !== i) hh.splice(tpl, 0, hh.splice(i, 1)[0]);
+    }
     S.dirty = true;
     keepScroll(render);
   }
@@ -1335,6 +1353,15 @@
           return chain.then(function () { bj.end(true); toast(t('saved_photos').replace('{n}', done)); keepScroll(render); }, function (e) { bj.end(false); throw e; });
         }).catch(function (e) { fail(e); keepScroll(render); });
         return;
+      }
+      if (act === 'hot-pick') { syncDraft(); var hi = parseInt(el.getAttribute('data-i'), 10); S.hotPick = S.hotPick === hi ? null : hi; keepScroll(render); return; }
+      if (act === 'hot-del') { syncDraft(); var hc = S.draft.page.content; (hc.hot = hc.hot || [])[parseInt(el.getAttribute('data-i'), 10)] = null; S.dirty = true; keepScroll(render); return; }
+      if (act === 'hot-set') {
+        if (S.hotPick == null) return;
+        var rc = el.getBoundingClientRect(), hx = Math.round(1000 * (e.clientX - rc.left) / rc.width) / 10, hy = Math.round(1000 * (e.clientY - rc.top) / rc.height) / 10;
+        syncDraft(); var hc2 = S.draft.page.content; hc2.hot = hc2.hot || [];
+        while (hc2.hot.length < S.hotPick) hc2.hot.push(null);
+        hc2.hot[S.hotPick] = [hx, hy]; S.hotPick = null; S.dirty = true; keepScroll(render); return;
       }
       if (act === 'ver-open') {
         e.preventDefault();
