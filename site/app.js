@@ -821,7 +821,15 @@
     var descHtml = E
       ? '<div class="ed ed-desc" contenteditable="true" data-path="' + cp + 'desc.' + lg + '" data-paras="1" data-ph="' + esc(t('empty_hint')) + '">' +
         desc.map(function (x) { var m = String(x).trim().match(FIGRE); return m ? figHtml(c, m[1], true) : '<p>' + clean(x) + '</p>'; }).join('') + '</div>'
-      : desc.map(function (x) { var m = String(x).trim().match(FIGRE); return m ? figHtml(c, m[1], false) : F('', x, 'p', '', { pid: id, done: done }); }).join('');
+      : (function () {
+        var items = desc.map(function (x) { var m = String(x).trim().match(FIGRE); return m ? figHtml(c, m[1], false) : F('', x, 'p', '', { pid: id, done: done }); });
+        var pics = pr ? picFigs(id, pr) : [];
+        if (!pics.length) return items.join('');
+        // photos chosen from the evidence are spread over the paragraphs, alternating right and left (members only)
+        var at = pics.map(function (h, k) { return Math.floor(k * items.length / pics.length); }), out = '';
+        items.forEach(function (h, i) { at.forEach(function (a, k) { if (a === i) out += pics[k]; }); out += h; });
+        return out;
+      })();
     var V2 = true;
 
     // tabs
@@ -870,7 +878,7 @@
       var dlIdx = panels.map(function (x) { return x[0]; }).indexOf('dl');
       panels.splice(dlIdx < 0 ? panels.length : dlIdx, 0, ['model9', null, m9]);
       var addImg = E ? '<div class="fig-add"><button type="button" class="btn fig-add-btn" data-act="fig-add">📷 ' + esc(t('add_img_here')) + '</button><span class="muted">' + esc(t('add_img_hint')) + '</span></div>' : '';
-      panels.unshift(['sum', null, F(cp + 'lead.' + lg, V('lead'), 'p', 'lead-p', { pid: id, done: done }) +
+      panels.unshift(['sum', null, (E ? picsSection(id, pr) : '') + F(cp + 'lead.' + lg, V('lead'), 'p', 'lead-p', { pid: id, done: done }) +
         '<h3 class="sum-h">' + esc(t('desc_h')) + '</h3>' + addImg + '<div class="desc-flow">' + descHtml + '</div>' + (c.layout === 'v3' ? '' : versionsHtml(id, c, E))]);
     } else panels.unshift(['sum', null, F(cp + 'lead.' + lg, V('lead'), 'p', 'lead-p', { pid: id, done: done }) + descHtml + stdHero]);
 
@@ -992,6 +1000,60 @@
     if (pr && pr.figs && pr.figs.length) return [{ title: { ca: '' }, desc: { ca: '' }, figs: pr.figs }];
     return [];
   }
+  // photos for the description: references (paths) to evidence photos, kept in priv.pics
+  function evidFig(pr, path) {
+    var gs = groupsOf(pr);
+    for (var g = 0; g < gs.length; g++) { var fs = gs[g].figs || []; for (var i = 0; i < fs.length; i++) if (fs[i].path === path) return { f: fs[i], g: g, i: i }; }
+    return null;
+  }
+  function picFigs(id, pr) {
+    var out = [];
+    (pr.pics || []).forEach(function (path) {
+      var r = evidFig(pr, path); if (!r) return;
+      var cap = L(r.f.cap), side = out.length % 2 ? 'fig-l' : 'fig-r';
+      out.push('<figure class="' + side + ' pic-fig"><button type="button" class="gal-open" data-act="lightbox" data-pid="' + id + '" data-g="' + r.g + '" data-i="' + r.i + '" aria-label="' + esc(plain(cap) || t('open_photo')) + '"><img data-priv="' + esc(r.f.thumb || r.f.path) + '" alt="' + esc(r.f.alt || plain(cap) || '') + '" loading="lazy"></button>' + (cap ? '<figcaption>' + clean(cap) + '</figcaption>' : '') + '</figure>');
+    });
+    return out;
+  }
+  function picsSection(id, pr) {
+    var pics = ((S.draft && S.draft.priv && S.draft.priv.pics) || []), lg = S.lang;
+    var slots = pics.map(function (path, i) {
+      var r = evidFig(S.draft.priv, path); if (!r) return '';
+      var cap = (r.f.cap || {})[lg] || L(r.f.cap);
+      return '<figure class="pic-slot filled"><img data-priv="' + esc(r.f.thumb || r.f.path) + '" alt=""><button type="button" class="pic-del" data-act="pic-del" data-i="' + i + '" aria-label="' + esc(t('remove')) + '" title="' + esc(t('remove')) + '">' + BIN + '</button>' +
+        (cap ? '<figcaption>' + clean(cap) + '</figcaption>' : '') + '</figure>';
+    }).join('');
+    return '<section class="pics-sec"><h3 class="sum-h">' + esc(t('pics_h')) + '</h3><div class="pic-grid">' + slots +
+      '<button type="button" class="pic-slot empty" data-act="pic-add" aria-label="' + esc(t('pics_add')) + '" title="' + esc(t('pics_add')) + '"><span aria-hidden="true">+</span></button></div>' +
+      '<p class="muted">' + esc(t('pics_hint')) + '</p></section>';
+  }
+  function picsDialog() {
+    syncDraft();
+    var pr = S.draft.priv, have = pr.pics || [], dlg = document.getElementById('pics-dlg'), lg = S.lang;
+    if (!dlg) { dlg = document.createElement('dialog'); dlg.id = 'pics-dlg'; dlg.className = 'dlg pics-dlg'; document.body.appendChild(dlg);
+      dlg.addEventListener('click', function (e) {
+        if (e.target === dlg || e.target.closest('[data-pics-close]')) { dlg.close(); return; }
+        if (e.target.closest('[data-pics-ok]')) {
+          var add = Array.prototype.map.call(dlg.querySelectorAll('input[type=checkbox]:checked'), function (x) { return x.value; });
+          dlg.close();
+          if (add.length && S.draft) { S.draft.priv.pics = (S.draft.priv.pics || []).concat(add); S.dirty = true; keepScroll(render); }
+        }
+      }); }
+    var items = '';
+    groupsOf(pr).forEach(function (g) {
+      (g.figs || []).forEach(function (f) {
+        if (!f.path || have.indexOf(f.path) >= 0) return;
+        var cap = (f.cap || {})[lg] || L(f.cap);
+        items += '<label class="pd-item"><input type="checkbox" value="' + esc(f.path) + '"><img data-priv="' + esc(f.thumb || f.path) + '" alt="" loading="lazy"><span>' + (cap ? clean(cap) : '<em class="muted">' + esc(t('no_caption')) + '</em>') + '</span></label>';
+      });
+    });
+    dlg.innerHTML = '<div class="hist-head"><h2>' + esc(t('pics_dlg_h')) + '</h2><button type="button" class="lb-close" data-pics-close="1" aria-label="' + esc(t('close')) + '">×</button></div>' +
+      '<p class="pd-from">' + esc(t('pics_from')) + '</p>' +
+      (items ? '<div class="pd-list">' + items + '</div><p class="pd-actions"><button type="button" class="btn" data-pics-ok="1">' + esc(t('pics_ok')) + '</button></p>' : '<p class="muted">' + esc(t('pics_none')) + '</p>');
+    dlg.showModal();
+    fillPrivateImages(dlg);
+  }
+
   function evidHtml(id, pr, E) {
     var lg = S.lang, groups = groupsOf(pr);
     var out = '';
@@ -1555,6 +1617,8 @@
         }).catch(fail);
         return;
       }
+      if (act === 'pic-add') { picsDialog(); return; }
+      if (act === 'pic-del') { syncDraft(); S.draft.priv.pics.splice(parseInt(el.getAttribute('data-i'), 10), 1); S.dirty = true; keepScroll(render); return; }
       if (act === 'lightbox') { lightbox(el.getAttribute('data-pid'), parseInt(el.getAttribute('data-g'), 10), parseInt(el.getAttribute('data-i'), 10)); return; }
       if (act === 'add-file') {
         pickFile('', true).then(function (files) {
