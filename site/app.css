@@ -509,3 +509,12 @@ table.members th,table.members td{padding:.3rem .4rem}
 table.members input,table.members select{font-size:.9rem;padding:.2rem .3rem;min-width:6rem}
 .th-sort{font-size:.9rem}
 .mem-joined select{min-width:4.2rem}
+
+.gal-notes{margin:.4rem 0 .8rem;border:1px solid var(--line);border-radius:3px;background:var(--sheet)}
+.gal-notes > summary{display:grid;grid-template-columns:minmax(0,1fr) 1rem;gap:1rem;align-items:center;padding:.5rem .9rem;cursor:pointer;list-style:none;font-family:var(--label);letter-spacing:.05em;color:var(--bleu)}
+.gal-notes > summary::-webkit-details-marker{display:none}
+.gal-notes > summary:hover{background:var(--quote-bg)}
+.gal-notes[open] .chev{transform:rotate(-135deg);margin-top:.2rem}
+.gal-notes-body{padding:.2rem .9rem .8rem;max-width:52rem}
+.gal-notes-body ul{padding-left:1.2rem}.gal-notes-body li{margin:.3rem 0}
+.gal-notes-ed{margin:.4rem 0}

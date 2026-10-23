@@ -1180,10 +1180,13 @@
     groups.forEach(function (g, gi) {
       var base = 'priv.groups.' + gi, figs = g.figs || [];
       var title = E ? (g.title || {})[lg] : L(g.title), desc = E ? (g.desc || {})[lg] : L(g.desc);
+      var notes = E ? (g.notes || {})[lg] : L(g.notes);
       out += '<section class="gal-group' + (E ? ' ed-group' : '') + '">' +
         (E ? '<div class="gal-head"' + rowAttr('priv.groups', gi) + '>' + dragH('priv.groups', gi) + F(base + '.title.' + lg, title, 'h3', 'gal-title', { raw: 1, single: 1, ph: t('group_title') }) + listBtns('priv.groups', gi) + '</div>'
           : (title ? '<h3 class="gal-title">' + clean(title) + '</h3>' : '')) +
         ((desc || E) ? F(base + '.desc.' + lg, desc, 'p', 'gal-desc', { raw: 1, ph: t('group_desc') }) : '') +
+        ((notes || E) ? (E ? '<div class="gal-notes-ed"><span class="lbl">' + esc(t('group_notes')) + '</span>' + F(base + '.notes.' + lg, notes, 'div', 'gal-notes-body', { raw: 1, ph: t('group_notes_ph') }) + '</div>'
+          : '<details class="gal-notes"><summary>' + esc(t('group_notes')) + '<span class="chev" aria-hidden="true"></span></summary><div class="gal-notes-body">' + clean(notes) + '</div></details>') : '') +
         '<div class="gallery">' + figs.map(function (f, i) {
           var thumb = f.thumb || f.path;
           var cap = E ? (f.cap || {})[lg] : L(f.cap);
