@@ -17,7 +17,7 @@ const json = (body: unknown, status = 200) =>
 async function viaAnthropic(key: string, texts: string[], source: string, target: string): Promise<string[]> {
   const prompt =
     `Translate each string of the JSON array below from ${LANG[source]} into ${LANG[target]}.\n` +
-    `Context: a reference guide on the uniform of a French Napoleonic light infantry regiment (9e Léger, 1809), written for reenactors.\n` +
+    `Context: a reference guide on the uniform of a French Napoleonic light infantry regiment (9e Léger, 1807), written for reenactors.\n` +
     `Rules:\n- Keep every HTML tag and attribute exactly as it is; translate only the visible text.\n` +
     `- Keep markers such as [[3]] unchanged.\n- Keep French technical names of uniform items (shako, habit-veste, giberne, briquet, buffleterie, guêtres...) and quotations in French unchanged when they appear in italics or quotes.\n` +
     `- Keep numbers and units unchanged. Use a clear, formal register.\n` +

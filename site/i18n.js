@@ -23,7 +23,7 @@ window.I18N = (function () {
     siblings: U("Altres parts", "Other parts", "Altre parti", "Autres parties", "Weitere Teile"),
     see_also: U("Vegeu també", "See also", "Vedi anche", "Voir aussi", "Siehe auch"),
     sub: U("Peça {n} de l'uniforme del 9e Léger", "Item {n} of the 9e Léger uniform", "Capo {n} dell'uniforme del 9e Léger", "Pièce {n} de l'uniforme du 9e Léger", "Stück {n} der Uniform des 9e Léger"),
-    cap: U("Detall de la làmina de referència (1809).", "Detail of the reference plate (1809).", "Dettaglio della tavola di riferimento (1809).", "Détail de la planche de référence (1809).", "Ausschnitt der Referenztafel (1809)."),
+    cap: U("Detall de la làmina de referència (1807).", "Detail of the reference plate (1807).", "Dettaglio della tavola di riferimento (1807).", "Détail de la planche de référence (1807).", "Ausschnitt der Referenztafel (1807)."),
     ib_std: U("Estàndard del 9e:", "9e standard:", "Standard del 9e:", "Standard du 9e :", "Standard des 9e:"),
     t_sum: U("Resum", "Summary", "Riepilogo", "Résumé", "Übersicht"),
     t_parts: U("Fitxa del producte", "Product sheet", "Scheda del prodotto", "Fiche du produit", "Produktblatt"),

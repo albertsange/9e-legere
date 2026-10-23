@@ -522,7 +522,7 @@
       F(P('about_h'), V('about_h'), 'h2', 'about-h', { raw: 1, single: 1, attr: ' id="about-h"' }) +
       '<div class="about-grid"><div class="about-list">' +
       ab(1, tabsStrip) + ab(2, srcLink) + ab(3) + ab(4, chips + decLink) + ab(5) + '</div>' +
-      '<figure class="about-plate"><img src="' + imgSrc(plate) + '" alt="9e Léger soldier, 1809" loading="lazy">' +
+      '<figure class="about-plate"><img src="' + imgSrc(plate) + '" alt="9e Léger soldier, 1807" loading="lazy">' +
       F(P('platecap'), V('platecap'), 'figcaption', '', { raw: 1 }) +
       (S.edit ? '<button type="button" class="btn-small" data-act="img" data-target="site.home.plate">' + esc(t('change_img')) + '</button>' : '') + '</figure>' +
       '</div></section>' +
