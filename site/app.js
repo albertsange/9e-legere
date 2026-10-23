@@ -872,7 +872,7 @@
       var m9 = '<div class="model9">' +
         '<p class="m9-state"><strong>' + esc(t('std_state')) + ':</strong> ' +
         (E ? '<select data-path="priv.std_status" aria-label="' + esc(t('std_state')) + '">' + ['decided', 'proposed', 'pending'].map(function (k) { return '<option value="' + k + '"' + (k === st ? ' selected' : '') + '>' + esc(t('sst_' + k)) + '</option>'; }).join('') + '</select>' : esc(t('sst_' + st))) + '</p>' +
-        F('priv.std.' + lg, PV('std'), 'p', '', { pid: id }) +
+        F('priv.std.' + lg, PV('std'), 'div', 'std-body', { pid: id }) +
         ((PV('just') || E) ? '<h3 class="sum-h">' + esc(t('just')) + '</h3>' + F('priv.just.' + lg, PV('just'), 'p', '', { pid: id }) : '') +
         ((PV('build') || E && pv.build) ? '<h3 class="sum-h">' + esc(t('build_h')) + '</h3>' + F('priv.build.' + lg, PV('build'), 'div', 'build-list', { pid: id }) : '') +
         (st === 'pending' && !E ? '<p><a class="tlink" href="#decisions">' + esc(L((S.site.decisions || {}).title) || t('decisions')) + '</a></p>' : '') + '</div>';
