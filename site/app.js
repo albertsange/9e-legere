@@ -485,6 +485,7 @@
   }
 
   /* ------------------------------------------------------------------ views: home and text blocks */
+  var HOME_THUMB = { equipement: 'img/home_uniforme.jpg', 'petit-equipement': 'img/home_petit.jpg', entretien: 'img/home_entretien.jpg', regs: 'img/home_regles.jpg' };
   function homeView() {
     var site = S.edit && S.draft && S.draft.site ? S.draft.site : S.site;
     var h = site.home || {};
@@ -493,9 +494,15 @@
     var row = homeRow;
     function secCard(id) {
       var p = S.byId[id], c = p.content || {}, kids = (S.children[id] || []), items = sectionItems(id);
-      return '<li class="hsec-card"><a class="hsec-main" href="#' + id + '"><span class="hsec-title">' + clean(L(c.h2) || p.name) + '</span>' +
+      var th = HOME_THUMB[id];
+      return '<li class="hsec-card"><a class="hsec-main" href="#' + id + '">' + (th ? '<img class="hsec-img" src="' + th + '" alt="" loading="lazy">' : '') + '<span class="hsec-title">' + clean(L(c.h2) || p.name) + '</span>' +
         '<span class="hsec-lead">' + esc(plain(L(c.lead))) + '</span><span class="hsec-n">' + esc(t('n_items').replace('{n}', items.length)) + '</span></a>' +
         (kids.length ? '<p class="hsec-kids">' + kids.map(tlink).join('') + '</p>' : '') + '</li>';
+    }
+    function regsCard() {
+      var rt = L((S.site.regs || {}).title) || t('regs_page');
+      return '<li class="hsec-card"><a class="hsec-main" href="#regulacions"><img class="hsec-img" src="' + HOME_THUMB.regs + '" alt="" loading="lazy"><span class="hsec-title">' + esc(plain(rt)) + '</span>' +
+        '<span class="hsec-lead">' + esc(t('regs_card_lead')) + '</span></a></li>';
     }
     var tops = S.children[''], secs = tops.filter(isSection), loose = tops.filter(function (x) { return !isSection(x); });
     var plate = h.plate || 'img/lamina_9e_1809.png';
@@ -517,7 +524,7 @@
       F(P('lead1'), V('lead1'), 'p', 'lead', { raw: 1 }) + '</header>' +
       (isAdmin() && !S.pages.length ? '<div class="locked empty-db"><div><strong>' + esc(t('empty_db_t')) + '</strong><p>' + esc(t('empty_db_p')) + '</p><p class="locked-actions"><a class="btn" href="#gestio">' + esc(t('admin')) + '</a></p></div></div>' :
       (secs.length ? '<div class="grid-head first"><h2>' + esc(t('sections_h')) + '</h2><p class="muted">' + esc(t('sections_hint')) + '</p></div>' +
-        '<ul class="hsec">' + secs.map(secCard).join('') + '</ul>' : '') +
+        '<ul class="hsec">' + secs.map(secCard).join('') + regsCard() + '</ul>' : '') +
       (loose.length ? '<div class="grid-head"><h2>' + esc(t('pieces')) + '</h2><p class="muted">' + esc(t('pieces_hint')) + '</p></div>' +
         '<ul class="hlist">' + loose.map(row).join('') + '</ul>' : '')) +
       '<section class="about" aria-labelledby="about-h">' +
@@ -622,6 +629,45 @@
       '</section>';
   }
 
+  /* ------------------------------------------------------------------ search inside the regulations and the inspections */
+  function searchBar(kind) {
+    return '<form class="ra-search" role="search" data-kind="' + kind + '" onsubmit="return false"><input type="search" class="ra-q" id="ra-q-' + kind + '" autocomplete="off" placeholder="' + esc(t('search_' + kind)) + '" aria-label="' + esc(t('search_' + kind)) + '">' +
+      '<span class="ra-count muted" aria-live="polite"></span></form>';
+  }
+  function foldText(x) { return String(x || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ''); }
+  function raSearch(form) {
+    var kind = form.getAttribute('data-kind'), q = foldText(form.querySelector('input').value).trim(), cnt = form.querySelector('.ra-count');
+    var box = document.getElementById(kind === 'insp' ? 'ra-insp' : 'ra-regs'); if (!box) return;
+    var blocks = Array.prototype.slice.call(box.querySelectorAll('details.reg, details.insp'));
+    Array.prototype.forEach.call(box.querySelectorAll('.hit'), function (x) { x.classList.remove('hit'); });
+    if (!q) { blocks.forEach(function (d) { d.open = false; }); cnt.textContent = ''; return; }
+    var words = q.split(/\s+/).filter(Boolean), first = null, n = 0;
+    blocks.forEach(function (d) {
+      // regulations: match each regulation entry inside a year block; inspections: the whole block
+      var units = kind === 'regs' ? Array.prototype.slice.call(d.querySelectorAll('.ra-reg')) : [d];
+      var any = false;
+      units.forEach(function (u) {
+        var txt = foldText((kind === 'regs' ? d.querySelector('summary').textContent + ' ' : '') + u.textContent);
+        if (words.every(function (w) { return txt.indexOf(w) > -1; })) { any = true; n++; u.classList.add('hit'); }
+      });
+      d.open = any;
+      if (any && !first) first = d;
+    });
+    cnt.textContent = n ? t('n_results').replace('{n}', n) : t('no_results');
+    if (first) {
+      var tgt = first.querySelector('.hit') || first;
+      window.scrollTo({ top: (first.getBoundingClientRect().top + window.scrollY) - 90, behavior: reduced() ? 'auto' : 'smooth' });
+    }
+  }
+  var raTimer = null;
+  document.addEventListener('input', function (e) {
+    var inp = e.target.closest && e.target.closest('.ra-search input'); if (!inp) return;
+    clearTimeout(raTimer); var f = inp.closest('form'); raTimer = setTimeout(function () { raSearch(f); }, 250);
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter' && e.target.closest && e.target.closest('.ra-search')) { e.preventDefault(); clearTimeout(raTimer); raSearch(e.target.closest('form')); }
+  });
+
   /* ------------------------------------------------------------------ view: all regulations and the inspections */
   function regsAllView() {
     var site = S.edit && S.draft && S.draft.site ? S.draft.site : S.site;
@@ -657,7 +703,7 @@
       ylist.sort();
       var ntexts = 0;
       ylist.forEach(function (y) { years[y].order.forEach(function (k) { ntexts += years[y].regs[k].parts.length; }); });
-      out += '<div class="regs" id="ra-regs"><div class="regs-head"><span>' + esc(t('n_regs').replace('{n}', ntexts)) + '</span><span></span>' +
+      out += searchBar('regs') + '<div class="regs" id="ra-regs"><div class="regs-head"><span>' + esc(t('n_regs').replace('{n}', ntexts)) + '</span><span></span>' +
         '<button type="button" class="regs-toggle" data-target="ra-regs" aria-expanded="false"><span class="when-closed">' + esc(t('open_all')) + '</span><span class="when-open">' + esc(t('close_all')) + '</span></button></div>';
       ylist.forEach(function (y) {
         var Y = years[y];
@@ -681,7 +727,9 @@
     out += '<section class="ra-part" aria-labelledby="ra-i"><h3 id="ra-i">' + esc(t('insp_h')) + '</h3>' + F('site.regs.intro_i.' + lg, V('intro_i'), 'p', 'ra-intro', { raw: 1 });
     if (!member) out += lockedHtml();
     else if (!(S.insp || []).length) out += '<p class="muted">' + esc(t('insp_none')) + '</p>';
-    else out += S.insp.map(function (row) { return inspHtml(row.id, row.content || {}); }).join('');
+    else out += searchBar('insp') + '<div class="insp-list" id="ra-insp"><div class="regs-head"><span>' + esc(t('n_insp').replace('{n}', S.insp.length)) + '</span><span></span>' +
+      '<button type="button" class="regs-toggle" data-target="ra-insp" aria-expanded="false"><span class="when-closed">' + esc(t('open_all')) + '</span><span class="when-open">' + esc(t('close_all')) + '</span></button></div>' +
+      S.insp.map(function (row) { return inspHtml(row.id, row.content || {}); }).join('') + '</div>';
     out += '</section></section>';
     return out;
   }
@@ -699,12 +747,12 @@
         (sh.sig ? '<p class="insp-sig" lang="fr">' + esc(sh.sig) + '</p>' : '') + '</section>';
     }).join('');
     var notes = LA(c.notes);
-    return '<article class="insp" id="insp-' + esc(id) + '"><h4><span class="yr-y">' + esc(c.year || '') + '</span> — <span lang="fr">' + esc(c.title || '') + '</span></h4>' +
-      '<p class="insp-meta" lang="fr">' + esc([c.date, c.place].filter(Boolean).join(', ')) + '</p>' +
+    return '<details class="insp" id="insp-' + esc(id) + '"><summary><span class="insp-sum"><span class="insp-t"><span class="yr-y">' + esc(c.year || '') + '</span> — <span lang="fr">' + esc(c.title || '') + '</span></span>' +
+      '<span class="insp-meta" lang="fr">' + esc([c.date, c.place].filter(Boolean).join(', ')) + '</span></span><span class="chev" aria-hidden="true"></span></summary><div class="insp-body">' +
       (L(c.summary) ? '<p>' + esc(L(c.summary)) + '</p>' : '') +
       (notes.length ? '<div class="insp-notes"><h5>' + esc(t('insp_notes')) + '</h5><ul>' + notes.map(function (n) { return '<li>' + esc(n) + '</li>'; }).join('') + '</ul></div>' : '') +
       '<h5 class="insp-tr-h">' + esc(t('insp_tr')) + '</h5>' + sheets +
-      ((c.pages || []).length ? '<p class="reg-pages">' + esc(t('regs_in')) + ' ' + c.pages.map(tlink).join(' ') + '</p>' : '') + '</article>';
+      ((c.pages || []).length ? '<p class="reg-pages">' + esc(t('regs_in')) + ' ' + c.pages.map(tlink).join(' ') + '</p>' : '') + '</div></details>';
   }
   function tlink(id) {
     var p = S.byId[id]; if (!p) return '';
