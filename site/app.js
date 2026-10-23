@@ -462,7 +462,7 @@
     if (id === 'home') html = homeView();
     else if (id === 'decisions' || id === 'fonts') html = blockView(id);
     else if (id === 'regulacions') html = regsAllView();
-    else if (id === 'registre') html = registerView();
+    else if (id === 'registre') { html = homeView(); setTimeout(function () { history.replaceState(null, '', location.pathname); openRegister(); }, 0); }
     else if (id === 'compte') html = accountView();
     else if (id === 'gestio') html = adminView();
     else if (id === 'nova') html = newPageView();
@@ -975,7 +975,7 @@
   function lockedHtml() {
     var msg = !S.session ? t('locked_p') : (S.profile && S.profile.status === 'blocked' ? t('locked_blocked') : t('locked_pending'));
     return '<div class="locked"><span class="lock-big" aria-hidden="true"></span><div><strong>' + esc(t('locked_t')) + '</strong><p>' + esc(msg) + '</p>' +
-      (!S.session ? '<p class="locked-actions"><button type="button" class="btn" data-act="login">' + esc(t('login')) + '</button> <a href="#registre">' + esc(t('register')) + '</a></p>' : '') + '</div></div>';
+      (!S.session ? '<p class="locked-actions"><button type="button" class="btn" data-act="login">' + esc(t('login')) + '</button> <button type="button" class="link" data-act="register">' + esc(t('register')) + '</button></p>' : '') + '</div></div>';
   }
 
   function regsHtml(id, pr, E) {
@@ -1282,19 +1282,6 @@
     return '<label class="fld"><span>' + esc(t('rank')) + '</span><select name="rank"' + (req ? ' required' : '') + '><option value="">' + esc(t('choose')) + '</option>' +
       RANKS.map(function (r) { return '<option' + (r === val ? ' selected' : '') + '>' + esc(r) + '</option>'; }).join('') + '</select></label>';
   }
-  function registerView() {
-    return '<section class="view narrow"><h2 class="page-title" tabindex="-1">' + esc(t('register_t')) + '</h2><p class="muted">' + esc(t('register_p')) + '</p>' +
-      '<form class="form" id="f-register" novalidate>' +
-      field('email', t('email'), 'email', '', ' required autocomplete="email"') +
-      '<div class="two">' + field('password', t('password'), 'password', '', ' required minlength="8" autocomplete="new-password"') +
-      field('password2', t('password2'), 'password', '', ' required minlength="8" autocomplete="new-password"') + '</div>' +
-      '<div class="two">' + field('first_name', t('first_name'), 'text', '', ' required maxlength="80" autocomplete="given-name"') +
-      field('last_name', t('last_name'), 'text', '', ' required maxlength="120" autocomplete="family-name"') + '</div>' +
-      '<div class="two">' + field('nom_guerre', t('nom_guerre'), 'text', '', ' required maxlength="80"') + squadField('') + '</div>' +
-      '<div class="two">' + rankField('', true) + '</div>' +
-      '<p class="form-msg" role="status"></p>' +
-      '<p class="form-actions"><button class="btn" type="submit">' + esc(t('register')) + '</button> <button type="button" class="link" data-act="login">' + esc(t('have_account')) + '</button></p></form></section>';
-  }
   function accountView() {
     if (!S.session) return '<section class="view narrow"><h2 class="page-title" tabindex="-1">' + esc(t('account')) + '</h2>' + lockedHtml() + '</section>';
     var p = S.profile || {};
@@ -1305,7 +1292,8 @@
       '<form class="form" id="f-profile"><h3>' + esc(t('my_data')) + '</h3>' +
       '<div class="two">' + field('first_name', t('first_name'), 'text', p.first_name, ' required maxlength="80"') + field('last_name', t('last_name'), 'text', p.last_name, ' required maxlength="120"') + '</div>' +
       '<div class="two">' + field('nom_guerre', t('nom_guerre'), 'text', p.nom_guerre, ' required maxlength="80"') + squadField(p.esquadra) + '</div>' +
-      '<div class="two">' + rankField(p.rank, false) + '</div>' +
+      '<div class="two">' + rankField(p.rank, false) + field('birth_date', t('birth_date'), 'date', p.birth_date, ' max="' + new Date().toISOString().slice(0, 10) + '" min="1900-01-01"') + '</div>' +
+      joinedFields((p.joined_9e || '').slice(0, 4), (p.joined_9e || '').slice(5, 7)) +
       '<p class="form-msg" role="status"></p><p class="form-actions"><button class="btn" type="submit">' + esc(t('save')) + '</button></p></form>' +
       '<form class="form" id="f-password"><h3>' + esc(t('set_pw_t')) + '</h3><div class="two">' +
       field('password', t('new_password'), 'password', '', ' required minlength="8" autocomplete="new-password"') + field('password2', t('password2'), 'password', '', ' required minlength="8" autocomplete="new-password"') + '</div>' +
@@ -1375,17 +1363,109 @@
   }
 
   /* ------------------------------------------------------------------ login dialog */
+  function dlgTabs(on) {
+    return '<div class="dlg-tabs" role="tablist">' + ['login', 'register'].map(function (k) {
+      return '<button type="button" role="tab" class="' + (k === on ? 'on' : '') + (k === 'register' ? ' cta' : '') + '" aria-selected="' + (k === on) + '" data-act="' + k + '">' + esc(t(k === 'login' ? 'login' : 'rg_tab')) + '</button>';
+    }).join('') + '</div>';
+  }
+  function showDlg(dlg) { if (!dlg.open) { if (dlg.showModal) dlg.showModal(); else dlg.setAttribute('open', ''); } }
   function openLogin() {
     var dlg = document.getElementById('login-dlg');
-    dlg.innerHTML = '<form method="dialog" class="form" id="f-login"><h2>' + esc(t('login')) + '</h2>' +
+    dlg.className = 'dlg';
+    dlg.innerHTML = dlgTabs('login') + '<form method="dialog" class="form" id="f-login"><h2>' + esc(t('login')) + '</h2>' +
       field('email', t('email'), 'email', '', ' required autocomplete="email"') +
       field('password', t('password'), 'password', '', ' required autocomplete="current-password"') +
       '<p class="form-msg" role="status"></p>' +
       '<p class="form-actions"><button class="btn" type="submit" value="go">' + esc(t('login')) + '</button> <button type="button" class="btn-ghost" data-act="close-dlg">' + esc(t('cancel')) + '</button></p>' +
-      '<p class="dlg-links"><button type="button" class="link" data-act="forgot">' + esc(t('forgot')) + '</button><a href="#registre" data-act="close-dlg">' + esc(t('no_account')) + '</a></p></form>';
-    if (dlg.showModal) dlg.showModal(); else dlg.setAttribute('open', '');
+      '<p class="dlg-links"><button type="button" class="link" data-act="forgot">' + esc(t('forgot')) + '</button></p></form>';
+    showDlg(dlg);
     var inp = dlg.querySelector('input'); if (inp) inp.focus();
   }
+  /* sign-up wizard in the same dialog: account, personal and 9e details */
+  function joinedFields(cy, cm) {
+    var y0 = new Date().getFullYear(), ys = '', ms = '', i;
+    cy = cy || ''; cm = cm || '';
+    for (i = y0; i >= 1970; i--) ys += '<option' + (String(i) === cy ? ' selected' : '') + '>' + i + '</option>';
+    for (i = 1; i <= 12; i++) { var mm = (i < 10 ? '0' : '') + i; ms += '<option value="' + mm + '"' + (mm === cm ? ' selected' : '') + '>' + esc(new Date(2000, i - 1, 1).toLocaleDateString(S.lang, { month: 'long' })) + '</option>'; }
+    return '<div class="fld"><span>' + esc(t('joined')) + ' <em>(' + esc(t('optional')) + ')</em></span><div class="two">' +
+      '<select name="jm" aria-label="' + esc(t('month')) + '"><option value="">' + esc(t('month')) + '</option>' + ms + '</select>' +
+      '<select name="jy" aria-label="' + esc(t('year')) + '"><option value="">' + esc(t('year')) + '</option>' + ys + '</select></div></div>';
+  }
+  function openRegister() {
+    var dlg = document.getElementById('login-dlg');
+    if (!S.rg) S.rg = { step: 0, d: {} };
+    drawReg(); showDlg(dlg);
+  }
+  function drawReg() {
+    var dlg = document.getElementById('login-dlg'), st = S.rg.step, d = S.rg.d, names = ['rg_s1', 'rg_s2', 'rg_s3'];
+    dlg.className = 'dlg dlg-wide';
+    var stepper = '<ol class="stepper">' + names.map(function (k, i) {
+      return '<li class="' + (i < st ? 'done' : i === st ? 'on' : '') + '"' + (i === st ? ' aria-current="step"' : '') + '><span class="sp-n">' + (i < st ? '✓' : i + 1) + '</span><span class="sp-l">' + esc(t(k)) + '</span></li>';
+    }).join('') + '</ol>';
+    var body = st === 0
+      ? field('email', t('email'), 'email', d.email, ' required autocomplete="email"') +
+        '<div class="two">' + field('password', t('password'), 'password', d.password, ' required minlength="8" autocomplete="new-password"') +
+        field('password2', t('password2'), 'password', d.password2, ' required minlength="8" autocomplete="new-password"') + '</div>'
+      : st === 1
+        ? '<div class="two">' + field('first_name', t('first_name'), 'text', d.first_name, ' required maxlength="80" autocomplete="given-name"') +
+          field('last_name', t('last_name'), 'text', d.last_name, ' required maxlength="120" autocomplete="family-name"') + '</div>' +
+          field('birth_date', t('birth_date'), 'date', d.birth_date, ' required max="' + new Date().toISOString().slice(0, 10) + '" min="1900-01-01" autocomplete="bday"')
+        : '<div class="two">' + field('nom_guerre', t('nom_guerre'), 'text', d.nom_guerre, ' required maxlength="80"') + squadField(d.esquadra) + '</div>' +
+          '<div class="two">' + rankField(d.rank, true) + '</div>' + joinedFields(d.jy, d.jm);
+    dlg.innerHTML = dlgTabs('register') + stepper + '<form class="form" id="f-register" novalidate>' + body + '<p class="form-msg" role="status"></p>' +
+      '<p class="form-actions">' + (st > 0 ? '<button type="button" class="btn-ghost" data-act="rg-back">' + esc(t('rg_back')) + '</button>' : '<button type="button" class="btn-ghost" data-act="close-dlg">' + esc(t('cancel')) + '</button>') +
+      '<button class="btn" type="submit">' + esc(st === 2 ? t('rg_go') : t('next')) + '</button></p></form>';
+    var inp = dlg.querySelector('form input, form select'); if (inp) inp.focus();
+  }
+  function regCollect(f) {
+    var d = S.rg.d;
+    Array.prototype.forEach.call(f.elements, function (el) {
+      if (!el.name) return;
+      if (el.name === 'jm' || el.name === 'jy') return;
+      d[el.name] = el.type === 'password' ? el.value : (el.value || '').trim();
+    });
+    if (f.jm) { d.jm = f.jm.value; d.jy = f.jy.value; d.joined = (d.jy && d.jm) ? d.jy + '-' + d.jm : ''; }
+  }
+  function regCheck(step, d) {
+    if (step === 0) {
+      if (!d.email || !d.password || !d.password2 || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(d.email)) return t('required');
+      if (d.password.length < 8) return t('pw_short');
+      if (d.password !== d.password2) return t('pw_mismatch');
+    } else if (step === 1) {
+      if (!d.first_name || !d.last_name || !d.birth_date) return t('required');
+      if (d.birth_date > new Date().toISOString().slice(0, 10) || d.birth_date < '1900-01-01') return t('rg_birth_bad');
+    } else {
+      if (!d.nom_guerre || !d.esquadra || !d.rank) return t('required');
+      if (!!d.jm !== !!d.jy) return t('rg_joined_both');
+    }
+    return '';
+  }
+  function regSubmit(f) {
+    regCollect(f);
+    var d = S.rg.d, bad = regCheck(S.rg.step, d);
+    if (bad) { msg(f, bad, true); return; }
+    if (S.rg.step < 2) { S.rg.step++; drawReg(); return; }
+    f.querySelector('button[type=submit]').disabled = true;
+    sb.auth.signUp({ email: d.email, password: d.password, options: { emailRedirectTo: location.origin + location.pathname,
+      data: { first_name: d.first_name, last_name: d.last_name, birth_date: d.birth_date, nom_guerre: d.nom_guerre, esquadra: d.esquadra, rank: d.rank, joined: d.joined || '', lang: S.lang } } }).then(function (r) {
+      if (r.error) throw r.error;
+      var rank = d.rank; S.rg = null; drawRegDone(rank);
+    }).catch(function (er) {
+      var m = /rate limit/i.test(er.message || '') ? t('rg_rate') : t('error') + ' ' + er.message;
+      msg(f, m, true); f.querySelector('button[type=submit]').disabled = false;
+    });
+  }
+  function drawRegDone(rank) {
+    var dlg = document.getElementById('login-dlg');
+    dlg.className = 'dlg dlg-wide';
+    dlg.innerHTML = '<div class="rg-done"><div class="rg-star" aria-hidden="true">★</div><h2>' + esc(t('rg_done_t')) + '</h2>' +
+      '<p class="rg-welcome">' + esc(t('rg_welcome').replace('{rank}', rank)) + '</p>' +
+      '<ol class="rg-steps"><li><span class="sp-n">1</span><div><b>' + esc(t('rg_w1')) + '</b><p>' + esc(t('rg_w1p')) + '</p></div></li>' +
+      '<li><span class="sp-n">2</span><div><b>' + esc(t('rg_w2')) + '</b><p>' + esc(t('rg_w2p')) + '</p></div></li></ol>' +
+      '<p class="muted">' + esc(t('rg_mail')) + '</p>' +
+      '<p class="form-actions"><button type="button" class="btn" data-act="close-dlg">' + esc(t('rg_ok')) + '</button></p></div>';
+  }
+  document.addEventListener('close', function (e) { if (e.target && e.target.id === 'login-dlg') S.rg = null; }, true);
   function closeLogin() { var dlg = document.getElementById('login-dlg'); if (dlg.open) { if (dlg.close) dlg.close(); else dlg.removeAttribute('open'); } }
   function msg(form, text, bad) { var m = form.querySelector('.form-msg'); if (m) { m.textContent = text; m.classList.toggle('bad', !!bad); } }
 
@@ -1591,7 +1671,9 @@
     if (el) {
       var act = el.getAttribute('data-act');
       if (act === 'login') { e.preventDefault(); openLogin(); return; }
-      if (act === 'close-dlg') { closeLogin(); return; }
+      if (act === 'register') { e.preventDefault(); openRegister(); return; }
+      if (act === 'rg-back') { var rf = document.getElementById('f-register'); if (rf) regCollect(rf); S.rg.step = Math.max(0, S.rg.step - 1); drawReg(); return; }
+      if (act === 'close-dlg') { S.rg = null; closeLogin(); return; }
       if (act === 'theme') {
         e.preventDefault();
         var nt = isDark() ? 'light' : 'dark', open = !!el.closest('.acct-menu[open]');
@@ -1852,24 +1934,14 @@
         closeLogin();
       }).catch(function () { msg(f, t('bad_login'), true); });
     } else if (fid === 'f-register') {
-      e.preventDefault();
-      var v = {}; ['email', 'password', 'password2', 'first_name', 'last_name', 'nom_guerre', 'esquadra', 'rank'].forEach(function (k) { v[k] = (f[k].value || '').trim(); });
-      v.password = f.password.value; v.password2 = f.password2.value;
-      if (Object.keys(v).some(function (k) { return !v[k]; }) || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v.email)) { msg(f, t('required'), true); return; }
-      if (v.password.length < 8) { msg(f, t('pw_short'), true); return; }
-      if (v.password !== v.password2) { msg(f, t('pw_mismatch'), true); return; }
-      f.querySelector('button[type=submit]').disabled = true;
-      sb.auth.signUp({ email: v.email, password: v.password, options: { emailRedirectTo: location.origin + location.pathname,
-        data: { first_name: v.first_name, last_name: v.last_name, nom_guerre: v.nom_guerre, esquadra: v.esquadra, rank: v.rank, lang: S.lang } } }).then(function (r) {
-        if (r.error) throw r.error;
-        f.reset(); msg(f, t('signup_ok'));
-      }).catch(function (er) { msg(f, t('error') + ' ' + er.message, true); })
-        .then(function () { f.querySelector('button[type=submit]').disabled = false; });
+      e.preventDefault(); regSubmit(f);
     } else if (fid === 'f-profile') {
       e.preventDefault();
       var upd = {}; ['first_name', 'last_name', 'nom_guerre', 'esquadra'].forEach(function (k) { upd[k] = (f[k].value || '').trim(); });
       if (Object.keys(upd).some(function (k) { return !upd[k]; })) { msg(f, t('required'), true); return; }
-      upd.rank = (f.rank.value || '').trim() || null;
+      upd.rank = (f.rank.value || '').trim() || null; upd.birth_date = f.birth_date.value || null;
+      if (!!f.jm.value !== !!f.jy.value) { msg(f, t('rg_joined_both'), true); return; }
+      upd.joined_9e = f.jy.value ? f.jy.value + '-' + f.jm.value + '-01' : null;
       track(t('saving'), sb.from('profiles').update(upd).eq('id', S.session.user.id).then(q).then(loadProfile)).then(function () { renderChrome(); msg(f, t('saved')); })
         .catch(function (er) { msg(f, t('error') + ' ' + er.message, true); });
     } else if (fid === 'f-password') {
