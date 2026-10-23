@@ -1277,6 +1277,11 @@
       S.squads.map(function (s) { return '<option' + (s.name === val ? ' selected' : '') + '>' + esc(s.name) + '</option>'; }).join('') +
       (val && !S.squads.some(function (s) { return s.name === val; }) ? '<option selected>' + esc(val) + '</option>' : '') + '</select></label>';
   }
+  var RANKS = ['Velite', 'Chasseur', 'Caporal', 'Caporal Fourrier', 'Sargeant', 'Sargeant Major', 'Sous Luitenant', 'Luitenant', 'Capitain'];
+  function rankField(val, req) {
+    return '<label class="fld"><span>' + esc(t('rank')) + '</span><select name="rank"' + (req ? ' required' : '') + '><option value="">' + esc(t('choose')) + '</option>' +
+      RANKS.map(function (r) { return '<option' + (r === val ? ' selected' : '') + '>' + esc(r) + '</option>'; }).join('') + '</select></label>';
+  }
   function registerView() {
     return '<section class="view narrow"><h2 class="page-title" tabindex="-1">' + esc(t('register_t')) + '</h2><p class="muted">' + esc(t('register_p')) + '</p>' +
       '<form class="form" id="f-register" novalidate>' +
@@ -1286,6 +1291,7 @@
       '<div class="two">' + field('first_name', t('first_name'), 'text', '', ' required maxlength="80" autocomplete="given-name"') +
       field('last_name', t('last_name'), 'text', '', ' required maxlength="120" autocomplete="family-name"') + '</div>' +
       '<div class="two">' + field('nom_guerre', t('nom_guerre'), 'text', '', ' required maxlength="80"') + squadField('') + '</div>' +
+      '<div class="two">' + rankField('', true) + '</div>' +
       '<p class="form-msg" role="status"></p>' +
       '<p class="form-actions"><button class="btn" type="submit">' + esc(t('register')) + '</button> <button type="button" class="link" data-act="login">' + esc(t('have_account')) + '</button></p></form></section>';
   }
@@ -1299,6 +1305,7 @@
       '<form class="form" id="f-profile"><h3>' + esc(t('my_data')) + '</h3>' +
       '<div class="two">' + field('first_name', t('first_name'), 'text', p.first_name, ' required maxlength="80"') + field('last_name', t('last_name'), 'text', p.last_name, ' required maxlength="120"') + '</div>' +
       '<div class="two">' + field('nom_guerre', t('nom_guerre'), 'text', p.nom_guerre, ' required maxlength="80"') + squadField(p.esquadra) + '</div>' +
+      '<div class="two">' + rankField(p.rank, false) + '</div>' +
       '<p class="form-msg" role="status"></p><p class="form-actions"><button class="btn" type="submit">' + esc(t('save')) + '</button></p></form>' +
       '<form class="form" id="f-password"><h3>' + esc(t('set_pw_t')) + '</h3><div class="two">' +
       field('password', t('new_password'), 'password', '', ' required minlength="8" autocomplete="new-password"') + field('password2', t('password2'), 'password', '', ' required minlength="8" autocomplete="new-password"') + '</div>' +
@@ -1341,13 +1348,13 @@
       if (!rows.length) { box.innerHTML = '<p class="muted">' + esc(t('no_members')) + '</p>'; return; }
       rows.sort(function (a, b) { return (a.status === 'pending' ? 0 : 1) - (b.status === 'pending' ? 0 : 1); });
       box.innerHTML = '<table class="members"><thead><tr><th>' + esc(t('first_name')) + ' / ' + esc(t('last_name')) + '</th><th>' + esc(t('nom_guerre')) + '</th><th>' + esc(t('esquadra')) +
-        '</th><th>' + esc(t('email')) + '</th><th>' + esc(t('status')) + '</th><th>' + esc(t('role')) + '</th><th></th></tr></thead><tbody>' +
+        '</th><th>' + esc(t('rank')) + '</th><th>' + esc(t('email')) + '</th><th>' + esc(t('status')) + '</th><th>' + esc(t('role')) + '</th><th></th></tr></thead><tbody>' +
         rows.map(function (m) {
           var me = S.session && m.id === S.session.user.id;
           var sq = S.squads.map(function (x) { return x.name; });
           if (m.esquadra && sq.indexOf(m.esquadra) < 0) sq.push(m.esquadra);
           var squadSel = '<select name="esquadra" aria-label="' + esc(t('esquadra')) + '">' + sq.map(function (n) { return '<option' + (n === m.esquadra ? ' selected' : '') + '>' + esc(n) + '</option>'; }).join('') + '</select>';
-          return '<tr data-id="' + m.id + '"' + (me ? ' data-me="1"' : '') + '><td>' + esc(m.first_name + ' ' + m.last_name) + (me ? ' <span class="muted">(' + esc(t('you')) + ')</span>' : '') + '</td><td>' + esc(m.nom_guerre) + '</td><td>' + squadSel + '</td><td>' + esc(m.email) + '</td>' +
+          return '<tr data-id="' + m.id + '"' + (me ? ' data-me="1"' : '') + '><td>' + esc(m.first_name + ' ' + m.last_name) + (me ? ' <span class="muted">(' + esc(t('you')) + ')</span>' : '') + '</td><td>' + esc(m.nom_guerre) + '</td><td>' + squadSel + '</td><td>' + esc(m.rank || '') + '</td><td>' + esc(m.email) + '</td>' +
             ((me || !isColonel()) ? '<td>' + esc(t('st_' + m.status)) + '</td><td>' + esc(roleLabel(m.role)) + '</td>'
               : '<td><select name="status" aria-label="' + esc(t('status')) + '">' + ['pending', 'approved', 'blocked'].map(function (s) { return '<option value="' + s + '"' + (m.status === s ? ' selected' : '') + '>' + esc(t('st_' + s)) + '</option>'; }).join('') + '</select></td>' +
                 '<td><select name="role" aria-label="' + esc(t('role')) + '">' + ['member', 'admin', 'colonel'].map(function (s) { return '<option value="' + s + '"' + (m.role === s ? ' selected' : '') + '>' + esc(roleLabel(s)) + '</option>'; }).join('') + '</select></td>') +
@@ -1846,14 +1853,14 @@
       }).catch(function () { msg(f, t('bad_login'), true); });
     } else if (fid === 'f-register') {
       e.preventDefault();
-      var v = {}; ['email', 'password', 'password2', 'first_name', 'last_name', 'nom_guerre', 'esquadra'].forEach(function (k) { v[k] = (f[k].value || '').trim(); });
+      var v = {}; ['email', 'password', 'password2', 'first_name', 'last_name', 'nom_guerre', 'esquadra', 'rank'].forEach(function (k) { v[k] = (f[k].value || '').trim(); });
       v.password = f.password.value; v.password2 = f.password2.value;
       if (Object.keys(v).some(function (k) { return !v[k]; }) || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v.email)) { msg(f, t('required'), true); return; }
       if (v.password.length < 8) { msg(f, t('pw_short'), true); return; }
       if (v.password !== v.password2) { msg(f, t('pw_mismatch'), true); return; }
       f.querySelector('button[type=submit]').disabled = true;
       sb.auth.signUp({ email: v.email, password: v.password, options: { emailRedirectTo: location.origin + location.pathname,
-        data: { first_name: v.first_name, last_name: v.last_name, nom_guerre: v.nom_guerre, esquadra: v.esquadra, lang: S.lang } } }).then(function (r) {
+        data: { first_name: v.first_name, last_name: v.last_name, nom_guerre: v.nom_guerre, esquadra: v.esquadra, rank: v.rank, lang: S.lang } } }).then(function (r) {
         if (r.error) throw r.error;
         f.reset(); msg(f, t('signup_ok'));
       }).catch(function (er) { msg(f, t('error') + ' ' + er.message, true); })
@@ -1862,6 +1869,7 @@
       e.preventDefault();
       var upd = {}; ['first_name', 'last_name', 'nom_guerre', 'esquadra'].forEach(function (k) { upd[k] = (f[k].value || '').trim(); });
       if (Object.keys(upd).some(function (k) { return !upd[k]; })) { msg(f, t('required'), true); return; }
+      upd.rank = (f.rank.value || '').trim() || null;
       track(t('saving'), sb.from('profiles').update(upd).eq('id', S.session.user.id).then(q).then(loadProfile)).then(function () { renderChrome(); msg(f, t('saved')); })
         .catch(function (er) { msg(f, t('error') + ' ' + er.message, true); });
     } else if (fid === 'f-password') {
