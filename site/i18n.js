@@ -72,6 +72,7 @@ window.I18N = (function () {
     rotating: U("Girant la foto…", "Rotating the photo…", "Rotazione della foto…", "Rotation de la photo…", "Foto wird gedreht…"),
     rot_l: U("Gira a l'esquerra", "Rotate left", "Ruota a sinistra", "Pivoter à gauche", "Nach links drehen"),
     rot_r: U("Gira a la dreta", "Rotate right", "Ruota a destra", "Pivoter à droite", "Nach rechts drehen"),
+    build_h: U("Detalls de construcció i fonts", "Construction details and sources", "Dettagli di costruzione e fonti", "Détails de fabrication et sources", "Konstruktionsdetails und Quellen"),
     t_dl: U("Descàrregues", "Downloads", "Download", "Téléchargements", "Downloads"),
     regs_head: U("Evidències en regulacions", "Evidence in regulations", "Evidenze nei regolamenti", "Preuves dans les règlements", "Belege in den Vorschriften"),
     open_all: U("Obrir-ho tot", "Expand all", "Apri tutto", "Tout ouvrir", "Alle öffnen"),
