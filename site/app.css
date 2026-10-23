@@ -489,8 +489,8 @@ table.members tr.new.dirty td{background:color-mix(in srgb,#d9a521 30%,var(--she
 
 /* wider and denser members table */
 .members-wide{position:relative;left:50%;width:min(98vw,1700px);transform:translateX(-50%);box-sizing:border-box;padding-inline:.5rem}
-table.members{font-size:.8rem}
+table.members{font-size:.9rem}
 table.members th,table.members td{padding:.3rem .4rem}
-table.members input,table.members select{font-size:.8rem;padding:.2rem .3rem;min-width:6rem}
-.th-sort{font-size:.8rem}
+table.members input,table.members select{font-size:.9rem;padding:.2rem .3rem;min-width:6rem}
+.th-sort{font-size:.9rem}
 .mem-joined select{min-width:4.2rem}

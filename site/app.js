@@ -1384,7 +1384,7 @@
   }
   function drawMembers() {
     var M = S.mem, box = document.getElementById('members'); if (!box) return;
-    var canEdit = isColonel() && !!M.edit, rows = memRows(), pendEd = isColonel() && rows.some(function (m) { return m.status === 'pending'; }), showAct = canEdit || pendEd;
+    var canEdit = isColonel() && !!M.edit, rows = memRows(), pendEd = isColonel() && rows.some(function (m) { return m.status === 'pending'; }), showAct = !canEdit && pendEd;
     var cellEd = function (m, k) { return canEdit || (isColonel() && m.status === 'pending' && (k === 'status' || k === 'role')); };
     var opt = function (arr, cur, lab) { return arr.map(function (x) { return '<option value="' + esc(x[0]) + '"' + (x[0] === cur ? ' selected' : '') + '>' + esc(x[1]) + '</option>'; }).join(''); };
     var sqs = S.squads.map(function (s) { return [s.name, s.name]; });
@@ -1394,7 +1394,7 @@
       '<select data-f="esquadra" aria-label="' + esc(t('esquadra')) + '"><option value="">' + esc(t('esquadra')) + ': ' + esc(t('mem_all')) + '</option>' + opt(sqs, M.f.esquadra) + '</select>' +
       '<select data-f="rank" aria-label="' + esc(t('rank')) + '"><option value="">' + esc(t('rank')) + ': ' + esc(t('mem_all')) + '</option>' + opt(RANKS.map(function (r) { return [r, r]; }), M.f.rank) + '</select>' +
       '<button type="button" class="btn-ghost" data-act="mem-clear">' + esc(t('mem_clear')) + '</button><span class="mem-count muted" id="mem-count"></span>' +
-      (isColonel() ? '<button type="button" class="' + (M.edit ? 'btn' : 'btn-ghost') + '" data-act="mem-edit">' + esc(t(M.edit ? 'mem_edit_done' : 'mem_edit')) + '</button>' : '') + '</div>';
+      (isColonel() ? (M.edit ? '<button type="button" class="btn-ghost" data-act="mem-cancel">' + esc(t('cancel')) + '</button><button type="button" class="btn" data-act="mem-save">' + esc(t('save')) + '</button>' : '<button type="button" class="btn-ghost" data-act="mem-edit">' + esc(t('mem_edit')) + '</button>') : '') + '</div>';
     var head = '<thead><tr>' + MEM_COLS.map(function (c) {
       var on = M.sort.k === c[0];
       return '<th scope="col" aria-sort="' + (on ? (M.sort.dir > 0 ? 'ascending' : 'descending') : 'none') + '"><button type="button" class="th-sort' + (on ? ' on' : '') + '" data-act="mem-sort" data-k="' + c[0] + '">' + esc(t(c[1])) + '<span class="arr" aria-hidden="true">' + (on ? (M.sort.dir > 0 ? '▲' : '▼') : '↕') + '</span></button></th>';
@@ -1403,7 +1403,7 @@
       var me = S.session && m.id === S.session.user.id;
       return '<tr data-id="' + m.id + '"' + (me ? ' data-me="1"' : '') + ' class="' + (m.status === 'pending' ? 'new ' : '') + (m._e ? 'dirty' : '') + '">' + MEM_COLS.map(function (c) {
         return '<td>' + memInput(m, c[0], cellEd(m, c[0]), me) + (c[0] === 'first_name' && me ? ' <span class="muted">(' + esc(t('you')) + ')</span>' : '') + '</td>';
-      }).join('') + (showAct ? '<td>' + ((canEdit || m.status === 'pending') && !me ? '<button type="button" class="btn-small" data-act="save-member">' + esc(t('save')) + '</button>' : (canEdit ? '<button type="button" class="btn-small" data-act="save-member">' + esc(t('save')) + '</button>' : '')) + '</td>' : '') + '</tr>';
+      }).join('') + (showAct ? '<td>' + (m.status === 'pending' && !me ? '<button type="button" class="btn-small" data-act="save-member">' + esc(t('save')) + '</button>' : '') + '</td>' : '') + '</tr>';
     }).join('') : '<tr><td colspan="12" class="muted">' + esc(t('no_members')) + '</td></tr>') + '</tbody>';
     var kf = document.activeElement && document.activeElement.id === 'mem-q';
     box.innerHTML = filters + '<div class="table-wrap"><table class="members">' + head + body + '</table></div>';
@@ -1425,6 +1425,17 @@
       S.mem = { edit: S.mem && S.mem.edit, rows: rows, f: keep || { q: '', status: '', role: '', esquadra: '', rank: '' }, sort: ks || { k: '', dir: 1 } };
       drawMembers();
     }).catch(fail);
+  }
+  // validates and normalises the pending edits of one member row
+  function memPrepare(m) {
+    var upd = {}; Object.keys(m._e).forEach(function (k) { upd[k] = m._e[k]; });
+    if (upd.joined_9e === '?') return { err: t('rg_joined_both') };
+    var bad = ['first_name', 'last_name', 'nom_guerre'].some(function (k) { return k in upd && !String(upd[k]).trim(); });
+    if (bad) return { err: t('required') };
+    if ('rank' in upd && upd.rank === '') upd.rank = null;
+    if (upd.birth_date === '') upd.birth_date = null;
+    if (S.session && m.id === S.session.user.id) { delete upd.status; delete upd.role; }
+    return { m: m, upd: upd };
   }
   function memRowById(id) { return S.mem && S.mem.rows.filter(function (m) { return m.id === id; })[0]; }
   document.addEventListener('input', function (e) {
@@ -1923,24 +1934,33 @@
         if (so.k === sk) { if (so.dir > 0) so.dir = -1; else { so.k = ''; so.dir = 1; } } else { so.k = sk; so.dir = 1; }
         drawMembers(); return;
       }
-      if (act === 'mem-edit') {
-        if (S.mem.edit && S.mem.rows.some(function (m) { return m._e; })) { if (!window.confirm(t('mem_discard_q'))) return; S.mem.rows.forEach(function (m) { delete m._e; }); }
-        S.mem.edit = !S.mem.edit; drawMembers(); return;
+      if (act === 'mem-edit') { S.mem.edit = true; drawMembers(); return; }
+      if (act === 'mem-cancel') {
+        if (S.mem.rows.some(function (m) { return m._e; })) { if (!window.confirm(t('mem_discard_q'))) return; S.mem.rows.forEach(function (m) { delete m._e; }); }
+        S.mem.edit = false; drawMembers(); return;
+      }
+      if (act === 'mem-save') {
+        var dirty = S.mem.rows.filter(function (m) { return m._e; });
+        if (!dirty.length) { S.mem.edit = false; drawMembers(); return; }
+        var jobs = [];
+        for (var di = 0; di < dirty.length; di++) { var jb = memPrepare(dirty[di]); if (jb.err) { toast(jb.err, true); return; } jobs.push(jb); }
+        track(t('saving'), Promise.all(jobs.map(function (jb2) { return sb.from('profiles').update(jb2.upd).eq('id', jb2.m.id).then(q); }))).then(function () {
+          var meSaved = false;
+          jobs.forEach(function (jb2) { Object.keys(jb2.upd).forEach(function (k) { jb2.m[k] = jb2.upd[k]; }); delete jb2.m._e; if (S.session && jb2.m.id === S.session.user.id) meSaved = true; });
+          S.mem.edit = false; drawMembers();
+          if (meSaved) loadProfile().then(renderChrome);
+        }).catch(fail);
+        return;
       }
       if (act === 'mem-clear') { S.mem.f = { q: '', status: '', role: '', esquadra: '', rank: '' }; S.mem.sort = { k: '', dir: 1 }; drawMembers(); return; }
       if (act === 'save-member') {
         var mrow = el.closest('tr'), mm = memRowById(mrow.getAttribute('data-id'));
         if (!mm || !mm._e) return;
-        var upd = {}; Object.keys(mm._e).forEach(function (k) { upd[k] = mm._e[k]; });
-        if (upd.joined_9e === '?') { toast(t('rg_joined_both')); return; }
-        ['first_name', 'last_name', 'nom_guerre'].forEach(function (k) { if (k in upd && !String(upd[k]).trim()) upd[k] = undefined; });
-        if (Object.keys(upd).some(function (k) { return upd[k] === undefined; })) { toast(t('required')); return; }
-        ['rank', 'esquadra'].forEach(function (k) { if (k in upd && upd[k] === '') upd[k] = k === 'rank' ? null : ''; });
-        if (upd.birth_date === '') upd.birth_date = null;
-        if (mrow.hasAttribute('data-me')) { delete upd.status; delete upd.role; }
-        track(t('saving'), sb.from('profiles').update(upd).eq('id', mm.id).then(q)).then(function () {
-          Object.keys(upd).forEach(function (k) { mm[k] = upd[k]; }); delete mm._e; drawMembers();
-          if (mrow.hasAttribute('data-me')) loadProfile().then(renderChrome);
+        var jb = memPrepare(mm);
+        if (jb.err) { toast(jb.err, true); return; }
+        track(t('saving'), sb.from('profiles').update(jb.upd).eq('id', mm.id).then(q)).then(function () {
+          Object.keys(jb.upd).forEach(function (k) { mm[k] = jb.upd[k]; }); delete mm._e; drawMembers();
+          if (S.session && mm.id === S.session.user.id) loadProfile().then(renderChrome);
         }).catch(fail);
         return;
       }
