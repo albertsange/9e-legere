@@ -511,7 +511,7 @@
     var srcLink = '<p class="about-link"><a class="tlink" href="#fonts">' + esc(L((S.site.fonts || {}).title) || t('sources')) + '</a> <a class="tlink" href="#regulacions">' + esc(L((S.site.regs || {}).title) || t('regs_page')) + '</a></p>';
     var chips = '<p class="about-tabs">' + chip('proposed') + chip('pending') + '<span class="chip gaps">' + esc(t('t_gaps')) + '</span></p>';
     return '<section class="view home" data-view="home">' +
-      '<header class="home-hero">' +
+      '<header class="home-hero">' + '<span class="mark mark-lg" aria-hidden="true"></span>' +
       F(P('eyebrow'), V('eyebrow'), 'div', 'eyebrow', { raw: 1, single: 1 }) +
       '<div class="piece-head">' + F(P('h1'), V('h1'), 'h1', '', { raw: 1, single: 1, attr: ' tabindex="-1"' }) + penBtn() + '</div>' +
       F(P('lead1'), V('lead1'), 'p', 'lead', { raw: 1 }) + '</header>' +
@@ -1364,15 +1364,15 @@
 
   /* ------------------------------------------------------------------ login dialog */
   function dlgTabs(on) {
-    return '<div class="dlg-tabs" role="tablist">' + ['login', 'register'].map(function (k) {
-      return '<button type="button" role="tab" class="' + (k === on ? 'on' : '') + (k === 'register' ? ' cta' : '') + '" aria-selected="' + (k === on) + '" data-act="' + k + '">' + esc(t(k === 'login' ? 'login' : 'rg_tab')) + '</button>';
-    }).join('') + '</div>';
+    var other = on === 'login' ? 'register' : 'login';
+    return '<div class="dlg-tabs"><span class="dlg-cur" aria-current="page">' + esc(t(on === 'login' ? 'login' : 'rg_tab')) + '</span>' +
+      '<button type="button" class="btn" data-act="' + other + '">' + esc(t(other === 'login' ? 'login' : 'rg_tab')) + '</button></div>';
   }
   function showDlg(dlg) { if (!dlg.open) { if (dlg.showModal) dlg.showModal(); else dlg.setAttribute('open', ''); } }
   function openLogin() {
     var dlg = document.getElementById('login-dlg');
     dlg.className = 'dlg';
-    dlg.innerHTML = dlgTabs('login') + '<form method="dialog" class="form" id="f-login"><h2>' + esc(t('login')) + '</h2>' +
+    dlg.innerHTML = dlgTabs('login') + '<form method="dialog" class="form" id="f-login" aria-label="' + esc(t('login')) + '">' +
       field('email', t('email'), 'email', '', ' required autocomplete="email"') +
       field('password', t('password'), 'password', '', ' required autocomplete="current-password"') +
       '<p class="form-msg" role="status"></p>' +
@@ -1458,7 +1458,7 @@
   function drawRegDone(rank) {
     var dlg = document.getElementById('login-dlg');
     dlg.className = 'dlg dlg-wide';
-    dlg.innerHTML = '<div class="rg-done"><div class="rg-star" aria-hidden="true">★</div><h2>' + esc(t('rg_done_t')) + '</h2>' +
+    dlg.innerHTML = '<div class="rg-done"><span class="mark mark-xl" aria-hidden="true"></span><h2>' + esc(t('rg_done_t')) + '</h2>' +
       '<p class="rg-welcome">' + esc(t('rg_welcome').replace('{rank}', rank)) + '</p>' +
       '<ol class="rg-steps"><li><span class="sp-n">1</span><div><b>' + esc(t('rg_w1')) + '</b><p>' + esc(t('rg_w1p')) + '</p></div></li>' +
       '<li><span class="sp-n">2</span><div><b>' + esc(t('rg_w2')) + '</b><p>' + esc(t('rg_w2p')) + '</p></div></li></ol>' +

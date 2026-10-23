@@ -430,11 +430,8 @@ body.editing .infobox{position:static;max-height:none;overflow:visible}
 
 /* login / sign-up dialog */
 .dlg-wide{width:min(34rem,calc(100vw - 2rem))}
-.dlg-tabs{display:grid;grid-template-columns:1fr 1fr;gap:.4rem;margin:-.2rem 0 1.1rem;padding:.25rem;background:var(--quote-bg);border-radius:6px}
-.dlg-tabs button{font:inherit;font-family:var(--label);letter-spacing:.04em;padding:.6rem .5rem;border:0;border-radius:4px;background:transparent;color:var(--muted);cursor:pointer}
-.dlg-tabs button.on{background:var(--sheet);color:var(--bleu);box-shadow:0 1px 3px rgba(0,0,0,.18);font-weight:600}
-.dlg-tabs button.cta:not(.on){background:var(--ecarlate);color:#fff;font-weight:600}
-.dlg-tabs button.cta:not(.on):hover{filter:brightness(1.08)}
+.dlg-tabs{display:flex;align-items:center;justify-content:space-between;gap:1rem;margin:-.2rem 0 1.2rem;padding-bottom:1rem;border-bottom:1px solid var(--line)}
+.dlg-cur{font-family:var(--display);font-size:1.5rem;color:var(--bleu);line-height:1.1}
 .stepper{list-style:none;display:flex;justify-content:space-between;gap:.5rem;margin:0 0 1.2rem;padding:0;position:relative}
 .stepper::before{content:"";position:absolute;left:12%;right:12%;top:1rem;height:2px;background:var(--line)}
 .stepper li{flex:1;display:flex;flex-direction:column;align-items:center;gap:.35rem;text-align:center;position:relative;z-index:1}
@@ -447,7 +444,7 @@ body.editing .infobox{position:static;max-height:none;overflow:visible}
 .dlg .form-actions{justify-content:space-between}
 .fld em{font-style:normal;opacity:.75}
 .rg-done{text-align:center}
-.rg-star{font-size:2.6rem;line-height:1;color:var(--ecarlate);margin-bottom:.4rem}
+.rg-done .mark{margin-bottom:.6rem}
 .rg-welcome{font-size:1.15rem;margin:.4rem 0 1.2rem}
 .rg-steps{list-style:none;margin:0 0 1rem;padding:0;display:grid;gap:.7rem;text-align:left}
 .rg-steps li{display:flex;gap:.9rem;align-items:flex-start;padding:.8rem 1rem;border:1px solid var(--line);border-radius:6px;background:var(--sheet)}
@@ -455,3 +452,13 @@ body.editing .infobox{position:static;max-height:none;overflow:visible}
 .rg-steps b{display:block}
 .rg-steps p{margin:.15rem 0 0;color:var(--muted);font-size:.92rem}
 .rg-done .form-actions{justify-content:center}
+
+/* 9e emblem (the horn with the 9): blue in light mode, white in dark mode */
+.mark{--mk:var(--bleu);display:inline-block;width:1.7rem;height:1.7rem;flex:none;background-color:var(--mk);-webkit-mask:url(img/logo-9e.png) center/contain no-repeat;mask:url(img/logo-9e.png) center/contain no-repeat;vertical-align:middle}
+:root[data-theme="dark"] .mark{--mk:#fff}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .mark{--mk:#fff}}
+.mark-lg{width:4.5rem;height:4.5rem;display:block;margin:0 auto 1rem}
+.mark-xl{width:5rem;height:5rem;display:block;margin:0 auto}
+.unit-mark{display:inline-flex;align-items:center;margin-right:.55rem;text-decoration:none}
+.side-title{display:inline-flex;align-items:center;gap:.5rem}
+.side-title .mark{width:1.5rem;height:1.5rem}
