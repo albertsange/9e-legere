@@ -518,3 +518,6 @@ table.members input,table.members select{font-size:.9rem;padding:.2rem .3rem;min
 .gal-notes-body{padding:.2rem .9rem .8rem;max-width:52rem}
 .gal-notes-body ul{padding-left:1.2rem}.gal-notes-body li{margin:.3rem 0}
 .gal-notes-ed{margin:.4rem 0}
+
+.rr-ex{display:block;color:var(--muted);font-size:.92rem;margin:.1rem 0 .5rem;max-width:48rem}
+.rr-real li.obj{border-left:3px solid var(--bleu);padding-left:.5rem}

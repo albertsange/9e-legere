@@ -980,6 +980,19 @@
       (v3 && panels.length < 2 ? '' : '<div class="tabs wiki-tabs' + (v3 ? ' sticky-tabs' : '') + '" role="tablist">' + tl + '</div>') + tp + '</div></section>';
   }
 
+  // short description of a regulation entry: the beginning of its first text part in the reader's language
+  function regExcerpt(r) {
+    var lg = S.lang, out = '';
+    (r.parts || []).some(function (x) {
+      var txt = lg === 'fr' ? plain(x.fr || '') : plain(L(x.tr) || '');
+      txt = txt.replace(/^[\s\[\]…\.:;—-]+/, '').trim();
+      if (txt.length < 25) return false;
+      var lb = x.label ? plain(x.label) : '';
+      if (txt.length > 210) { var cut = txt.slice(0, 210), p = Math.max(cut.lastIndexOf('. '), cut.lastIndexOf('; ')); cut = p > 90 ? cut.slice(0, p + 1) : cut.replace(/\s+\S*$/, '') + '…'; txt = cut; }
+      out = (lb ? lb + ': ' : '') + txt; return true;
+    });
+    return out;
+  }
   // "Rules and reality": per attribute, what the regulations say next to what the inspections found, and the 9e choice
   function rrHtml(id, pr, E, src) {
     var rows = pr.rr || [], fs = (S.findings || {})[id] || [], used = {};
@@ -987,7 +1000,12 @@
     var out = '<p class="rr-intro">' + esc(t('rr_intro')) + '</p>';
     if (!rows.length) {
       // no hand-made comparison yet: automatic overview of the regulations and the inspection findings of this item
-      var ns = (pr.regs || []).map(function (r, n) { return r.insp ? '' : '<li><b class="yr-y">' + esc(r.year) + '</b> <span lang="fr">' + clean(r.name) + '</span> ' + rich('[[' + (n + 1) + ']]', id) + '</li>'; }).join('');
+      var ns = (pr.regs || []).map(function (r, n) {
+        if (r.insp) return '';
+        var ex = regExcerpt(r);
+        return '<li><b class="yr-y">' + esc(r.year) + '</b> <span lang="fr">' + clean(r.name) + '</span> ' + rich('[[' + (n + 1) + ']]', id) +
+          (ex ? '<span class="rr-ex">' + esc(ex) + '</span>' : '') + '</li>';
+      }).join('');
       var rl = fs.map(function (f) {
         var ib2 = byInsp[f.inspection_id] || {}, i2 = ib2.content || ib2;
         return '<li class="' + esc(f.certainty) + (ib2.own_unit === false ? ' other' : '') + '"><a class="tlink" href="#regulacions~insp-' + esc(f.inspection_id) + '"><b class="yr-y">' + esc(i2.year || '') + '</b> ' + esc(plain(i2.place || '')) + '</a> ' + esc(plain(L(f.value))) +
@@ -1004,7 +1022,10 @@
       }).join('');
       var mine = fs.filter(function (f) { return f.attribute === r.key; });
       mine.forEach(function (f) { used[f.id] = 1; });
-      var real = mine.map(function (f) {
+      var objs = (r.objs || []).map(function (o) {
+        return '<li class="obj"><b class="yr-y">' + esc(plain(L(o.src) || t('rr_museum'))) + '</b> ' + rich(L(o.value), id) + ' <span class="rr-tag">' + esc(t('obs_object')) + '</span></li>';
+      }).join('');
+      var real = objs + mine.map(function (f) {
         var ib = byInsp[f.inspection_id] || {}, i = ib.content || ib;
         var own = ib.own_unit === false ? ' other' : '';
         return '<li class="' + esc(f.certainty) + own + '"><a class="tlink" href="#regulacions~insp-' + esc(f.inspection_id) + '"><b class="yr-y">' + esc(i.year || '') + '</b> ' + esc(plain(i.place || '')) + '</a> ' +

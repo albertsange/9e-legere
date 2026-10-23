@@ -42,6 +42,8 @@ window.I18N = (function () {
     regs_card_lead: U("Els textos dels reglaments i les revistes d'inspecció del 9e, amb cercador.", "The texts of the regulations and the 9e's inspection reports, with search.", "I testi dei regolamenti e le ispezioni del 9e, con ricerca.", "Les textes des règlements et les revues d'inspection du 9e, avec recherche.", "Die Texte der Vorschriften und die Inspektionsberichte des 9e, mit Suche."),
     group_notes: U("Notes addicionals", "Additional notes", "Note aggiuntive", "Notes complémentaires", "Zusätzliche Notizen"),
     group_notes_ph: U("Notes addicionals d'aquest grup…", "Additional notes for this group…", "Note aggiuntive di questo gruppo…", "Notes complémentaires de ce groupe…", "Zusätzliche Notizen zu dieser Gruppe…"),
+    rr_museum: U("Habit del Musée de l'Empéri", "Habit of the Musée de l'Empéri", "Habit del Musée de l'Empéri", "Habit du Musée de l'Empéri", "Habit des Musée de l'Empéri"),
+    obs_object: U("peça conservada", "surviving piece", "pezzo conservato", "pièce conservée", "erhaltenes Stück"),
     search_regs: U("Cerca a les regulacions…", "Search the regulations…", "Cerca nei regolamenti…", "Rechercher dans les règlements…", "In den Vorschriften suchen…"),
     search_insp: U("Cerca a les inspeccions…", "Search the inspections…", "Cerca nelle ispezioni…", "Rechercher dans les inspections…", "In den Inspektionen suchen…"),
     n_results: U("{n} resultats", "{n} results", "{n} risultati", "{n} résultats", "{n} Treffer"),
