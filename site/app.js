@@ -1309,7 +1309,7 @@
   function adminView() {
     if (!isAdmin()) return '<section class="view narrow"><h2 class="page-title" tabindex="-1">' + esc(t('admin')) + '</h2>' + lockedHtml() + '</section>';
     return '<section class="view"><h2 class="page-title" tabindex="-1">' + esc(t('admin')) + '</h2>' +
-      '<h3>' + esc(t('members')) + '</h3>' + (isColonel() ? '' : '<p class="muted">' + esc(t('colonel_only')) + '</p>') + '<div id="members"><p class="muted">' + esc(t('loading')) + '</p></div>' +
+      '<h3>' + esc(t('members')) + '</h3>' + (isColonel() ? '' : '<p class="muted">' + esc(t('colonel_only')) + '</p>') + '<div id="members" class="members-wide"><p class="muted">' + esc(t('loading')) + '</p></div>' +
       '<h3>' + esc(t('squads')) + '</h3><ul class="squads">' + S.squads.map(function (s) {
         return '<li>' + esc(s.name) + ' <button type="button" class="mini del" data-act="del-squad" data-id="' + s.id + '" aria-label="' + esc(t('remove')) + '">×</button></li>';
       }).join('') + '</ul><form class="form inline" id="f-squad"><input name="name" maxlength="80" required aria-label="' + esc(t('esquadra')) + '"><button class="btn" type="submit">' + esc(t('add')) + '</button></form>' +
