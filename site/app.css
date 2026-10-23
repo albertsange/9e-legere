@@ -419,3 +419,11 @@ body.editing .infobox{position:static;max-height:none;overflow:visible}
 .pic-rot button{width:2.2rem;height:2.2rem;border-radius:50%;border:1px solid var(--line);background:var(--paper);color:var(--ink);font-size:1.15rem;line-height:1;cursor:pointer}
 .pic-rot.inline{position:static;display:inline-flex}
 .pic-rot.inline button{width:1.9rem;height:1.9rem;font-size:1rem}
+
+/* model timeline: one model shown at a time */
+.vtl.sel-mode li.nine .vtl-dot{background:var(--sheet);border-color:var(--muted);box-shadow:none}
+.vtl.sel-mode li.sel .vtl-dot{background:var(--bleu);border-color:var(--bleu);box-shadow:0 0 0 4px color-mix(in srgb,var(--bleu) 25%,transparent)}
+.vtl.sel-mode li.sel .vtl-y{font-weight:700;color:var(--bleu)}
+.vtl.sel-mode a{cursor:pointer}
+.ver-panel[hidden]{display:none}
+.ver-head{padding:.7rem 1rem;display:flex;align-items:center;gap:.7rem;flex-wrap:wrap}

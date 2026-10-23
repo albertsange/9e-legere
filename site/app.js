@@ -753,8 +753,15 @@
     if (!vs.length && !E) return '';
     var VS = function (v) { return E ? ((v.specs || {})[lg] || []) : LA(v.specs); };
     var html = '<h3 class="sum-h">' + esc(t('evol_h')) + '</h3>';
-    if (vs.length) html += '<ol class="vtl">' + vs.map(function (v, i) {
-      return '<li' + (v.nine ? ' class="nine"' : '') + '><a href="#' + id + '-ver-' + i + '" data-act="ver-open" data-i="' + i + '"><span class="vtl-dot" aria-hidden="true"></span><span class="vtl-y">' + esc(v.year || '—') + '</span>' +
+    // reading mode: a clickable timeline that shows one model at a time (the 9e one first); edit mode keeps every model open
+    var sel = -1;
+    if (!E && vs.length) {
+      var ds = vs.length - 1;
+      for (var q = 0; q < vs.length; q++) if (vs[q].nine) { ds = q; break; }
+      sel = (S.verSel && S.verSel[id] != null && S.verSel[id] < vs.length) ? S.verSel[id] : ds;
+    }
+    if (vs.length) html += '<ol class="vtl' + (E ? '' : ' sel-mode') + '">' + vs.map(function (v, i) {
+      return '<li class="' + (v.nine ? 'nine' : '') + (i === sel ? ' sel' : '') + '"><a href="#' + id + '-ver-' + i + '" data-act="' + (E ? 'ver-open' : 'ver-sel') + '" data-i="' + i + '"' + (i === sel ? ' aria-current="true"' : '') + '><span class="vtl-dot" aria-hidden="true"></span><span class="vtl-y">' + esc(v.year || '—') + '</span>' +
         (v.nine ? '<span class="nine-b">9e</span>' : '') + '</a></li>';
     }).join('') + '</ol>';
     html += vs.map(function (v, i) {
@@ -770,8 +777,9 @@
           '<p><button type="button" class="btn-small" data-act="img" data-target="' + cp + '.' + i + '.image">' + esc(t('change_img')) + '</button>' + listBtns(cp, i) + '</p></div>' +
           img + F(cp + '.' + i + '.text.' + lg, (v.text || {})[lg], 'div', 'ver-text', { pid: id }) + specs
         : img + F('', L(v.text), 'div', 'ver-text', { pid: id }) + specs;
-      return '<details class="ver' + (v.nine ? ' nine' : '') + '" id="' + id + '-ver-' + i + '"' + (E || v.nine ? ' open' : '') + '><summary><span class="ver-y">' + esc(v.year || '—') + '</span><span class="ver-t">' + esc(plain(L(v.title))) + '</span>' +
-        (v.nine ? '<span class="nine-b">9e</span>' : '') + '</summary><div class="ver-body">' + body + '</div></details>';
+      var head = '<span class="ver-y">' + esc(v.year || '—') + '</span><span class="ver-t">' + esc(plain(L(v.title))) + '</span>' + (v.nine ? '<span class="nine-b">9e</span>' : '');
+      if (!E) return '<div class="ver ver-panel' + (v.nine ? ' nine' : '') + '" id="' + id + '-ver-' + i + '"' + (i === sel ? '' : ' hidden') + '><div class="ver-head">' + head + '</div><div class="ver-body">' + body + '</div></div>';
+      return '<details class="ver' + (v.nine ? ' nine' : '') + '" id="' + id + '-ver-' + i + '" open><summary>' + head + '</summary><div class="ver-body">' + body + '</div></details>';
     }).join('');
     if (E) html += addBtn(cp, 'version', 'add_version');
     // comparison of the measurements of every model that has them
@@ -1631,6 +1639,18 @@
         syncDraft(); var hc2 = S.draft.page.content; hc2.hot = hc2.hot || [];
         while (hc2.hot.length < S.hotPick) hc2.hot.push(null);
         hc2.hot[S.hotPick] = [hx, hy]; S.hotPick = null; S.dirty = true; keepScroll(render); return;
+      }
+      if (act === 'ver-sel') {
+        e.preventDefault();
+        var ev = el.closest('.evol'), vi = +el.getAttribute('data-i');
+        if (!ev) return;
+        S.verSel = S.verSel || {}; S.verSel[routeId()] = vi;
+        ev.querySelectorAll('.vtl li').forEach(function (li, k) {
+          li.classList.toggle('sel', k === vi);
+          var a = li.querySelector('a'); if (k === vi) a.setAttribute('aria-current', 'true'); else a.removeAttribute('aria-current');
+        });
+        ev.querySelectorAll('.ver-panel').forEach(function (pn, k) { pn.hidden = k !== vi; });
+        return;
       }
       if (act === 'ver-open') {
         e.preventDefault();
