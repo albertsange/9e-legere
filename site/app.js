@@ -1384,7 +1384,8 @@
   }
   function drawMembers() {
     var M = S.mem, box = document.getElementById('members'); if (!box) return;
-    var canEdit = isColonel() && !!M.edit, rows = memRows();
+    var canEdit = isColonel() && !!M.edit, rows = memRows(), pendEd = isColonel() && rows.some(function (m) { return m.status === 'pending'; }), showAct = canEdit || pendEd;
+    var cellEd = function (m, k) { return canEdit || (isColonel() && m.status === 'pending' && (k === 'status' || k === 'role')); };
     var opt = function (arr, cur, lab) { return arr.map(function (x) { return '<option value="' + esc(x[0]) + '"' + (x[0] === cur ? ' selected' : '') + '>' + esc(x[1]) + '</option>'; }).join(''); };
     var sqs = S.squads.map(function (s) { return [s.name, s.name]; });
     var filters = '<div class="mem-filters"><input id="mem-q" type="search" value="' + esc(M.f.q || '') + '" placeholder="' + esc(t('mem_search')) + '" aria-label="' + esc(t('mem_search')) + '">' +
@@ -1397,12 +1398,12 @@
     var head = '<thead><tr>' + MEM_COLS.map(function (c) {
       var on = M.sort.k === c[0];
       return '<th scope="col" aria-sort="' + (on ? (M.sort.dir > 0 ? 'ascending' : 'descending') : 'none') + '"><button type="button" class="th-sort' + (on ? ' on' : '') + '" data-act="mem-sort" data-k="' + c[0] + '">' + esc(t(c[1])) + '<span class="arr" aria-hidden="true">' + (on ? (M.sort.dir > 0 ? '▲' : '▼') : '↕') + '</span></button></th>';
-    }).join('') + (canEdit ? '<th></th>' : '') + '</tr></thead>';
+    }).join('') + (showAct ? '<th></th>' : '') + '</tr></thead>';
     var body = '<tbody>' + (rows.length ? rows.map(function (m) {
       var me = S.session && m.id === S.session.user.id;
       return '<tr data-id="' + m.id + '"' + (me ? ' data-me="1"' : '') + ' class="' + (m.status === 'pending' ? 'new ' : '') + (m._e ? 'dirty' : '') + '">' + MEM_COLS.map(function (c) {
-        return '<td>' + memInput(m, c[0], canEdit, me) + (c[0] === 'first_name' && me ? ' <span class="muted">(' + esc(t('you')) + ')</span>' : '') + '</td>';
-      }).join('') + (canEdit ? '<td><button type="button" class="btn-small" data-act="save-member">' + esc(t('save')) + '</button></td>' : '') + '</tr>';
+        return '<td>' + memInput(m, c[0], cellEd(m, c[0]), me) + (c[0] === 'first_name' && me ? ' <span class="muted">(' + esc(t('you')) + ')</span>' : '') + '</td>';
+      }).join('') + (showAct ? '<td>' + ((canEdit || m.status === 'pending') && !me ? '<button type="button" class="btn-small" data-act="save-member">' + esc(t('save')) + '</button>' : (canEdit ? '<button type="button" class="btn-small" data-act="save-member">' + esc(t('save')) + '</button>' : '')) + '</td>' : '') + '</tr>';
     }).join('') : '<tr><td colspan="12" class="muted">' + esc(t('no_members')) + '</td></tr>') + '</tbody>';
     var kf = document.activeElement && document.activeElement.id === 'mem-q';
     box.innerHTML = filters + '<div class="table-wrap"><table class="members">' + head + body + '</table></div>';
