@@ -880,10 +880,10 @@
       panels.splice(dlIdx < 0 ? panels.length : dlIdx, 0, ['model9', null, m9]);
       var addImg = E ? '<div class="fig-add"><button type="button" class="btn fig-add-btn" data-act="fig-add">📷 ' + esc(t('add_img_here')) + '</button><span class="muted">' + esc(t('add_img_hint')) + '</span></div>' : '';
       panels.unshift(['sum', null, (E ? picsSection(id, pr) : '') + F(cp + 'lead.' + lg, V('lead'), 'p', 'lead-p', { pid: id, done: done }) +
-        '<h3 class="sum-h">' + esc(t('desc_h')) + '</h3>' + addImg + '<div class="desc-flow">' + descHtml + '</div>' + (c.layout === 'v3' ? '' : versionsHtml(id, c, E))]);
+        '<h3 class="sum-h">' + esc(t('desc_h')) + '</h3>' + addImg + '<div class="desc-flow">' + descHtml + '</div>' ]);
     } else panels.unshift(['sum', null, F(cp + 'lead.' + lg, V('lead'), 'p', 'lead-p', { pid: id, done: done }) + descHtml + stdHero]);
 
-    var v3 = c.layout === 'v3';
+    var v3 = true;
     if (v3) {
       // v3: description (public) / rules and reality / documents / photos and pieces / 9e standard; the product sheet is not shown
       var byK = {}; panels.forEach(function (x) { byK[x[0]] = x; });
@@ -927,6 +927,19 @@
     var rows = pr.rr || [], fs = (S.findings || {})[id] || [], used = {};
     var byInsp = {}; (S.insp || []).forEach(function (x) { byInsp[x.id] = x; });
     var out = '<p class="rr-intro">' + esc(t('rr_intro')) + '</p>';
+    if (!rows.length) {
+      // no hand-made comparison yet: automatic overview of the regulations and the inspection findings of this item
+      var ns = (pr.regs || []).map(function (r, n) { return r.insp ? '' : '<li><b class="yr-y">' + esc(r.year) + '</b> <span lang="fr">' + clean(r.name) + '</span> ' + rich('[[' + (n + 1) + ']]', id) + '</li>'; }).join('');
+      var rl = fs.map(function (f) {
+        var ib2 = byInsp[f.inspection_id] || {}, i2 = ib2.content || ib2;
+        return '<li class="' + esc(f.certainty) + (ib2.own_unit === false ? ' other' : '') + '"><a class="tlink" href="#regulacions~insp-' + esc(f.inspection_id) + '"><b class="yr-y">' + esc(i2.year || '') + '</b> ' + esc(plain(i2.place || '')) + '</a> ' + esc(plain(L(f.value))) +
+          ' <span class="rr-tag">' + esc(t('obs_' + f.observation)) + '</span>' + (f.certainty !== 'certain' ? ' <span class="rr-tag unsure">' + esc(t('cert_' + f.certainty)) + '</span>' : '') +
+          (f.verdict && f.verdict !== 'unreviewed' ? ' <span class="rr-tag v-' + esc(f.verdict) + '">' + esc(t('verd_' + f.verdict)) + '</span>' : '') + '</li>';
+      }).join('');
+      return out + '<section class="rr-row"><h4>' + esc(t('rr_overview')) + '</h4><div class="rr-cols">' +
+        '<div class="rr-norm"><span class="lbl">' + esc(t('rr_norm')) + '</span>' + (ns ? '<ul>' + ns + '</ul>' : '<p class="muted">' + esc(t('rr_none')) + '</p>') + '</div>' +
+        '<div class="rr-real"><span class="lbl">' + esc(t('rr_real')) + '</span>' + (rl ? '<ul>' + rl + '</ul>' : '<p class="muted">' + esc(t('rr_none_i')) + '</p>') + '</div></div></section>' + (src ? versionsHtml(id, {}, E, src) : '');
+    }
     out += rows.map(function (r) {
       var norms = (r.norms || []).map(function (n) {
         return '<li><b class="yr-y">' + esc(n.year) + '</b> ' + rich(L(n.value), id) + '</li>';
@@ -1365,7 +1378,7 @@
     syncDraft();
     pruneFallbacks();
     // v3 pages keep the model timeline private; its public one-line summary is rebuilt on every save
-    if (S.draft.page && S.draft.page.content.layout === 'v3' && S.draft.priv && S.draft.priv.versions) {
+    if (S.draft.page && S.draft.priv && S.draft.priv.versions) {
       S.draft.page.content.pats = S.draft.priv.versions.map(function (v) { return { year: v.year, title: v.title || {}, nine: !!v.nine }; });
     }
     var btn = document.querySelector('#editbar [data-act="save"]'); if (btn) btn.disabled = true;
