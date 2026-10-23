@@ -1309,7 +1309,7 @@
   function adminView() {
     if (!isAdmin()) return '<section class="view narrow"><h2 class="page-title" tabindex="-1">' + esc(t('admin')) + '</h2>' + lockedHtml() + '</section>';
     return '<section class="view"><h2 class="page-title" tabindex="-1">' + esc(t('admin')) + '</h2>' +
-      '<h3>' + esc(t('members')) + '</h3>' + (isColonel() ? '' : '<p class="muted">' + esc(t('colonel_only')) + '</p>') + '<div class="table-wrap" id="members"><p class="muted">' + esc(t('loading')) + '</p></div>' +
+      '<h3>' + esc(t('members')) + '</h3>' + (isColonel() ? '' : '<p class="muted">' + esc(t('colonel_only')) + '</p>') + '<div id="members"><p class="muted">' + esc(t('loading')) + '</p></div>' +
       '<h3>' + esc(t('squads')) + '</h3><ul class="squads">' + S.squads.map(function (s) {
         return '<li>' + esc(s.name) + ' <button type="button" class="mini del" data-act="del-squad" data-id="' + s.id + '" aria-label="' + esc(t('remove')) + '">×</button></li>';
       }).join('') + '</ul><form class="form inline" id="f-squad"><input name="name" maxlength="80" required aria-label="' + esc(t('esquadra')) + '"><button class="btn" type="submit">' + esc(t('add')) + '</button></form>' +
@@ -1328,28 +1328,119 @@
         '<span class="meter"><span style="width:' + Math.min(100, d.bytes / 10737418.24).toFixed(1) + '%"></span></span>';
     }).catch(function () {});
   }
+  /* members table: editable by the manager only, with sorting and filters */
+  var MEM_COLS = [
+    ['first_name', 'first_name'], ['last_name', 'last_name'], ['nom_guerre', 'nom_guerre'], ['esquadra', 'esquadra'], ['rank', 'rank'],
+    ['birth_date', 'birth_date'], ['joined_9e', 'joined'], ['email', 'email'], ['status', 'status'], ['role', 'role'], ['created_at', 'mem_created']
+  ];
+  function memVal(m, k) { return (m._e && k in m._e) ? m._e[k] : m[k]; }
+  function memLabel(m, k) {
+    var v = memVal(m, k);
+    if (k === 'status') return t('st_' + (v || 'pending'));
+    if (k === 'role') return roleLabel(v);
+    if (k === 'joined_9e') return v ? new Date(String(v).slice(0, 7) + '-01T12:00:00').toLocaleDateString(S.lang, { month: 'short', year: 'numeric' }) : '';
+    if (k === 'birth_date' || k === 'created_at') return v ? fmtDate(v) : '';
+    return v || '';
+  }
+  function memRows() {
+    var M = S.mem, f = M.f, q = norm(f.q || '');
+    var rows = M.rows.filter(function (m) {
+      if (f.status && memVal(m, 'status') !== f.status) return false;
+      if (f.role && memVal(m, 'role') !== f.role) return false;
+      if (f.esquadra && memVal(m, 'esquadra') !== f.esquadra) return false;
+      if (f.rank && memVal(m, 'rank') !== f.rank) return false;
+      if (q && ![m.first_name, m.last_name, m.nom_guerre, m.email].some(function (x) { return norm(x || '').indexOf(q) > -1; })) return false;
+      return true;
+    });
+    var k = M.sort.k, dir = M.sort.dir;
+    rows.sort(function (a, b) {
+      if (!k) { var pa = a.status === 'pending' ? 0 : 1, pb = b.status === 'pending' ? 0 : 1; return pa - pb || String(b.created_at).localeCompare(String(a.created_at)); }
+      var x = memVal(a, k) || '', y = memVal(b, k) || '';
+      if (!x && y) return 1; if (x && !y) return -1;
+      var r = String(x).localeCompare(String(y), S.lang, { numeric: true, sensitivity: 'base' });
+      return dir * r;
+    });
+    return rows;
+  }
+  function memInput(m, k, canEdit, me) {
+    var v = memVal(m, k);
+    if (!canEdit || k === 'email' || k === 'created_at' || ((k === 'status' || k === 'role') && me)) return esc(memLabel(m, k));
+    var ar = ' data-k="' + k + '" aria-label="' + esc(t(k === 'joined_9e' ? 'joined' : k === 'created_at' ? 'mem_created' : k)) + '"';
+    if (k === 'esquadra') {
+      var sq = S.squads.map(function (x) { return x.name; }); if (v && sq.indexOf(v) < 0) sq.push(v);
+      return '<select' + ar + '><option value=""></option>' + sq.map(function (n) { return '<option' + (n === v ? ' selected' : '') + '>' + esc(n) + '</option>'; }).join('') + '</select>';
+    }
+    if (k === 'rank') return '<select' + ar + '><option value=""></option>' + RANKS.map(function (r) { return '<option' + (r === v ? ' selected' : '') + '>' + esc(r) + '</option>'; }).join('') + '</select>';
+    if (k === 'status') return '<select' + ar + '>' + ['pending', 'approved', 'blocked'].map(function (s) { return '<option value="' + s + '"' + (v === s ? ' selected' : '') + '>' + esc(t('st_' + s)) + '</option>'; }).join('') + '</select>';
+    if (k === 'role') return '<select' + ar + '>' + ['member', 'admin', 'colonel'].map(function (s) { return '<option value="' + s + '"' + (v === s ? ' selected' : '') + '>' + esc(roleLabel(s)) + '</option>'; }).join('') + '</select>';
+    if (k === 'birth_date') return '<input type="date"' + ar + ' value="' + esc(v || '') + '" min="1900-01-01" max="' + new Date().toISOString().slice(0, 10) + '">';
+    if (k === 'joined_9e') {
+      var y0 = new Date().getFullYear(), cy = (v || '').slice(0, 4), cm = (v || '').slice(5, 7), ys = '', ms = '', i;
+      for (i = y0; i >= 1970; i--) ys += '<option' + (String(i) === cy ? ' selected' : '') + '>' + i + '</option>';
+      for (i = 1; i <= 12; i++) { var mm = (i < 10 ? '0' : '') + i; ms += '<option value="' + mm + '"' + (mm === cm ? ' selected' : '') + '>' + esc(new Date(2000, i - 1, 1).toLocaleDateString(S.lang, { month: 'short' })) + '</option>'; }
+      return '<span class="mem-joined"><select data-k="jm" aria-label="' + esc(t('month')) + '"><option value=""></option>' + ms + '</select><select data-k="jy" aria-label="' + esc(t('year')) + '"><option value=""></option>' + ys + '</select></span>';
+    }
+    return '<input type="text"' + ar + ' value="' + esc(v || '') + '" maxlength="' + (k === 'last_name' ? 120 : 80) + '">';
+  }
+  function drawMembers() {
+    var M = S.mem, box = document.getElementById('members'); if (!box) return;
+    var canEdit = isColonel(), rows = memRows();
+    var opt = function (arr, cur, lab) { return arr.map(function (x) { return '<option value="' + esc(x[0]) + '"' + (x[0] === cur ? ' selected' : '') + '>' + esc(x[1]) + '</option>'; }).join(''); };
+    var sqs = S.squads.map(function (s) { return [s.name, s.name]; });
+    var filters = '<div class="mem-filters"><input id="mem-q" type="search" value="' + esc(M.f.q || '') + '" placeholder="' + esc(t('mem_search')) + '" aria-label="' + esc(t('mem_search')) + '">' +
+      '<select data-f="status" aria-label="' + esc(t('status')) + '"><option value="">' + esc(t('status')) + ': ' + esc(t('mem_all')) + '</option>' + opt(['pending', 'approved', 'blocked'].map(function (s) { return [s, t('st_' + s)]; }), M.f.status) + '</select>' +
+      '<select data-f="role" aria-label="' + esc(t('role')) + '"><option value="">' + esc(t('role')) + ': ' + esc(t('mem_all')) + '</option>' + opt(['member', 'admin', 'colonel'].map(function (s) { return [s, roleLabel(s)]; }), M.f.role) + '</select>' +
+      '<select data-f="esquadra" aria-label="' + esc(t('esquadra')) + '"><option value="">' + esc(t('esquadra')) + ': ' + esc(t('mem_all')) + '</option>' + opt(sqs, M.f.esquadra) + '</select>' +
+      '<select data-f="rank" aria-label="' + esc(t('rank')) + '"><option value="">' + esc(t('rank')) + ': ' + esc(t('mem_all')) + '</option>' + opt(RANKS.map(function (r) { return [r, r]; }), M.f.rank) + '</select>' +
+      '<button type="button" class="btn-ghost" data-act="mem-clear">' + esc(t('mem_clear')) + '</button><span class="mem-count muted" id="mem-count"></span></div>';
+    var head = '<thead><tr>' + MEM_COLS.map(function (c) {
+      var on = M.sort.k === c[0];
+      return '<th scope="col" aria-sort="' + (on ? (M.sort.dir > 0 ? 'ascending' : 'descending') : 'none') + '"><button type="button" class="th-sort' + (on ? ' on' : '') + '" data-act="mem-sort" data-k="' + c[0] + '">' + esc(t(c[1])) + '<span class="arr" aria-hidden="true">' + (on ? (M.sort.dir > 0 ? '▲' : '▼') : '↕') + '</span></button></th>';
+    }).join('') + (canEdit ? '<th></th>' : '') + '</tr></thead>';
+    var body = '<tbody>' + (rows.length ? rows.map(function (m) {
+      var me = S.session && m.id === S.session.user.id;
+      return '<tr data-id="' + m.id + '"' + (me ? ' data-me="1"' : '') + (m._e ? ' class="dirty"' : '') + '>' + MEM_COLS.map(function (c) {
+        return '<td>' + memInput(m, c[0], canEdit, me) + (c[0] === 'first_name' && me ? ' <span class="muted">(' + esc(t('you')) + ')</span>' : '') + '</td>';
+      }).join('') + (canEdit ? '<td><button type="button" class="btn-small" data-act="save-member">' + esc(t('save')) + '</button></td>' : '') + '</tr>';
+    }).join('') : '<tr><td colspan="12" class="muted">' + esc(t('no_members')) + '</td></tr>') + '</tbody>';
+    var kf = document.activeElement && document.activeElement.id === 'mem-q';
+    box.innerHTML = filters + '<div class="table-wrap"><table class="members">' + head + body + '</table></div>';
+    document.getElementById('mem-count').textContent = rows.length + ' / ' + M.rows.length;
+    if (kf) { var qi = document.getElementById('mem-q'); qi.focus(); qi.setSelectionRange(qi.value.length, qi.value.length); }
+    // restore pending month/year selects (they are two controls for one value)
+    rows.forEach(function (m) {
+      var tr = box.querySelector('tr[data-id="' + m.id + '"]'); if (!tr || !canEdit) return;
+      var v = memVal(m, 'joined_9e') || '', jm = tr.querySelector('[data-k=jm]'), jy = tr.querySelector('[data-k=jy]');
+      if (jm) jm.value = v.slice(5, 7); if (jy) jy.value = v.slice(0, 4);
+    });
+  }
   function loadMembers() {
     loadUsage();
     sb.from('profiles').select('*').order('created_at', { ascending: false }).then(function (r) {
       var rows = q(r) || [], box = document.getElementById('members');
       if (!box) return;
-      if (!rows.length) { box.innerHTML = '<p class="muted">' + esc(t('no_members')) + '</p>'; return; }
-      rows.sort(function (a, b) { return (a.status === 'pending' ? 0 : 1) - (b.status === 'pending' ? 0 : 1); });
-      box.innerHTML = '<table class="members"><thead><tr><th>' + esc(t('first_name')) + ' / ' + esc(t('last_name')) + '</th><th>' + esc(t('nom_guerre')) + '</th><th>' + esc(t('esquadra')) +
-        '</th><th>' + esc(t('rank')) + '</th><th>' + esc(t('email')) + '</th><th>' + esc(t('status')) + '</th><th>' + esc(t('role')) + '</th><th></th></tr></thead><tbody>' +
-        rows.map(function (m) {
-          var me = S.session && m.id === S.session.user.id;
-          var sq = S.squads.map(function (x) { return x.name; });
-          if (m.esquadra && sq.indexOf(m.esquadra) < 0) sq.push(m.esquadra);
-          var squadSel = '<select name="esquadra" aria-label="' + esc(t('esquadra')) + '">' + sq.map(function (n) { return '<option' + (n === m.esquadra ? ' selected' : '') + '>' + esc(n) + '</option>'; }).join('') + '</select>';
-          return '<tr data-id="' + m.id + '"' + (me ? ' data-me="1"' : '') + '><td>' + esc(m.first_name + ' ' + m.last_name) + (me ? ' <span class="muted">(' + esc(t('you')) + ')</span>' : '') + '</td><td>' + esc(m.nom_guerre) + '</td><td>' + squadSel + '</td><td>' + esc(m.rank || '') + '</td><td>' + esc(m.email) + '</td>' +
-            ((me || !isColonel()) ? '<td>' + esc(t('st_' + m.status)) + '</td><td>' + esc(roleLabel(m.role)) + '</td>'
-              : '<td><select name="status" aria-label="' + esc(t('status')) + '">' + ['pending', 'approved', 'blocked'].map(function (s) { return '<option value="' + s + '"' + (m.status === s ? ' selected' : '') + '>' + esc(t('st_' + s)) + '</option>'; }).join('') + '</select></td>' +
-                '<td><select name="role" aria-label="' + esc(t('role')) + '">' + ['member', 'admin', 'colonel'].map(function (s) { return '<option value="' + s + '"' + (m.role === s ? ' selected' : '') + '>' + esc(roleLabel(s)) + '</option>'; }).join('') + '</select></td>') +
-            '<td><button type="button" class="btn-small" data-act="save-member">' + esc(t('save')) + '</button></td></tr>';
-        }).join('') + '</tbody></table>';
+      var keep = S.mem && S.mem.f, ks = S.mem && S.mem.sort;
+      S.mem = { rows: rows, f: keep || { q: '', status: '', role: '', esquadra: '', rank: '' }, sort: ks || { k: '', dir: 1 } };
+      drawMembers();
     }).catch(fail);
   }
+  function memRowById(id) { return S.mem && S.mem.rows.filter(function (m) { return m.id === id; })[0]; }
+  document.addEventListener('input', function (e) {
+    if (e.target.id === 'mem-q' && S.mem) { S.mem.f.q = e.target.value; drawMembers(); }
+  });
+  document.addEventListener('change', function (e) {
+    var el = e.target; if (!S.mem) return;
+    if (el.hasAttribute('data-f')) { S.mem.f[el.getAttribute('data-f')] = el.value; drawMembers(); return; }
+    var tr = el.closest && el.closest('table.members tr[data-id]'), k = el.getAttribute && el.getAttribute('data-k');
+    if (!tr || !k) return;
+    var m = memRowById(tr.getAttribute('data-id')); if (!m) return;
+    m._e = m._e || {};
+    if (k === 'jm' || k === 'jy') {
+      var jm = tr.querySelector('[data-k=jm]').value, jy = tr.querySelector('[data-k=jy]').value;
+      m._e.joined_9e = (jm && jy) ? jy + '-' + jm + '-01' : (jm || jy ? '?' : null);
+    } else m._e[k] = el.value;
+    tr.classList.add('dirty');
+  });
   function newPageView() {
     if (!isAdmin()) return '<section class="view narrow"><h2 class="page-title" tabindex="-1">' + esc(t('new_page')) + '</h2>' + lockedHtml() + '</section>';
     var opts = '<option value="">' + esc(t('f_top')) + '</option>' + S.allOrder.map(function (x) { return '<option value="' + x + '"' + (S.newParent === x ? ' selected' : '') + '>' + esc(S.byId[x].name) + '</option>'; }).join('');
@@ -1825,11 +1916,26 @@
         if (tb && tb.rows.length) { var tr = tb.rows[tb.rows.length - 1].cloneNode(true); Array.prototype.forEach.call(tr.cells, function (c) { c.innerHTML = '&nbsp;'; }); tb.appendChild(tr); S.dirty = true; }
         return;
       }
+      if (act === 'mem-sort') {
+        var sk = el.getAttribute('data-k'), so = S.mem.sort;
+        if (so.k === sk) { if (so.dir > 0) so.dir = -1; else { so.k = ''; so.dir = 1; } } else { so.k = sk; so.dir = 1; }
+        drawMembers(); return;
+      }
+      if (act === 'mem-clear') { S.mem.f = { q: '', status: '', role: '', esquadra: '', rank: '' }; S.mem.sort = { k: '', dir: 1 }; drawMembers(); return; }
       if (act === 'save-member') {
-        var row = el.closest('tr');
-        var upd = { esquadra: row.querySelector('[name=esquadra]').value };
-        if (!row.hasAttribute('data-me') && isColonel()) { upd.status = row.querySelector('[name=status]').value; upd.role = row.querySelector('[name=role]').value; }
-        track(t('saving'), sb.from('profiles').update(upd).eq('id', row.getAttribute('data-id')).then(q)).then(function () { if (row.hasAttribute('data-me')) loadProfile().then(renderChrome); }).catch(fail);
+        var mrow = el.closest('tr'), mm = memRowById(mrow.getAttribute('data-id'));
+        if (!mm || !mm._e) return;
+        var upd = {}; Object.keys(mm._e).forEach(function (k) { upd[k] = mm._e[k]; });
+        if (upd.joined_9e === '?') { toast(t('rg_joined_both')); return; }
+        ['first_name', 'last_name', 'nom_guerre'].forEach(function (k) { if (k in upd && !String(upd[k]).trim()) upd[k] = undefined; });
+        if (Object.keys(upd).some(function (k) { return upd[k] === undefined; })) { toast(t('required')); return; }
+        ['rank', 'esquadra'].forEach(function (k) { if (k in upd && upd[k] === '') upd[k] = k === 'rank' ? null : ''; });
+        if (upd.birth_date === '') upd.birth_date = null;
+        if (mrow.hasAttribute('data-me')) { delete upd.status; delete upd.role; }
+        track(t('saving'), sb.from('profiles').update(upd).eq('id', mm.id).then(q)).then(function () {
+          Object.keys(upd).forEach(function (k) { mm[k] = upd[k]; }); delete mm._e; drawMembers();
+          if (mrow.hasAttribute('data-me')) loadProfile().then(renderChrome);
+        }).catch(fail);
         return;
       }
       if (act === 'del-squad') {
