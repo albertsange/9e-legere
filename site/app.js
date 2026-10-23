@@ -925,8 +925,8 @@
       var mine = fs.filter(function (f) { return f.attribute === r.key; });
       mine.forEach(function (f) { used[f.id] = 1; });
       var real = mine.map(function (f) {
-        var i = byInsp[f.inspection_id] || {};
-        var own = i.own_unit === false ? ' other' : '';
+        var ib = byInsp[f.inspection_id] || {}, i = ib.content || ib;
+        var own = ib.own_unit === false ? ' other' : '';
         return '<li class="' + esc(f.certainty) + own + '"><a class="tlink" href="#regulacions~insp-' + esc(f.inspection_id) + '"><b class="yr-y">' + esc(i.year || '') + '</b> ' + esc(plain(i.place || '')) + '</a> ' +
           esc(plain(L(f.value))) + ' <span class="rr-tag">' + esc(t('obs_' + f.observation)) + '</span>' +
           (f.certainty !== 'certain' ? ' <span class="rr-tag unsure">' + esc(t('cert_' + f.certainty)) + '</span>' : '') +
