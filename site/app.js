@@ -244,11 +244,12 @@
     return sb.from('profiles').select('*').eq('id', S.session.user.id).maybeSingle().then(function (r) { S.profile = q(r); });
   }
   function loadPrivate() {
-    S.priv = {}; S.insp = [];
+    S.priv = {}; S.insp = []; S.findings = {};
     if (!isMember()) return Promise.resolve();
-    return Promise.all([sb.from('page_private').select('*'), sb.from('inspections').select('*').order('sort')]).then(function (r) {
+    return Promise.all([sb.from('page_private').select('*'), sb.from('inspections').select('*').order('sort'), sb.from('inspection_findings').select('*').order('sort')]).then(function (r) {
       (q(r[0]) || []).forEach(function (row) { S.priv[row.page_id] = row.content || {}; });
       S.insp = (r[1] && !r[1].error && r[1].data) || [];
+      ((r[2] && !r[2].error && r[2].data) || []).forEach(function (f) { (S.findings[f.page_id] = S.findings[f.page_id] || []).push(f); });
     });
   }
   function signedUrls(paths) {
@@ -444,6 +445,8 @@
       fetch(src + '?v=' + (window.ASSET_V || '')).then(function (r) { return r.ok ? r.text() : ''; }).then(function (t) { if (t) { DG[src] = t; put(t); } }).catch(function () {});
     });
   }
+  function setBarH() { var b = document.querySelector('.bar'); if (b) document.documentElement.style.setProperty('--barh', b.offsetHeight + 'px'); }
+  window.addEventListener('resize', setBarH);
   function render() {
     if (!S.ready) return;
     var id = routeId();
@@ -465,6 +468,7 @@
     else if (S.byId[id]) html = isSection(id) ? sectionView(id) : pageView(id);
     else html = '<section class="view"><h2 class="page-title" tabindex="-1">' + esc(t('not_found')) + '</h2><p><a href="#">' + esc(t('home')) + '</a></p></section>';
     main.innerHTML = html;
+    setBarH();
     loadDiagrams();
     Array.prototype.forEach.call(document.querySelectorAll('#menu-body a[data-sec]'), function (a) {
       var on = a.getAttribute('data-sec') === id;
@@ -744,8 +748,8 @@
     if (c.figs) Object.keys(c.figs).forEach(function (id) { if (!used[id]) delete c.figs[id]; });
   }
   function stChip(st) { return '<span class="st-chip st-' + st + '">' + esc(t('sst_' + st)) + '</span>'; }
-  function versionsHtml(id, c, E) {
-    var vs = c.versions || [], lg = S.lang, cp = 'page.content.versions';
+  function versionsHtml(id, c, E, src) {
+    var vs = src ? src.vs : (c.versions || []), lg = S.lang, cp = src ? src.cp : 'page.content.versions';
     if (!vs.length && !E) return '';
     var VS = function (v) { return E ? ((v.specs || {})[lg] || []) : LA(v.specs); };
     var html = '<h3 class="sum-h">' + esc(t('evol_h')) + '</h3>';
@@ -867,9 +871,27 @@
       panels.splice(dlIdx < 0 ? panels.length : dlIdx, 0, ['model9', null, m9]);
       var addImg = E ? '<div class="fig-add"><button type="button" class="btn fig-add-btn" data-act="fig-add">📷 ' + esc(t('add_img_here')) + '</button><span class="muted">' + esc(t('add_img_hint')) + '</span></div>' : '';
       panels.unshift(['sum', null, F(cp + 'lead.' + lg, V('lead'), 'p', 'lead-p', { pid: id, done: done }) +
-        '<h3 class="sum-h">' + esc(t('desc_h')) + '</h3>' + addImg + '<div class="desc-flow">' + descHtml + '</div>' + versionsHtml(id, c, E)]);
+        '<h3 class="sum-h">' + esc(t('desc_h')) + '</h3>' + addImg + '<div class="desc-flow">' + descHtml + '</div>' + (c.layout === 'v3' ? '' : versionsHtml(id, c, E))]);
     } else panels.unshift(['sum', null, F(cp + 'lead.' + lg, V('lead'), 'p', 'lead-p', { pid: id, done: done }) + descHtml + stdHero]);
 
+    var v3 = c.layout === 'v3';
+    if (v3) {
+      // v3: description (public) / rules and reality / documents / photos and pieces / 9e standard; the product sheet is not shown
+      var byK = {}; panels.forEach(function (x) { byK[x[0]] = x; });
+      var vocab = E ? ((c.vocab || {})[lg] || []) : LA(c.vocab), pats = c.pats || [];
+      var sumV3 = byK.sum[2] +
+        (vocab.length ? '<h3 class="sum-h">' + esc(t('vocab_h')) + '</h3><dl class="vocab">' + vocab.map(function (r) { return '<div><dt lang="fr">' + clean(r[0]) + '</dt><dd>' + clean(r[1]) + '</dd></div>'; }).join('') + '</dl>' : '') +
+        (pats.length ? '<h3 class="sum-h">' + esc(t('evol_h')) + '</h3><ol class="vtl">' + pats.map(function (v) {
+          return '<li' + (v.nine ? ' class="nine"' : '') + '><span class="vtl-dot" aria-hidden="true"></span><span class="vtl-y">' + esc(v.year || '—') + '</span>' + (v.nine ? '<span class="nine-b">9e</span>' : '') + '<span class="vtl-t">' + esc(plain(L(v.title))) + '</span></li>';
+        }).join('') + '</ol>' : '');
+      panels = [['sum', null, sumV3]];
+      if (member && pr) {
+        panels.push(['rr', null, rrHtml(id, pr, E, pr.versions ? { vs: pr.versions, cp: 'priv.versions' } : (E ? { vs: [], cp: 'priv.versions' } : null))]);
+        panels.push(['docs', byK.reg[1], byK.reg[2]]);
+        panels.push(['pics', (byK.evid[1] || 0) + (byK.dl[1] || 0) || null, byK.evid[2] + '<h3 class="sum-h">' + esc(t('t_dl')) + '</h3>' + byK.dl[2]]);
+        panels.push(byK.model9);
+      }
+    }
     var sel = S.tab[id] && panels.some(function (x) { return x[0] === S.tab[id]; }) ? S.tab[id] : 'sum';
     var tl = panels.map(function (x) {
       var k = x[0], lock = LOCKED[k] && !member;
@@ -888,7 +910,34 @@
       '<header class="wiki-head"><div class="piece-head">' + F(cp + 'h2.' + lg, V('h2'), 'h2', '', { raw: 1, single: 1, attr: ' tabindex="-1"' }) + penBtn() + '</div>' + editMeta(id) + relHtml(id) + '</header>' +
       infobox +
       '<div class="wiki-body">' +
-      '<div class="tabs wiki-tabs" role="tablist">' + tl + '</div>' + tp + '</div></section>';
+      (v3 && panels.length < 2 ? '' : '<div class="tabs wiki-tabs' + (v3 ? ' sticky-tabs' : '') + '" role="tablist">' + tl + '</div>') + tp + '</div></section>';
+  }
+
+  // "Rules and reality": per attribute, what the regulations say next to what the inspections found, and the 9e choice
+  function rrHtml(id, pr, E, src) {
+    var rows = pr.rr || [], fs = (S.findings || {})[id] || [], used = {};
+    var byInsp = {}; (S.insp || []).forEach(function (x) { byInsp[x.id] = x; });
+    var out = '<p class="rr-intro">' + esc(t('rr_intro')) + '</p>';
+    out += rows.map(function (r) {
+      var norms = (r.norms || []).map(function (n) {
+        return '<li><b class="yr-y">' + esc(n.year) + '</b> ' + rich(L(n.value), id) + '</li>';
+      }).join('');
+      var mine = fs.filter(function (f) { return f.attribute === r.key; });
+      mine.forEach(function (f) { used[f.id] = 1; });
+      var real = mine.map(function (f) {
+        var i = byInsp[f.inspection_id] || {};
+        var own = i.own_unit === false ? ' other' : '';
+        return '<li class="' + esc(f.certainty) + own + '"><a class="tlink" href="#regulacions~insp-' + esc(f.inspection_id) + '"><b class="yr-y">' + esc(i.year || '') + '</b> ' + esc(plain(i.place || '')) + '</a> ' +
+          esc(plain(L(f.value))) + ' <span class="rr-tag">' + esc(t('obs_' + f.observation)) + '</span>' +
+          (f.certainty !== 'certain' ? ' <span class="rr-tag unsure">' + esc(t('cert_' + f.certainty)) + '</span>' : '') +
+          (f.verdict && f.verdict !== 'unreviewed' ? ' <span class="rr-tag v-' + esc(f.verdict) + '">' + esc(t('verd_' + f.verdict)) + '</span>' : '') + '</li>';
+      }).join('');
+      return '<section class="rr-row"><h4>' + esc(plain(L(r.label))) + '</h4><div class="rr-cols">' +
+        '<div class="rr-norm"><span class="lbl">' + esc(t('rr_norm')) + '</span>' + (norms ? '<ul>' + norms + '</ul>' : '<p class="muted">' + esc(t('rr_none')) + '</p>') + '</div>' +
+        '<div class="rr-real"><span class="lbl">' + esc(t('rr_real')) + '</span>' + (real ? '<ul>' + real + '</ul>' : '<p class="muted">' + esc(t('rr_none_i')) + '</p>') + '</div></div>' +
+        (L(r.std) ? '<p class="rr-std"><span class="star" aria-hidden="true">★</span> <b>' + esc(t('t_std')) + ':</b> ' + esc(plain(L(r.std))) + '</p>' : '') + '</section>';
+    }).join('');
+    return out + (src ? versionsHtml(id, {}, E, src) : '');
   }
 
   function lockedHtml() {
@@ -1221,6 +1270,10 @@
     if (isBusy()) { toast(t('busy_wait'), true); return; }
     syncDraft();
     pruneFallbacks();
+    // v3 pages keep the model timeline private; its public one-line summary is rebuilt on every save
+    if (S.draft.page && S.draft.page.content.layout === 'v3' && S.draft.priv && S.draft.priv.versions) {
+      S.draft.page.content.pats = S.draft.priv.versions.map(function (v) { return { year: v.year, title: v.title || {}, nine: !!v.nine }; });
+    }
     var btn = document.querySelector('#editbar [data-act="save"]'); if (btn) btn.disabled = true;
     var orig = S.draft.page ? { page: S.byId[S.draft.page.id], priv: S.priv[S.draft.page.id] } : { site: S.site };
     var warn = null, job = busy(t('saving'));

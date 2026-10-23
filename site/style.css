@@ -494,3 +494,21 @@ a.wl:focus-visible{outline:2px solid var(--ecarlate);outline-offset:1px;border-r
 .chip.gaps{background:var(--gap-bg);color:var(--gap-ink);border-color:var(--gap-ink)}
 .home-hero h1{font-size:clamp(2rem,4.6vw,3.1rem);margin:.2rem 0 .3rem}
 @media (max-width:760px){.about-grid{grid-template-columns:1fr}.about-plate{position:static;max-width:320px;margin:0 auto}.about-card{grid-template-columns:2.2rem minmax(0,1fr);column-gap:.6rem;padding:1rem}.about-n{font-size:1.6rem}}
+
+/* v3 item page: sticky tab bar, rules-and-reality, vocabulary */
+:root{--barh:4.5rem}
+.tabs.sticky-tabs{position:sticky;top:var(--barh);z-index:15;background:var(--paper);margin-top:0}
+.vocab{margin:0}.vocab div{display:grid;grid-template-columns:minmax(7rem,28%) 1fr;gap:.2rem .8rem;padding:.35rem 0;border-bottom:1px solid var(--line)}
+.vocab dt{font-weight:700;font-style:italic}.vocab dd{margin:0}
+.vtl-t{margin-left:.4rem;font-size:.85rem;color:var(--muted)}
+.rr-intro{color:var(--muted);margin-top:0}
+.rr-row{border:1px solid var(--line);border-radius:3px;padding:.7rem .9rem;margin-bottom:1rem;background:var(--sheet)}
+.rr-row h4{margin:0 0 .5rem;font-family:var(--label);letter-spacing:.04em}
+.rr-cols{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
+.rr-cols ul{margin:.2rem 0 0;padding-left:1rem}.rr-cols li{margin-bottom:.35rem}
+.rr-cols .lbl{font-family:var(--label);font-size:.8rem;color:var(--muted);letter-spacing:.05em;text-transform:uppercase}
+.rr-tag{font-size:.72rem;padding:0 .4rem;border-radius:999px;background:var(--quote-bg);color:var(--muted);white-space:nowrap}
+.rr-tag.unsure{outline:1px dashed var(--muted)}.rr-tag.v-differs{background:var(--ecarlate);color:#fff}
+.rr-real li.doubtful{opacity:.75}.rr-real li.other{opacity:.8;font-style:italic}
+.rr-std{margin:.7rem 0 0;padding-top:.5rem;border-top:1px dashed var(--line);color:var(--chasseur)}
+@media (max-width:700px){.rr-cols{grid-template-columns:1fr}}
