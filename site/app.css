@@ -482,3 +482,7 @@ table.members tr.dirty td{background:var(--quote-bg)}
 .th-sort.on .arr{opacity:1;color:var(--bleu)}
 .mem-joined{display:flex;gap:.3rem}
 .mem-joined select{min-width:5rem}
+
+table.members tr.new td{background:color-mix(in srgb,#d9a521 20%,var(--sheet))}
+table.members tr.new td:first-child{box-shadow:inset 4px 0 0 #d9a521}
+table.members tr.new.dirty td{background:color-mix(in srgb,#d9a521 30%,var(--sheet))}

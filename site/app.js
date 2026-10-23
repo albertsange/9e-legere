@@ -1384,7 +1384,7 @@
   }
   function drawMembers() {
     var M = S.mem, box = document.getElementById('members'); if (!box) return;
-    var canEdit = isColonel(), rows = memRows();
+    var canEdit = isColonel() && !!M.edit, rows = memRows();
     var opt = function (arr, cur, lab) { return arr.map(function (x) { return '<option value="' + esc(x[0]) + '"' + (x[0] === cur ? ' selected' : '') + '>' + esc(x[1]) + '</option>'; }).join(''); };
     var sqs = S.squads.map(function (s) { return [s.name, s.name]; });
     var filters = '<div class="mem-filters"><input id="mem-q" type="search" value="' + esc(M.f.q || '') + '" placeholder="' + esc(t('mem_search')) + '" aria-label="' + esc(t('mem_search')) + '">' +
@@ -1392,14 +1392,15 @@
       '<select data-f="role" aria-label="' + esc(t('role')) + '"><option value="">' + esc(t('role')) + ': ' + esc(t('mem_all')) + '</option>' + opt(['member', 'admin', 'colonel'].map(function (s) { return [s, roleLabel(s)]; }), M.f.role) + '</select>' +
       '<select data-f="esquadra" aria-label="' + esc(t('esquadra')) + '"><option value="">' + esc(t('esquadra')) + ': ' + esc(t('mem_all')) + '</option>' + opt(sqs, M.f.esquadra) + '</select>' +
       '<select data-f="rank" aria-label="' + esc(t('rank')) + '"><option value="">' + esc(t('rank')) + ': ' + esc(t('mem_all')) + '</option>' + opt(RANKS.map(function (r) { return [r, r]; }), M.f.rank) + '</select>' +
-      '<button type="button" class="btn-ghost" data-act="mem-clear">' + esc(t('mem_clear')) + '</button><span class="mem-count muted" id="mem-count"></span></div>';
+      '<button type="button" class="btn-ghost" data-act="mem-clear">' + esc(t('mem_clear')) + '</button><span class="mem-count muted" id="mem-count"></span>' +
+      (isColonel() ? '<button type="button" class="' + (M.edit ? 'btn' : 'btn-ghost') + '" data-act="mem-edit">' + esc(t(M.edit ? 'mem_edit_done' : 'mem_edit')) + '</button>' : '') + '</div>';
     var head = '<thead><tr>' + MEM_COLS.map(function (c) {
       var on = M.sort.k === c[0];
       return '<th scope="col" aria-sort="' + (on ? (M.sort.dir > 0 ? 'ascending' : 'descending') : 'none') + '"><button type="button" class="th-sort' + (on ? ' on' : '') + '" data-act="mem-sort" data-k="' + c[0] + '">' + esc(t(c[1])) + '<span class="arr" aria-hidden="true">' + (on ? (M.sort.dir > 0 ? '▲' : '▼') : '↕') + '</span></button></th>';
     }).join('') + (canEdit ? '<th></th>' : '') + '</tr></thead>';
     var body = '<tbody>' + (rows.length ? rows.map(function (m) {
       var me = S.session && m.id === S.session.user.id;
-      return '<tr data-id="' + m.id + '"' + (me ? ' data-me="1"' : '') + (m._e ? ' class="dirty"' : '') + '>' + MEM_COLS.map(function (c) {
+      return '<tr data-id="' + m.id + '"' + (me ? ' data-me="1"' : '') + ' class="' + (m.status === 'pending' ? 'new ' : '') + (m._e ? 'dirty' : '') + '">' + MEM_COLS.map(function (c) {
         return '<td>' + memInput(m, c[0], canEdit, me) + (c[0] === 'first_name' && me ? ' <span class="muted">(' + esc(t('you')) + ')</span>' : '') + '</td>';
       }).join('') + (canEdit ? '<td><button type="button" class="btn-small" data-act="save-member">' + esc(t('save')) + '</button></td>' : '') + '</tr>';
     }).join('') : '<tr><td colspan="12" class="muted">' + esc(t('no_members')) + '</td></tr>') + '</tbody>';
@@ -1420,7 +1421,7 @@
       var rows = q(r) || [], box = document.getElementById('members');
       if (!box) return;
       var keep = S.mem && S.mem.f, ks = S.mem && S.mem.sort;
-      S.mem = { rows: rows, f: keep || { q: '', status: '', role: '', esquadra: '', rank: '' }, sort: ks || { k: '', dir: 1 } };
+      S.mem = { edit: S.mem && S.mem.edit, rows: rows, f: keep || { q: '', status: '', role: '', esquadra: '', rank: '' }, sort: ks || { k: '', dir: 1 } };
       drawMembers();
     }).catch(fail);
   }
@@ -1920,6 +1921,10 @@
         var sk = el.getAttribute('data-k'), so = S.mem.sort;
         if (so.k === sk) { if (so.dir > 0) so.dir = -1; else { so.k = ''; so.dir = 1; } } else { so.k = sk; so.dir = 1; }
         drawMembers(); return;
+      }
+      if (act === 'mem-edit') {
+        if (S.mem.edit && S.mem.rows.some(function (m) { return m._e; })) { if (!window.confirm(t('mem_discard_q'))) return; S.mem.rows.forEach(function (m) { delete m._e; }); }
+        S.mem.edit = !S.mem.edit; drawMembers(); return;
       }
       if (act === 'mem-clear') { S.mem.f = { q: '', status: '', role: '', esquadra: '', rank: '' }; S.mem.sort = { k: '', dir: 1 }; drawMembers(); return; }
       if (act === 'save-member') {
