@@ -1011,6 +1011,23 @@
         : '<details id="' + id + '-reg-r' + (n + 1) + '" class="reg yr' + (r.insp ? ' insp-reg' : '') + '">' + head + body + link + '</details>';
       if (r.insp && !EE) inspOut += html1; else out += html1;
     });
+    // inspections with findings about this item that are not yet linked as a regulation entry: listed automatically
+    if (!EE) {
+      var auto = '', linked = {}; regs.forEach(function (r) { if (r.insp) linked[r.insp] = 1; });
+      (S.insp || []).forEach(function (row) {
+        if (linked[row.id]) return;
+        var fs = ((S.findings || {})[id] || []).filter(function (f) { return f.inspection_id === row.id && f.quote_fr; });
+        if (!fs.length) return;
+        var c = row.content || {};
+        var trs = fs.map(function (f) { return '<p>' + clean(lg === 'fr' ? '' : L(f.value)) + '</p>'; }).join('');
+        var frs = fs.map(function (f) { return '<p lang="fr">« ' + clean(f.quote_fr) + ' »</p>'; }).join('');
+        auto += '<details id="' + id + '-insp-' + esc(row.id) + '" class="reg yr insp-reg"><summary><span class="reg-date"><b class="yr-y">' + esc(c.year || '') + '</b> — <span lang="fr">' + esc(plain(c.title || row.id)) + '</span></span>' +
+          '<span class="yr-count">' + (fs.length > 1 ? fs.length : '') + '</span><span class="chev" aria-hidden="true"></span></summary>' +
+          '<div class="reg-body"><div class="orig"><span class="lbl">' + esc(t('fr_text')) + '</span>' + frs + '</div><div class="tr"><span class="lbl">' + esc(t('tr_text')) + '</span>' + trs + '</div></div>' +
+          '<p class="insp-link"><a class="tlink" href="#regulacions~insp-' + esc(row.id) + '">' + esc(t('insp_open')) + '</a></p></details>';
+      });
+      inspOut = auto + inspOut;
+    }
     if (inspOut) out += '<div class="regs-sub">' + esc(t('insp_h')) + '</div>' + inspOut;
     out += '</div>' + (EE ? addBtn(pp + 'regs', 'reg', 'add_reg') : '');
     var note = E ? ((pr.note || {})[lg]) : L(pr.note);
