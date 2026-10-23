@@ -1631,7 +1631,6 @@
       '<p class="rg-welcome">' + esc(t('rg_welcome').replace('{rank}', rank)) + '</p>' +
       '<ol class="rg-steps"><li><span class="sp-n">1</span><div><b>' + esc(t('rg_w1')) + '</b><p>' + esc(t('rg_w1p')) + '</p></div></li>' +
       '<li><span class="sp-n">2</span><div><b>' + esc(t('rg_w2')) + '</b><p>' + esc(t('rg_w2p')) + '</p></div></li></ol>' +
-      '<p class="muted">' + esc(t('rg_mail')) + '</p>' +
       '<p class="form-actions"><button type="button" class="btn" data-act="close-dlg">' + esc(t('rg_ok')) + '</button></p></div>';
   }
   document.addEventListener('close', function (e) { if (e.target && e.target.id === 'login-dlg') S.rg = null; }, true);
