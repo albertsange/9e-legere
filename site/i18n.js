@@ -181,6 +181,10 @@ window.I18N = (function () {
     role: U("Rol", "Role", "Ruolo", "Rôle", "Rolle"),
     r_member: U("Membre", "Member", "Membro", "Membre", "Mitglied"),
     r_admin: U("Administrador", "Administrator", "Amministratore", "Administrateur", "Administrator"),
+    r_colonel: U("Coronel", "Colonel", "Colonnello", "Colonel", "Oberst"),
+    notif_edited: U("ha editat", "edited", "ha modificato", "a modifié", "hat bearbeitet"),
+    notif_signup: U("s'ha registrat i espera aprovació", "has registered and is waiting for approval", "si è registrato e attende l'approvazione", "s'est inscrit et attend son approbation", "hat sich registriert und wartet auf Freigabe"),
+    colonel_only: U("Només el coronel pot aprovar membres nous i canviar-ne el rol.", "Only the colonel can approve new members and change their role.", "Solo il colonnello può approvare nuovi membri e cambiarne il ruolo.", "Seul le colonel peut approuver de nouveaux membres et changer leur rôle.", "Nur der Oberst kann neue Mitglieder freigeben und ihre Rolle ändern."),
     my_data: U("Les meves dades", "My details", "I miei dati", "Mes informations", "Meine Daten"),
 
     // admin

@@ -59,7 +59,9 @@
     obj[p[p.length - 1]] = val;
   }
   function isMember() { return !!(S.profile && S.profile.status === 'approved'); }
-  function isAdmin() { return isMember() && S.profile.role === 'admin'; }
+  function isAdmin() { return isMember() && (S.profile.role === 'admin' || S.profile.role === 'colonel'); }
+  function isColonel() { return isMember() && S.profile.role === 'colonel'; }
+  function roleLabel(r) { return t(r === 'colonel' ? 'r_colonel' : r === 'admin' ? 'r_admin' : 'r_member'); }
   function toast(msg, bad) {
     var el = document.getElementById('toast');
     el.textContent = msg; el.className = 'toast show' + (bad ? ' bad' : '');
@@ -1293,7 +1295,7 @@
     return '<section class="view narrow"><h2 class="page-title" tabindex="-1">' + esc(t('account')) + '</h2>' +
       '<dl class="kv"><div><dt>' + esc(t('email')) + '</dt><dd>' + esc(S.session.user.email) + '</dd></div>' +
       '<div><dt>' + esc(t('status')) + '</dt><dd>' + esc(t('st_' + (p.status || 'pending'))) + '</dd></div>' +
-      '<div><dt>' + esc(t('role')) + '</dt><dd>' + esc(t(p.role === 'admin' ? 'r_admin' : 'r_member')) + '</dd></div></dl>' +
+      '<div><dt>' + esc(t('role')) + '</dt><dd>' + esc(roleLabel(p.role)) + '</dd></div></dl>' +
       '<form class="form" id="f-profile"><h3>' + esc(t('my_data')) + '</h3>' +
       '<div class="two">' + field('first_name', t('first_name'), 'text', p.first_name, ' required maxlength="80"') + field('last_name', t('last_name'), 'text', p.last_name, ' required maxlength="120"') + '</div>' +
       '<div class="two">' + field('nom_guerre', t('nom_guerre'), 'text', p.nom_guerre, ' required maxlength="80"') + squadField(p.esquadra) + '</div>' +
@@ -1312,7 +1314,7 @@
   function adminView() {
     if (!isAdmin()) return '<section class="view narrow"><h2 class="page-title" tabindex="-1">' + esc(t('admin')) + '</h2>' + lockedHtml() + '</section>';
     return '<section class="view"><h2 class="page-title" tabindex="-1">' + esc(t('admin')) + '</h2>' +
-      '<h3>' + esc(t('members')) + '</h3><div class="table-wrap" id="members"><p class="muted">' + esc(t('loading')) + '</p></div>' +
+      '<h3>' + esc(t('members')) + '</h3>' + (isColonel() ? '' : '<p class="muted">' + esc(t('colonel_only')) + '</p>') + '<div class="table-wrap" id="members"><p class="muted">' + esc(t('loading')) + '</p></div>' +
       '<h3>' + esc(t('squads')) + '</h3><ul class="squads">' + S.squads.map(function (s) {
         return '<li>' + esc(s.name) + ' <button type="button" class="mini del" data-act="del-squad" data-id="' + s.id + '" aria-label="' + esc(t('remove')) + '">×</button></li>';
       }).join('') + '</ul><form class="form inline" id="f-squad"><input name="name" maxlength="80" required aria-label="' + esc(t('esquadra')) + '"><button class="btn" type="submit">' + esc(t('add')) + '</button></form>' +
@@ -1346,9 +1348,9 @@
           if (m.esquadra && sq.indexOf(m.esquadra) < 0) sq.push(m.esquadra);
           var squadSel = '<select name="esquadra" aria-label="' + esc(t('esquadra')) + '">' + sq.map(function (n) { return '<option' + (n === m.esquadra ? ' selected' : '') + '>' + esc(n) + '</option>'; }).join('') + '</select>';
           return '<tr data-id="' + m.id + '"' + (me ? ' data-me="1"' : '') + '><td>' + esc(m.first_name + ' ' + m.last_name) + (me ? ' <span class="muted">(' + esc(t('you')) + ')</span>' : '') + '</td><td>' + esc(m.nom_guerre) + '</td><td>' + squadSel + '</td><td>' + esc(m.email) + '</td>' +
-            (me ? '<td>' + esc(t('st_' + m.status)) + '</td><td>' + esc(t(m.role === 'admin' ? 'r_admin' : 'r_member')) + '</td>'
+            ((me || !isColonel()) ? '<td>' + esc(t('st_' + m.status)) + '</td><td>' + esc(roleLabel(m.role)) + '</td>'
               : '<td><select name="status" aria-label="' + esc(t('status')) + '">' + ['pending', 'approved', 'blocked'].map(function (s) { return '<option value="' + s + '"' + (m.status === s ? ' selected' : '') + '>' + esc(t('st_' + s)) + '</option>'; }).join('') + '</select></td>' +
-                '<td><select name="role" aria-label="' + esc(t('role')) + '">' + ['member', 'admin'].map(function (s) { return '<option value="' + s + '"' + (m.role === s ? ' selected' : '') + '>' + esc(t(s === 'admin' ? 'r_admin' : 'r_member')) + '</option>'; }).join('') + '</select></td>') +
+                '<td><select name="role" aria-label="' + esc(t('role')) + '">' + ['member', 'admin', 'colonel'].map(function (s) { return '<option value="' + s + '"' + (m.role === s ? ' selected' : '') + '>' + esc(roleLabel(s)) + '</option>'; }).join('') + '</select></td>') +
             '<td><button type="button" class="btn-small" data-act="save-member">' + esc(t('save')) + '</button></td></tr>';
         }).join('') + '</tbody></table>';
     }).catch(fail);
@@ -1737,7 +1739,7 @@
       if (act === 'save-member') {
         var row = el.closest('tr');
         var upd = { esquadra: row.querySelector('[name=esquadra]').value };
-        if (!row.hasAttribute('data-me')) { upd.status = row.querySelector('[name=status]').value; upd.role = row.querySelector('[name=role]').value; }
+        if (!row.hasAttribute('data-me') && isColonel()) { upd.status = row.querySelector('[name=status]').value; upd.role = row.querySelector('[name=role]').value; }
         track(t('saving'), sb.from('profiles').update(upd).eq('id', row.getAttribute('data-id')).then(q)).then(function () { if (row.hasAttribute('data-me')) loadProfile().then(renderChrome); }).catch(fail);
         return;
       }
@@ -2244,7 +2246,7 @@
       (open ? '<div class="bell-pop"><div class="bell-h"><b>' + esc(t('notif_title')) + '</b>' + (n ? '<button type="button" class="link" data-act="notif-all">' + esc(t('notif_all_read')) + '</button>' : '') + '</div>' +
         (S.notifs.length ? S.notifs.map(function (x) {
           var pg = S.byId[x.page_id];
-          return '<button type="button" class="notif' + (x.read_at ? '' : ' unread') + '" data-act="notif-go" data-id="' + x.id + '"><span><b>' + esc(x.actor_name || '?') + '</b> ' + esc(t(x.kind === 'reply' ? 'cm_replied' : 'cm_mentioned')) + ' <b lang="fr">' + esc(pg ? pg.name : x.page_id) + '</b></span><time>' + esc(fmtDate(x.created_at, true)) + '</time></button>';
+          return '<button type="button" class="notif' + (x.read_at ? '' : ' unread') + '" data-act="notif-go" data-id="' + x.id + '"><span><b>' + esc(x.actor_name || '?') + '</b> ' + esc(t(x.kind === 'reply' ? 'cm_replied' : x.kind === 'edit' ? 'notif_edited' : x.kind === 'signup' ? 'notif_signup' : 'cm_mentioned')) + (x.kind === 'signup' ? '' : ' <b lang="fr">' + esc(pg ? pg.name : x.page_id) + '</b>') + '</span><time>' + esc(fmtDate(x.created_at, true)) + '</time></button>';
         }).join('') : '<p class="muted">' + esc(t('notif_none')) + '</p>') + '</div>' : '');
   }
   function markRead(ids) {
@@ -2261,7 +2263,7 @@
     else if (act === 'notif-all') { markRead(S.notifs.map(function (x) { return x.id; })); }
     else if (act === 'notif-go') {
       var x = S.notifs.filter(function (n) { return n.id === +el.getAttribute('data-id'); })[0]; if (!x) return;
-      S.bellOpen = false; markRead([x.id]); S.cmtFocus = x.comment_id; delete S.cmts[x.page_id];
+      S.bellOpen = false; markRead([x.id]); if (x.kind === 'signup') { location.hash = 'gestio'; return; } S.cmtFocus = x.comment_id; delete S.cmts[x.page_id];
       if (routeId() === x.page_id) render(); else location.hash = x.page_id;
     } else if (act === 'cm-reply') {
       var slot = document.querySelector('[data-slot="' + el.getAttribute('data-id') + '"]');
