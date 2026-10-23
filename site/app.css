@@ -413,3 +413,9 @@ body.editing .infobox{position:static;max-height:none;overflow:visible}
 .pd-item input{width:1.2rem;height:1.2rem}
 .pd-actions{text-align:right;margin:.8rem 0 0}
 @media (max-width:640px){.fig-l{float:none;width:auto;margin:.5rem 0 1rem}}
+.pic-fig .gal-open{aspect-ratio:auto;overflow:visible;border:0;background:none}
+.pic-fig img{display:block;width:100%;height:auto;aspect-ratio:auto;object-fit:contain}
+.pic-rot{position:absolute;top:.35rem;left:.35rem;display:flex;gap:.25rem}
+.pic-rot button{width:2.2rem;height:2.2rem;border-radius:50%;border:1px solid var(--line);background:var(--paper);color:var(--ink);font-size:1.15rem;line-height:1;cursor:pointer}
+.pic-rot.inline{position:static;display:inline-flex}
+.pic-rot.inline button{width:1.9rem;height:1.9rem;font-size:1rem}

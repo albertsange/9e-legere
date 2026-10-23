@@ -1015,12 +1015,42 @@
     });
     return out;
   }
+  // rotates a stored evidence photo (large version and thumbnail) by 90 degrees and stores the result under new names
+  function rotBlob(path, deg, quality) {
+    return signedUrls([path]).then(function () {
+      var u = S.urls[path]; if (!u) throw new Error('no url');
+      return fetch(u.url).then(function (r) { if (!r.ok) throw new Error('fetch ' + r.status); return r.blob(); });
+    }).then(function (b) { return createImageBitmap(b); }).then(function (bmp) {
+      var cv = document.createElement('canvas'), w = bmp.width, h = bmp.height;
+      cv.width = h; cv.height = w;
+      var cx = cv.getContext('2d'); cx.fillStyle = '#fff'; cx.fillRect(0, 0, h, w);
+      cx.translate(h / 2, w / 2); cx.rotate(deg * Math.PI / 180); cx.drawImage(bmp, -w / 2, -h / 2);
+      if (bmp.close) bmp.close();
+      return new Promise(function (res, rej) { cv.toBlob(function (o) { o ? res({ blob: o, w: h, h: w }) : rej(new Error('blob')); }, 'image/jpeg', quality); });
+    });
+  }
+  function rotateFig(gi, i, deg) {
+    syncDraft();
+    var f = (((S.draft.priv.groups || [])[gi] || {}).figs || [])[i]; if (!f || !f.path) return;
+    var job = busy(t('rotating')), old = f.path, base = old.replace(/[^\/]+$/, '') + Date.now().toString(36) + Math.random().toString(36).slice(2, 5) + '-rot';
+    return rotBlob(f.path, deg, IMG.q).then(function (big) {
+      return putBlob(PRIVATE_BUCKET, big.blob, base + '.jpg', 'image/jpeg').then(function (p) {
+        var res = { path: p, w: big.w, h: big.h };
+        if (!f.thumb) return res;
+        return rotBlob(f.thumb, deg, IMG.qThumb).then(function (sm) { return putBlob(PRIVATE_BUCKET, sm.blob, base + '.thumb.jpg', 'image/jpeg'); }).then(function (tp) { res.thumb = tp; return res; });
+      });
+    }).then(function (res) {
+      f.path = res.path; f.w = res.w; f.h = res.h; if (res.thumb) f.thumb = res.thumb;
+      var pp = S.draft.priv.pics || []; pp.forEach(function (x, k) { if (x === old) pp[k] = res.path; });
+      S.dirty = true; job.end(true); keepScroll(render);
+    }).catch(function (e) { job.end(false); fail(e); });
+  }
   function picsSection(id, pr) {
     var pics = ((S.draft && S.draft.priv && S.draft.priv.pics) || []), lg = S.lang;
     var slots = pics.map(function (path, i) {
       var r = evidFig(S.draft.priv, path); if (!r) return '';
       var cap = (r.f.cap || {})[lg] || L(r.f.cap);
-      return '<figure class="pic-slot filled"><img data-priv="' + esc(r.f.thumb || r.f.path) + '" alt=""><button type="button" class="pic-del" data-act="pic-del" data-i="' + i + '" aria-label="' + esc(t('remove')) + '" title="' + esc(t('remove')) + '">' + BIN + '</button>' +
+      return '<figure class="pic-slot filled"><img data-priv="' + esc(r.f.thumb || r.f.path) + '" alt=""><span class="pic-rot"><button type="button" data-act="rot" data-g="' + r.g + '" data-i="' + r.i + '" data-d="-90" aria-label="' + esc(t('rot_l')) + '" title="' + esc(t('rot_l')) + '">↺</button><button type="button" data-act="rot" data-g="' + r.g + '" data-i="' + r.i + '" data-d="90" aria-label="' + esc(t('rot_r')) + '" title="' + esc(t('rot_r')) + '">↻</button></span><button type="button" class="pic-del" data-act="pic-del" data-i="' + i + '" aria-label="' + esc(t('remove')) + '" title="' + esc(t('remove')) + '">' + BIN + '</button>' +
         (cap ? '<figcaption>' + clean(cap) + '</figcaption>' : '') + '</figure>';
     }).join('');
     return '<section class="pics-sec"><h3 class="sum-h">' + esc(t('pics_h')) + '</h3><div class="pic-grid">' + slots +
@@ -1075,6 +1105,7 @@
             groups.map(function (o, oi) { return oi === gi ? '' : '<option value="' + oi + '">' + esc(plain(L(o.title)) || (t('group') + ' ' + (oi + 1))) + '</option>'; }).join('') + '</select>' : '';
           return '<figure class="gal-item"' + rowAttr(base + '.figs', i) + '>' + dragH(base + '.figs', i) + img + F(base + '.figs.' + i + '.cap.' + lg, cap, 'figcaption', '', { raw: 1, ph: t('caption') }) +
             '<span class="fig-tools"><input type="text" data-path="' + base + '.figs.' + i + '.alt" value="' + esc(f.alt || '') + '" placeholder="' + esc(t('alt')) + '" aria-label="' + esc(t('alt')) + '">' +
+            '<span class="pic-rot inline"><button type="button" data-act="rot" data-g="' + gi + '" data-i="' + i + '" data-d="-90" aria-label="' + esc(t('rot_l')) + '" title="' + esc(t('rot_l')) + '">↺</button><button type="button" data-act="rot" data-g="' + gi + '" data-i="' + i + '" data-d="90" aria-label="' + esc(t('rot_r')) + '" title="' + esc(t('rot_r')) + '">↻</button></span>' +
             moveOpts + listBtns(base + '.figs', i) + '</span></figure>';
         }).join('') + '</div>' +
         (E ? '<button type="button" class="add-btn" data-act="add-photos" data-g="' + gi + '">+ ' + esc(t('add_photos')) + '</button>' : '') + '</section>';
@@ -1617,6 +1648,7 @@
         }).catch(fail);
         return;
       }
+      if (act === 'rot') { rotateFig(parseInt(el.getAttribute('data-g'), 10), parseInt(el.getAttribute('data-i'), 10), parseInt(el.getAttribute('data-d'), 10)); return; }
       if (act === 'pic-add') { picsDialog(); return; }
       if (act === 'pic-del') { syncDraft(); S.draft.priv.pics.splice(parseInt(el.getAttribute('data-i'), 10), 1); S.dirty = true; keepScroll(render); return; }
       if (act === 'lightbox') { lightbox(el.getAttribute('data-pid'), parseInt(el.getAttribute('data-g'), 10), parseInt(el.getAttribute('data-i'), 10)); return; }
