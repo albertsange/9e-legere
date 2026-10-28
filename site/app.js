@@ -2742,9 +2742,9 @@
     var body = '<tbody>' + (Q.rows.length ? Q.rows.map(function (m) {
       return '<tr data-sid="' + m.id + '"' + (m._p ? ' class="sq-webrow"' : '') + '>' + cols.map(function (c) { return '<td>' + sqCell(m, c) + '</td>'; }).join('') +
         '<td class="sq-act">' + (m._p ? '<span class="sq-badge" title="' + esc(t('sq_web_hint')) + '">' + esc(t('sq_web')) + '</span>'
-          : '<span class="sq-badge unconf" title="' + esc(t('sq_unconf_hint')) + '">' + esc(t('st_unconfirmed')) + '</span> <button type="button" class="mini del" data-sq="del-row" title="' + esc(t('sq_del_row')) + '" aria-label="' + esc(t('sq_del_row')) + '">🗑</button>') + '</td></tr>';
+          : '<span class="sq-badge unconf" title="' + esc(t('sq_unconf_hint')) + '">' + esc(t('st_unconfirmed')) + '</span> <button type="button" class="btn-small" data-sq="link-row" title="' + esc(t('sq_link_t')) + '">' + esc(t('sq_link')) + '</button> <button type="button" class="mini del" data-sq="del-row" title="' + esc(t('sq_del_row')) + '" aria-label="' + esc(t('sq_del_row')) + '">🗑</button>') + '</td></tr>';
     }).join('') : '<tr><td colspan="' + (cols.length + 1) + '" class="muted">' + esc(t('no_members')) + '</td></tr>') + '</tbody>';
-    return bar + '<div class="table-wrap"><table class="members sq-table">' + head + body + '</table></div>';
+    return bar + sqNoticeHtml() + '<div class="table-wrap"><table class="members sq-table">' + head + body + '</table></div>';
   }
   /* uniform level: one group of columns per item (shako), one column for the item and each of its sub-pieces (cordon, plaque…) */
   function sqKitGroups() {
@@ -2856,9 +2856,11 @@
     if (act === 'view') { Q.view = el.getAttribute('data-v'); drawSquad(); return; }
     if (act === 'aview') { Q.aview = el.getAttribute('data-v'); drawSquad(); return; }
     if (act === 'sec') { Q.sec = el.getAttribute('data-v'); drawSquad(); return; }
-    if (act === 'add-existing') { closeAddMenu(); sqOpenPick(); return; }
+    if (act === 'add-existing') { closeAddMenu(); sqOpenPick(null); return; }
     if (act === 'add-new') { closeAddMenu(); Q.nw = { step: 0, d: {} }; sqDrawNew(); showDlg(sqDlg()); return; }
     if (act === 'dlg-close') { sqCloseDlg(); return; }
+    if (act === 'link-row') { var lr = sqRow(el); if (lr) sqOpenPick(lr.id); return; }
+    if (act === 'link-suggest') { sqLink(el.getAttribute('data-sid'), el.getAttribute('data-id')); return; }
     if (act === 'pick') { sqPick(el.getAttribute('data-id')); return; }
     if (act === 'nw-back') { var nf = document.getElementById('f-sq-new'); if (nf) nwCollect(nf); Q.nw.step = Math.max(0, Q.nw.step - 1); sqDrawNew(); return; }
     if (act === 'del-row') {
@@ -2944,7 +2946,7 @@
   /* adding members: pick an existing web member, or create one in three steps (personal, 9e, extra columns) */
   function sqDlg() {
     var d = document.getElementById('sq-dlg');
-    if (!d) { d = document.createElement('dialog'); d.id = 'sq-dlg'; d.className = 'dlg dlg-wide'; document.body.appendChild(d); d.addEventListener('close', function () { if (S.sq) S.sq.nw = null; }); }
+    if (!d) { d = document.createElement('dialog'); d.id = 'sq-dlg'; d.className = 'dlg dlg-wide'; document.body.appendChild(d); d.addEventListener('close', function () { if (S.sq) { S.sq.nw = null; S.sq.linkRow = null; } }); }
     return d;
   }
   function sqCloseDlg() { var d = document.getElementById('sq-dlg'); if (d && d.open) { if (d.close) d.close(); else d.removeAttribute('open'); } }
@@ -2955,13 +2957,24 @@
   }
   function sqTop() { var top = 0; sqState().rows.forEach(function (m) { top = Math.max(top, m.sort || 0); }); return top; }
   function sqAdded(name) { return t('sq_added').replace('{name}', name).replace('{squad}', sqState().squad); }
-  function sqOpenPick() {
-    var Q = sqState(), have = {};
+  function sqRowName(m) { return sqv(m, 'nom_guerre') || sqFull(m) || '—'; }
+  function sqEmpty(m, att) { return !att[m.id] && !Object.keys(m.kit || {}).length && !Object.keys(m.extra || {}).some(function (k) { return m.extra[k]; }); }
+  // web accounts a hand-made member can be linked to: no row yet, or only the empty row the site created by itself
+  function sqCandidates() {
+    var Q = sqState(), rowOf = {}, att = {};
+    Q.rows.forEach(function (m) { if (m.profile_id) rowOf[m.profile_id] = m; });
+    Q.events.forEach(function (e) { (e.attendees || []).forEach(function (id) { att[id] = 1; }); });
+    return (Q.prof || []).filter(function (p) { var r = rowOf[p.id]; if ((Q.others || {})[p.id]) return false; return !r || sqEmpty(r, att); });
+  }
+  function sqSameMail(m, p) { return !!(m && p && m.email && p.email && String(m.email).trim().toLowerCase() === String(p.email).trim().toLowerCase()); }
+  function sqOpenPick(linkId) {
+    var Q = sqState(), have = {}, dlg = sqDlg(), lm = linkId && Q.rows.filter(function (m) { return m.id === linkId; })[0];
+    Q.linkRow = lm ? lm.id : null;
     Q.rows.forEach(function (m) { if (m.profile_id) have[m.profile_id] = 1; });
-    Q.pickList = (Q.prof || []).filter(function (p) { return !have[p.id]; });
-    var dlg = sqDlg();
+    Q.pickList = lm ? sqCandidates() : (Q.prof || []).filter(function (p) { return !have[p.id]; });
     dlg.className = 'dlg dlg-wide';
-    dlg.innerHTML = sqDlgHead(t('sq_pick_t')) + '<div class="form"><input id="sq-pickq" type="search" placeholder="' + esc(t('sq_pick_search')) + '" aria-label="' + esc(t('sq_pick_search')) + '" autocomplete="off">' +
+    dlg.innerHTML = sqDlgHead(t(lm ? 'sq_link_t' : 'sq_pick_t')) + '<div class="form">' + (lm ? '<p class="sq-linkfor">' + esc(t('sq_link_for').replace('{name}', sqRowName(lm))) + '</p>' : '') +
+      '<input id="sq-pickq" type="search" placeholder="' + esc(t('sq_pick_search')) + '" aria-label="' + esc(t('sq_pick_search')) + '" autocomplete="off">' +
       '<ul class="sq-picklist" id="sq-picklist"></ul></div>';
     sqFillPick(''); showDlg(dlg);
     var i = document.getElementById('sq-pickq'); if (i) i.focus();
@@ -2970,16 +2983,19 @@
     var Q = sqState(), ul = document.getElementById('sq-picklist'); if (!ul) return;
     var qn = norm(qs || ''), list = (Q.pickList || []).filter(function (p) {
       return !qn || [p.nom_guerre, p.first_name, p.last_name, (p.first_name || '') + ' ' + (p.last_name || '')].some(function (x) { return x && norm(x).indexOf(qn) > -1; });
-    }).sort(function (a, b) { return dirName(a).localeCompare(dirName(b), S.lang); });
+    });
+    var lm = Q.linkRow && Q.rows.filter(function (m) { return m.id === Q.linkRow; })[0];
+    list.sort(function (a, b) { return (sqSameMail(lm, b) - sqSameMail(lm, a)) || dirName(a).localeCompare(dirName(b), S.lang); });
     ul.innerHTML = list.length ? list.map(function (p) {
       var full = ((p.first_name || '') + ' ' + (p.last_name || '')).trim();
       return '<li><button type="button" class="sq-pickrow" data-sq="pick" data-id="' + p.id + '"><strong>' + esc(p.nom_guerre || full || '—') + '</strong>' +
-        (p.nom_guerre && full ? '<span>' + esc(full) + '</span>' : '') + '<em>' + esc(p.esquadra || '') + '</em></button></li>';
-    }).join('') : '<li class="muted sq-pickempty">' + esc(t('sq_pick_none')) + '</li>';
+        (p.nom_guerre && full ? '<span>' + esc(full) + '</span>' : '') + (sqSameMail(lm, p) ? '<b class="sq-badge">' + esc(t('sq_same_email')) + '</b>' : '') + '<em>' + esc(p.esquadra || '') + '</em></button></li>';
+    }).join('') : '<li class="muted sq-pickempty">' + esc(t(lm ? 'sq_link_none' : 'sq_pick_none')) + '</li>';
   }
   document.addEventListener('input', function (e) { if (e.target.id === 'sq-pickq') sqFillPick(e.target.value); });
   function sqPick(pid) {
     var Q = sqState(), p = (Q.prof || []).filter(function (x) { return x.id === pid; })[0]; if (!p) return;
+    if (Q.linkRow) { sqLink(Q.linkRow, pid); return; }
     var other = (Q.others || {})[pid], sort = sqTop() + 1, name = p.nom_guerre || ((p.first_name || '') + ' ' + (p.last_name || '')).trim();
     sqCloseDlg();
     var job = busy(t('sq_adding'));
@@ -2987,6 +3003,32 @@
       : sb.from('squad_members').insert({ squad: Q.squad, profile_id: pid, sort: sort }).select().single().then(q)).then(function () {
       job.end(true, sqAdded(name)); Q.loaded = ''; loadSquad(true);
     }).catch(function (er) { job.end(false); fail(er); });
+  }
+  // links a hand-made member to a web account: the row keeps its attendance and uniform level and takes the account's details
+  function sqLink(rowId, pid) {
+    var Q = sqState(), m = Q.rows.filter(function (x) { return x.id === rowId; })[0], p = (Q.prof || []).filter(function (x) { return x.id === pid; })[0];
+    if (!m || !p) return;
+    var acc = p.nom_guerre || ((p.first_name || '') + ' ' + (p.last_name || '')).trim(), who = sqRowName(m);
+    if (!window.confirm(t('sq_link_q').replace('{name}', who).replace('{account}', acc))) return;
+    var dup = Q.rows.filter(function (x) { return x.profile_id === pid && x.id !== rowId; })[0];
+    sqCloseDlg();
+    var job = busy(t('sq_linking'));
+    (dup ? sb.from('squad_members').delete().eq('id', dup.id).then(q) : Promise.resolve()).then(function () {
+      return sb.from('squad_members').update({ profile_id: pid }).eq('id', rowId).then(q);
+    }).then(function () {
+      job.end(true, t('sq_linked').replace('{name}', who).replace('{account}', acc)); Q.loaded = ''; loadSquad(true);
+    }).catch(function (er) { job.end(false); fail(er); });
+  }
+  // an account registered with the e-mail of a hand-made member is offered as a match
+  function sqNoticeHtml() {
+    var Q = sqState(), cand = sqCandidates(), out = [];
+    Q.rows.forEach(function (m) {
+      if (m._p || m.profile_id || !m.email) return;
+      var p = cand.filter(function (c) { return sqSameMail(m, c); })[0];
+      if (p) out.push('<li><span>' + esc(t('sq_notice').replace('{name}', sqRowName(m)).replace('{account}', p.nom_guerre || ((p.first_name || '') + ' ' + (p.last_name || '')).trim())) + '</span> ' +
+        '<button type="button" class="btn-small" data-sq="link-suggest" data-sid="' + m.id + '" data-id="' + p.id + '">' + esc(t('sq_link_both')) + '</button></li>');
+    });
+    return out.length ? '<ul class="sq-notice" role="status">' + out.join('') + '</ul>' : '';
   }
   function nwVis(k) { return (sqState().set.hide || []).indexOf(k) < 0; }
   function sqDrawNew() {

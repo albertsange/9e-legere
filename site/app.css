@@ -609,3 +609,8 @@ table.sq-att input[data-ek=year]{max-width:6rem}
 #sq-pickq{font:inherit;color:var(--ink);background:var(--sheet);border:1px solid var(--line);border-radius:3px;padding:.5rem .7rem;width:100%;box-sizing:border-box}
 .sq-badge.unconf{border-color:#b8860b;color:var(--ink);background:color-mix(in srgb,#d9a521 18%,var(--sheet))}
 table.members tr.sq-unconf td{color:var(--muted)}
+
+.sq-act{white-space:nowrap}
+.sq-linkfor{margin:0 0 .6rem;font-family:var(--label);letter-spacing:.03em;color:var(--bleu)}
+.sq-notice{list-style:none;margin:0 0 .8rem;padding:0;display:grid;gap:.4rem}
+.sq-notice li{display:flex;flex-wrap:wrap;gap:.5rem .8rem;align-items:center;padding:.6rem .8rem;border:1px solid var(--bleu);border-left-width:4px;border-radius:4px;background:var(--sheet)}
