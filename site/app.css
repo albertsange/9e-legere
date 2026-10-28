@@ -617,3 +617,22 @@ table.members tr.sq-unconf td{color:var(--muted)}
 
 .cf-text{margin:0 0 1rem;line-height:1.5}
 .dlg .form-actions .btn-danger{margin-top:0}
+
+/* attendance grid: edit button on the right, fixed event columns and fixed header row */
+.sq-right{margin-left:auto;display:inline-flex;gap:.6rem;align-items:center}
+.sq-attwrap{max-height:calc(100vh - 14rem);min-height:16rem;overflow:auto}
+table.sq-att{border-collapse:separate;border-spacing:0}
+table.sq-att th,table.sq-att td{border-bottom:1px solid var(--line)}
+table.sq-att thead th{position:sticky;top:0;z-index:3;background:var(--sheet);box-shadow:0 1px 0 var(--line)}
+table.sq-att .sq-stick{position:sticky;z-index:2;background:var(--sheet);box-sizing:border-box;box-shadow:none;text-align:left}
+table.sq-att thead .sq-stick{z-index:5}
+table.sq-att .c1{left:0;width:13rem;min-width:13rem;max-width:13rem}
+table.sq-att .c2{left:13rem;width:5rem;min-width:5rem;max-width:5rem}
+table.sq-att .c3{left:18rem;width:8rem;min-width:8rem;max-width:8rem;box-shadow:2px 0 0 var(--line)}
+table.sq-att .c1 input,table.sq-att .c2 input,table.sq-att .c3 input{width:100%;min-width:0;box-sizing:border-box}
+table.sq-att td.c1,table.sq-att th.c1,table.sq-att .c2,table.sq-att .c3{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+table.sq-att tbody tr.dirty .sq-stick{background:var(--quote-bg)}
+table.sq-att tbody tr:hover td,table.sq-att tbody tr:hover .sq-stick{background:color-mix(in srgb,var(--bleu) 7%,var(--sheet))}
+table.sq-att tbody tr.dirty:hover td,table.sq-att tbody tr.dirty:hover .sq-stick{background:var(--quote-bg)}
+.sq-yes{color:var(--bleu);font-weight:700;font-size:1.05rem}
+table.sq-att td.sq-chk{min-width:6.5rem}

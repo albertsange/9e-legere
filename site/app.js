@@ -2719,6 +2719,11 @@
         if (sqState().squad !== sq) return;
         Q.set = (set && set.settings) || {};
         Q.rows = all.filter(function (m) { return m.squad === sq; }).map(function (m) { m._p = m.profile_id ? byP[m.profile_id] || null : null; return m; });
+        // order of entry into the unit: earliest joining date first; people without a date after those with one, in list order
+        Q.rows.sort(function (a, b) {
+          var x = sqv(a, 'joined_9e') || '9999', y = sqv(b, 'joined_9e') || '9999';
+          return x < y ? -1 : x > y ? 1 : ((a.sort || 0) - (b.sort || 0)) || String(a.created_at).localeCompare(String(b.created_at));
+        });
         Q.events = evs;
         Q.loaded = sq;
       });
@@ -2818,27 +2823,37 @@
     }).join('') : '<tr><td colspan="' + (keys.length + 2) + '" class="muted">' + esc(t('no_members')) + '</td></tr>';
     return bar + '<p class="muted sq-hint">' + esc(t('sq_kit_hint')) + '</p><div class="table-wrap sq-kitwrap"><table class="sq-kit"><thead>' + h1 + h2 + '</thead><tbody>' + body + '</tbody></table></div>';
   }
-  /* attendance: events in rows, members in columns */
+  /* attendance: events in rows, members in columns; read-only until "Edit table" is pressed */
+  function evv(e, k) { return (e._e && k in e._e) ? e._e[k] : e[k]; }
   function sqAttendHtml() {
-    var Q = sqState(), ev = Q.events, rows = Q.rows;
-    var bar = '<div class="sq-bar">' + sqSwitch(['grid', 'sq_grid'], ['stats', 'sq_analysis'], 'grid', 'aview') + '</div>';
-    var add = '<form class="form inline sq-evform" id="f-sq-ev"><strong>' + esc(t('sq_new_ev')) + '</strong>' +
+    var Q = sqState(), ev = Q.events, rows = Q.rows, ed = !!Q.aedit;
+    var dirty = ev.some(function (e) { return e._e; });
+    var bar = '<div class="sq-bar">' + sqSwitch(['grid', 'sq_grid'], ['stats', 'sq_analysis'], 'grid', 'aview') +
+      '<span class="sq-right">' + (ed ? '<button type="button" class="btn-ghost" data-sq="a-cancel">' + esc(t('cancel')) + '</button><button type="button" class="btn" data-sq="a-save">' + esc(t('save')) + '</button>'
+        : '<button type="button" class="btn-ghost" data-sq="a-edit">' + esc(t('mem_edit')) + '</button>') + '</span></div>';
+    var add = !ed ? '' : '<form class="form inline sq-evform" id="f-sq-ev"><strong>' + esc(t('sq_new_ev')) + '</strong>' +
       '<input name="name" required maxlength="120" placeholder="' + esc(t('sq_event')) + '" aria-label="' + esc(t('sq_event')) + '">' +
       '<input name="year" type="number" min="1900" max="2100" value="' + new Date().getFullYear() + '" aria-label="' + esc(t('year')) + '">' +
       '<input name="country" maxlength="60" placeholder="' + esc(t('sq_country')) + '" aria-label="' + esc(t('sq_country')) + '">' +
       '<button class="btn" type="submit">' + esc(t('sq_add_ev')) + '</button></form>';
-    var head = '<thead><tr><th scope="col" class="sq-stick">' + esc(t('sq_event')) + '</th><th scope="col">' + esc(t('year')) + '</th><th scope="col">' + esc(t('sq_country')) + '</th>' +
+    var head = '<thead><tr><th scope="col" class="sq-stick c1">' + esc(t('sq_event')) + '</th><th scope="col" class="sq-stick c2">' + esc(t('year')) + '</th><th scope="col" class="sq-stick c3">' + esc(t('sq_country')) + '</th>' +
       rows.map(function (m) { return '<th scope="col" class="sq-mem"><strong>' + esc(sqName(m)) + '</strong>' + (sqv(m, 'nom_guerre') && sqFull(m) ? '<span>' + esc(sqFull(m)) + '</span>' : '') + '</th>'; }).join('') +
-      '<th scope="col">' + esc(t('sq_total')) + '</th><th scope="col"><span class="sr-only">' + esc(t('remove')) + '</span></th></tr></thead>';
+      '<th scope="col">' + esc(t('sq_total')) + '</th>' + (ed ? '<th scope="col"><span class="sr-only">' + esc(t('remove')) + '</span></th>' : '') + '</tr></thead>';
     var body = ev.length ? ev.map(function (e) {
-      var att = e.attendees || [], n = rows.filter(function (m) { return att.indexOf(m.id) > -1; }).length;
-      return '<tr data-eid="' + e.id + '"><th scope="row" class="sq-stick"><input data-ek="name" value="' + esc(e.name || '') + '" maxlength="120" aria-label="' + esc(t('sq_event')) + '"></th>' +
-        '<td><input data-ek="year" type="number" min="1900" max="2100" value="' + esc(e.year || '') + '" aria-label="' + esc(t('year')) + '" class="sq-year"></td>' +
-        '<td><input data-ek="country" value="' + esc(e.country || '') + '" maxlength="60" aria-label="' + esc(t('sq_country')) + '"></td>' +
-        rows.map(function (m) { return '<td class="sq-chk"><input type="checkbox" data-att="' + m.id + '"' + (att.indexOf(m.id) > -1 ? ' checked' : '') + ' aria-label="' + esc(sqName(m) + ' · ' + (e.name || '')) + '"></td>'; }).join('') +
-        '<td class="sq-num">' + n + '</td><td class="sq-act"><button type="button" class="mini del" data-sq="del-ev" title="' + esc(t('remove')) + '" aria-label="' + esc(t('remove')) + '">🗑</button></td></tr>';
+      var att = evv(e, 'attendees') || [], n = rows.filter(function (m) { return att.indexOf(m.id) > -1; }).length;
+      var cell = function (k, c, type) {
+        var v = evv(e, k);
+        return ed ? '<input data-ek="' + k + '" ' + (type === 'number' ? 'type="number" min="1900" max="2100"' : 'maxlength="' + (k === 'name' ? 120 : 60) + '"') + ' value="' + esc(v == null ? '' : v) + '" aria-label="' + esc(t(k === 'name' ? 'sq_event' : k === 'year' ? 'year' : 'sq_country')) + '">' : esc(v == null ? '' : v);
+      };
+      return '<tr data-eid="' + e.id + '"' + (e._e ? ' class="dirty"' : '') + '><th scope="row" class="sq-stick c1">' + cell('name') + '</th><td class="sq-stick c2">' + cell('year', 0, 'number') + '</td><td class="sq-stick c3">' + cell('country') + '</td>' +
+        rows.map(function (m) {
+          var on = att.indexOf(m.id) > -1, lab = sqName(m) + ' · ' + (evv(e, 'name') || '');
+          return '<td class="sq-chk">' + (ed ? '<input type="checkbox" data-att="' + m.id + '"' + (on ? ' checked' : '') + ' aria-label="' + esc(lab) + '">'
+            : (on ? '<span class="sq-yes" role="img" aria-label="' + esc(lab) + '">✓</span>' : '')) + '</td>';
+        }).join('') + '<td class="sq-num">' + n + '</td>' +
+        (ed ? '<td class="sq-act"><button type="button" class="mini del" data-sq="del-ev" title="' + esc(t('remove')) + '" aria-label="' + esc(t('remove')) + '">🗑</button></td>' : '') + '</tr>';
     }).join('') : '<tr><td colspan="' + (rows.length + 5) + '" class="muted">' + esc(t('sq_no_events')) + '</td></tr>';
-    return bar + add + '<div class="table-wrap"><table class="members sq-att">' + head + '<tbody>' + body + '</tbody></table></div>';
+    return bar + add + '<div class="table-wrap sq-attwrap"><table class="members sq-att' + (ed ? ' editing' : '') + '">' + head + '<tbody>' + body + '</tbody></table></div>';
   }
   function sqStatsHtml() {
     var Q = sqState(), ev = Q.events, rows = Q.rows;
@@ -2887,6 +2902,25 @@
     if (act === 'add-existing') { closeAddMenu(); sqOpenPick(null); return; }
     if (act === 'add-new') { closeAddMenu(); Q.nw = { step: 0, d: {} }; sqDrawNew(); showDlg(sqDlg()); return; }
     if (act === 'dlg-close') { sqCloseDlg(); return; }
+    if (act === 'a-edit') { Q.aedit = true; drawSquad(); return; }
+    if (act === 'a-cancel') {
+      var dirtyEv = Q.events.some(function (x) { return x._e; });
+      var leave = function () { Q.events.forEach(function (x) { delete x._e; }); Q.aedit = false; drawSquad(); };
+      if (!dirtyEv) { leave(); return; }
+      sqAsk({ title: t('cancel'), text: t('mem_discard_q'), ok: t('sq_discard') }).then(function (ok) { if (ok) leave(); });
+      return;
+    }
+    if (act === 'a-save') {
+      var chg = Q.events.filter(function (x) { return x._e; });
+      if (!chg.length) { Q.aedit = false; drawSquad(); return; }
+      if (chg.some(function (x) { return !String(evv(x, 'name') || '').trim(); })) { toast(t('required'), true); return; }
+      track(t('saving'), Promise.all(chg.map(function (x) { return sb.from('squad_events').update(x._e).eq('id', x.id).then(q); }))).then(function () {
+        chg.forEach(function (x) { Object.keys(x._e).forEach(function (k) { x[k] = x._e[k]; }); delete x._e; });
+        Q.events.sort(function (a2, b2) { return (a2.year || 0) - (b2.year || 0) || (a2.sort || 0) - (b2.sort || 0); });
+        Q.aedit = false; drawSquad();
+      }).catch(fail);
+      return;
+    }
     if (act === 'link-row') { var lr = sqRow(el); if (lr) sqOpenPick(lr.id); return; }
     if (act === 'link-suggest') { sqLink(el.getAttribute('data-sid'), el.getAttribute('data-id')); return; }
     if (act === 'pick') { sqPick(el.getAttribute('data-id')); return; }
@@ -2932,7 +2966,7 @@
   document.addEventListener('change', function (e) {
     var el = e.target; if (!S.sq || !el.closest || !el.closest('#sq, .sq-head')) return;
     var Q = S.sq;
-    if (el.id === 'sq-squad') { Q.squad = el.value; Q.loaded = ''; loadSquad(true); return; }
+    if (el.id === 'sq-squad') { Q.squad = el.value; Q.loaded = ''; Q.aedit = false; loadSquad(true); return; }
     var sk = el.getAttribute('data-sk'), kk = el.getAttribute('data-kk'), ek = el.getAttribute('data-ek'), att = el.getAttribute('data-att'), m, upd = {};
     if (sk) {
       m = sqRow(el); if (!m) return;
@@ -2959,16 +2993,15 @@
     }
     if (ek || att) {
       var ev = sqEv(el); if (!ev) return;
-      if (ek) { var v = el.value.trim(); if (ek === 'name' && !v) { el.value = ev.name; return; } upd[ek] = ek === 'year' ? (parseInt(v, 10) || null) : (v || null); }
+      ev._e = ev._e || {};
+      if (ek) { var v = el.value.trim(); ev._e[ek] = ek === 'year' ? (parseInt(v, 10) || null) : (ek === 'name' ? v : (v || null)); }
       else {
-        var a = (ev.attendees || []).filter(function (x) { return x !== att; });
+        var a = (evv(ev, 'attendees') || []).filter(function (x) { return x !== att; });
         if (el.checked) a.push(att);
-        upd.attendees = a;
+        ev._e.attendees = a;
+        var c = el.closest('tr').querySelector('.sq-num'); if (c) c.textContent = Q.rows.filter(function (m2) { return a.indexOf(m2.id) > -1; }).length;
       }
-      track(t('saving'), sb.from('squad_events').update(upd).eq('id', ev.id).then(q)).then(function () {
-        Object.keys(upd).forEach(function (x) { ev[x] = upd[x]; });
-        if (att) { var c = el.closest('tr').querySelector('.sq-num'); if (c) c.textContent = Q.rows.filter(function (m2) { return ev.attendees.indexOf(m2.id) > -1; }).length; }
-      }).catch(fail);
+      el.closest('tr').classList.add('dirty');
     }
   });
   document.addEventListener('submit', function (e) {

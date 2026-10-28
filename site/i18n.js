@@ -411,6 +411,7 @@ window.I18N = (function () {
     sq_linked: U("S'ha vinculat {name} amb el compte web de {account}", "{name} has been linked to the web account of {account}", "{name} è stato collegato all'account web di {account}", "{name} a été lié au compte du site de {account}", "{name} wurde mit dem Web-Konto von {account} verknüpft"),
     sq_notice: U("{name} té el mateix correu que el compte web de {account}.", "{name} has the same e-mail as the web account of {account}.", "{name} ha la stessa e-mail dell'account web di {account}.", "{name} a le même e-mail que le compte du site de {account}.", "{name} hat dieselbe E-Mail wie das Web-Konto von {account}."),
     sq_link_both: U("Vincula'ls", "Link them", "Collegali", "Les lier", "Verknüpfen"),
+    sq_discard: U("Descarta els canvis", "Discard changes", "Scarta le modifiche", "Abandonner les modifications", "Änderungen verwerfen"),
     sq_admin_only: U("De moment només ho veuen els administradors.", "For now only administrators can see this.", "Per ora la vedono solo gli amministratori.", "Pour l'instant, seuls les administrateurs la voient.", "Vorerst nur für Administratoren sichtbar.")
   };
 })();
