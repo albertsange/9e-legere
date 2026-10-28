@@ -73,8 +73,9 @@
     var job = { label: label, total: total || 0, done: 0, state: 'run' };
     job.set = function (l) { job.label = l; drawBusy(); return job; };
     job.tick = function () { job.done++; drawBusy(); return job; };
-    job.end = function (ok) {
+    job.end = function (ok, fin) {
       if (job.state !== 'run') return;
+      if (fin) job.final = fin;
       job.state = ok === false ? 'bad' : 'ok'; drawBusy();
       setTimeout(function () { var i = BUSY.indexOf(job); if (i > -1) BUSY.splice(i, 1); drawBusy(); }, ok === false ? 5000 : 1800);
     };
@@ -92,7 +93,7 @@
     el.innerHTML = BUSY.map(function (j) {
       var pct = j.total ? Math.round(100 * j.done / j.total) : 0;
       var ico = j.state === 'run' ? '<span class="busy-spin" aria-hidden="true"></span>' : '<span class="busy-ico" aria-hidden="true">' + (j.state === 'ok' ? '✓' : '✕') + '</span>';
-      var lbl = j.state === 'run' ? j.label : j.label + ' · ' + t(j.state === 'ok' ? 'busy_done' : 'busy_failed');
+      var lbl = j.state === 'run' ? j.label : (j.final || j.label + ' · ' + t(j.state === 'ok' ? 'busy_done' : 'busy_failed'));
       return '<div class="busy-row ' + j.state + '">' + ico + '<span class="busy-lbl">' + esc(lbl) + '</span>' +
         (j.total ? '<span class="busy-n">' + j.done + ' / ' + j.total + '</span>' : '') +
         '<span class="busy-bar' + (j.total || j.state !== 'run' ? '' : ' ind') + '"><i style="width:' + (j.state === 'ok' ? 100 : (j.total ? pct : 35)) + '%"></i></span></div>';
@@ -1432,7 +1433,7 @@
   function memLabel(m, k) {
     var v = memVal(m, k);
     if (k === 'status') return t('st_' + (v || 'pending'));
-    if (k === 'role') return roleLabel(v);
+    if (k === 'role') return v ? roleLabel(v) : '';
     if (k === 'joined_9e') return v ? new Date(String(v).slice(0, 7) + '-01T12:00:00').toLocaleDateString(S.lang, { month: 'short', year: 'numeric' }) : '';
     if (k === 'birth_date' || k === 'created_at') return v ? fmtDate(v) : '';
     return v || '';
@@ -1459,6 +1460,7 @@
   }
   function memInput(m, k, canEdit, me) {
     var v = memVal(m, k);
+    if (m._sq && k === 'status') return '<span class="sq-badge unconf">' + esc(memLabel(m, k)) + '</span>';
     if (!canEdit || k === 'email' || k === 'created_at' || ((k === 'status' || k === 'role') && me)) return esc(memLabel(m, k));
     var ar = ' data-k="' + k + '" aria-label="' + esc(t(k === 'joined_9e' ? 'joined' : k === 'created_at' ? 'mem_created' : k)) + '"';
     if (k === 'esquadra') {
@@ -1480,11 +1482,11 @@
   function drawMembers() {
     var M = S.mem, box = document.getElementById('members'); if (!box) return;
     var canEdit = isColonel() && !!M.edit, rows = memRows(), pendEd = isColonel() && rows.some(function (m) { return m.status === 'pending'; }), showAct = !canEdit && pendEd;
-    var cellEd = function (m, k) { return canEdit || (isColonel() && m.status === 'pending' && (k === 'status' || k === 'role')); };
+    var cellEd = function (m, k) { return !m._sq && (canEdit || (isColonel() && m.status === 'pending' && (k === 'status' || k === 'role'))); };
     var opt = function (arr, cur, lab) { return arr.map(function (x) { return '<option value="' + esc(x[0]) + '"' + (x[0] === cur ? ' selected' : '') + '>' + esc(x[1]) + '</option>'; }).join(''); };
     var sqs = S.squads.map(function (s) { return [s.name, s.name]; });
     var filters = '<div class="mem-filters"><input id="mem-q" type="search" value="' + esc(M.f.q || '') + '" placeholder="' + esc(t('mem_search')) + '" aria-label="' + esc(t('mem_search')) + '">' +
-      '<select data-f="status" aria-label="' + esc(t('status')) + '"><option value="">' + esc(t('status')) + ': ' + esc(t('mem_all')) + '</option>' + opt(['pending', 'approved', 'blocked'].map(function (s) { return [s, t('st_' + s)]; }), M.f.status) + '</select>' +
+      '<select data-f="status" aria-label="' + esc(t('status')) + '"><option value="">' + esc(t('status')) + ': ' + esc(t('mem_all')) + '</option>' + opt(['pending', 'unconfirmed', 'approved', 'blocked'].map(function (s) { return [s, t('st_' + s)]; }), M.f.status) + '</select>' +
       '<select data-f="role" aria-label="' + esc(t('role')) + '"><option value="">' + esc(t('role')) + ': ' + esc(t('mem_all')) + '</option>' + opt(['member', 'admin', 'colonel'].map(function (s) { return [s, roleLabel(s)]; }), M.f.role) + '</select>' +
       '<select data-f="esquadra" aria-label="' + esc(t('esquadra')) + '"><option value="">' + esc(t('esquadra')) + ': ' + esc(t('mem_all')) + '</option>' + opt(sqs, M.f.esquadra) + '</select>' +
       '<select data-f="rank" aria-label="' + esc(t('rank')) + '"><option value="">' + esc(t('rank')) + ': ' + esc(t('mem_all')) + '</option>' + opt(RANKS.map(function (r) { return [r, r]; }), M.f.rank) + '</select>' +
@@ -1496,7 +1498,7 @@
     }).join('') + (showAct ? '<th></th>' : '') + '</tr></thead>';
     var body = '<tbody>' + (rows.length ? rows.map(function (m) {
       var me = S.session && m.id === S.session.user.id;
-      return '<tr data-id="' + m.id + '"' + (me ? ' data-me="1"' : '') + ' class="' + (m.status === 'pending' ? 'new ' : '') + (m._e ? 'dirty' : '') + '">' + MEM_COLS.map(function (c) {
+      return '<tr data-id="' + m.id + '"' + (me ? ' data-me="1"' : '') + ' class="' + (m.status === 'pending' ? 'new ' : '') + (m._sq ? 'sq-unconf ' : '') + (m._e ? 'dirty' : '') + '">' + MEM_COLS.map(function (c) {
         return '<td>' + memInput(m, c[0], cellEd(m, c[0]), me) + (c[0] === 'first_name' && me ? ' <span class="muted">(' + esc(t('you')) + ')</span>' : '') + '</td>';
       }).join('') + (showAct ? '<td>' + (m.status === 'pending' && !me ? '<button type="button" class="btn-small" data-act="save-member">' + esc(t('save')) + '</button>' : '') + '</td>' : '') + '</tr>';
     }).join('') : '<tr><td colspan="12" class="muted">' + esc(t('no_members')) + '</td></tr>') + '</tbody>';
@@ -1513,8 +1515,14 @@
   }
   function loadMembers() {
     loadUsage();
-    sb.from('profiles').select('*').order('created_at', { ascending: false }).then(function (r) {
-      var rows = q(r) || [], box = document.getElementById('members');
+    Promise.all([sb.from('profiles').select('*').order('created_at', { ascending: false }), sb.from('squad_members').select('*').is('profile_id', null)]).then(function (rr) {
+      var rows = q(rr[0]) || [], box = document.getElementById('members');
+      // people added by hand to a squad list, with no web account yet: read-only rows, status "awaiting confirmation"
+      (q(rr[1]) || []).forEach(function (m) {
+        if (!(m.first_name || m.last_name || m.nom_guerre)) return;
+        rows.push({ id: 'sq-' + m.id, _sq: true, first_name: m.first_name || '', last_name: m.last_name || '', nom_guerre: m.nom_guerre || '', esquadra: m.squad, rank: m.rank,
+          birth_date: m.birth_date, joined_9e: m.joined_9e, email: m.email || '', status: 'unconfirmed', role: '', created_at: m.created_at });
+      });
       if (!box) return;
       var keep = S.mem && S.mem.f, ks = S.mem && S.mem.sort;
       S.mem = { edit: S.mem && S.mem.edit, rows: rows, f: keep || { q: '', status: '', role: '', esquadra: '', rank: '' }, sort: ks || { k: '', dir: 1 } };
@@ -2668,14 +2676,14 @@
       var set = q(r[0]), all = q(r[1]) || [], evs = q(r[2]) || [], prof = q(r[3]) || [];
       var byP = {}, linked = {}, jobs = [], top = 0;
       prof.forEach(function (p) { byP[p.id] = p; });
-      all.forEach(function (m) { if (m.profile_id) linked[m.profile_id] = m; if (m.squad === sq) top = Math.max(top, m.sort || 0); });
-      // web members of this squad get a row; a row with a web account follows the squad of that account
+      Q.prof = prof; Q.others = {};
+      all.forEach(function (m) {
+        if (m.profile_id) { linked[m.profile_id] = m; if (m.squad !== sq) Q.others[m.profile_id] = m; }
+        if (m.squad === sq) top = Math.max(top, m.sort || 0);
+      });
+      // web members whose account names this squad get a row of their own the first time the list is opened
       prof.forEach(function (p) {
         if (p.esquadra === sq && !linked[p.id]) jobs.push(sb.from('squad_members').insert({ squad: sq, profile_id: p.id, sort: ++top }).select().single().then(q));
-      });
-      all.forEach(function (m) {
-        var p = m.profile_id && byP[m.profile_id];
-        if (p && p.esquadra && p.esquadra !== m.squad) { jobs.push(sb.from('squad_members').update({ squad: p.esquadra }).eq('id', m.id).then(q)); m.squad = p.esquadra; }
       });
       return Promise.all(jobs).then(function (added) {
         added.forEach(function (x) { if (x && x.id) all.push(x); });
@@ -2723,7 +2731,9 @@
   function sqListHtml() {
     var Q = sqState(), cols = sqCols(), hide = (Q.set.hide || []);
     var bar = '<div class="sq-bar">' + sqSwitch(['list', 'sq_list'], ['kit', 'sq_kit'], 'list', 'view') +
-      '<button type="button" class="btn" data-sq="add-row">+ ' + esc(t('sq_add_row')) + '</button>' +
+      '<details class="sq-addmenu"><summary class="btn">+ ' + esc(t('sq_add_row')) + '</summary><div class="acct-pop sq-pop">' +
+        '<button type="button" data-sq="add-existing">' + esc(t('sq_add_existing')) + '</button>' +
+        '<button type="button" data-sq="add-new">' + esc(t('sq_add_new')) + '</button></div></details>' +
       '<button type="button" class="btn-ghost" data-sq="add-col">+ ' + esc(t('sq_add_col')) + '</button>' +
       hide.map(function (k) { return '<button type="button" class="btn-small" data-sq="show-col" data-k="' + k + '">' + esc(t('sq_show')) + ': ' + esc(t(k === 'joined_9e' ? 'joined' : k)) + '</button>'; }).join('') + '</div>';
     var head = '<thead><tr>' + cols.map(function (c) {
@@ -2732,7 +2742,7 @@
     var body = '<tbody>' + (Q.rows.length ? Q.rows.map(function (m) {
       return '<tr data-sid="' + m.id + '"' + (m._p ? ' class="sq-webrow"' : '') + '>' + cols.map(function (c) { return '<td>' + sqCell(m, c) + '</td>'; }).join('') +
         '<td class="sq-act">' + (m._p ? '<span class="sq-badge" title="' + esc(t('sq_web_hint')) + '">' + esc(t('sq_web')) + '</span>'
-          : '<button type="button" class="mini del" data-sq="del-row" title="' + esc(t('sq_del_row')) + '" aria-label="' + esc(t('sq_del_row')) + '">🗑</button>') + '</td></tr>';
+          : '<span class="sq-badge unconf" title="' + esc(t('sq_unconf_hint')) + '">' + esc(t('st_unconfirmed')) + '</span> <button type="button" class="mini del" data-sq="del-row" title="' + esc(t('sq_del_row')) + '" aria-label="' + esc(t('sq_del_row')) + '">🗑</button>') + '</td></tr>';
     }).join('') : '<tr><td colspan="' + (cols.length + 1) + '" class="muted">' + esc(t('no_members')) + '</td></tr>') + '</tbody>';
     return bar + '<div class="table-wrap"><table class="members sq-table">' + head + body + '</table></div>';
   }
@@ -2846,14 +2856,11 @@
     if (act === 'view') { Q.view = el.getAttribute('data-v'); drawSquad(); return; }
     if (act === 'aview') { Q.aview = el.getAttribute('data-v'); drawSquad(); return; }
     if (act === 'sec') { Q.sec = el.getAttribute('data-v'); drawSquad(); return; }
-    if (act === 'add-row') {
-      var top = 0; Q.rows.forEach(function (m) { top = Math.max(top, m.sort || 0); });
-      track(t('saving'), sb.from('squad_members').insert({ squad: Q.squad, sort: top + 1 }).select().single().then(q)).then(function (m) {
-        m._p = null; Q.rows.push(m); drawSquad();
-        var inp = document.querySelector('#sq tr[data-sid="' + m.id + '"] input'); if (inp) inp.focus();
-      }).catch(fail);
-      return;
-    }
+    if (act === 'add-existing') { closeAddMenu(); sqOpenPick(); return; }
+    if (act === 'add-new') { closeAddMenu(); Q.nw = { step: 0, d: {} }; sqDrawNew(); showDlg(sqDlg()); return; }
+    if (act === 'dlg-close') { sqCloseDlg(); return; }
+    if (act === 'pick') { sqPick(el.getAttribute('data-id')); return; }
+    if (act === 'nw-back') { var nf = document.getElementById('f-sq-new'); if (nf) nwCollect(nf); Q.nw.step = Math.max(0, Q.nw.step - 1); sqDrawNew(); return; }
     if (act === 'del-row') {
       var m = sqRow(el); if (!m || !window.confirm(t('sq_del_row_q'))) return;
       track(t('deleting'), sb.from('squad_members').delete().eq('id', m.id).then(q)).then(function () {
@@ -2932,6 +2939,121 @@
       Q.events.sort(function (a, b) { return (a.year || 0) - (b.year || 0); });
       drawSquad();
     }).catch(fail);
+  });
+
+  /* adding members: pick an existing web member, or create one in three steps (personal, 9e, extra columns) */
+  function sqDlg() {
+    var d = document.getElementById('sq-dlg');
+    if (!d) { d = document.createElement('dialog'); d.id = 'sq-dlg'; d.className = 'dlg dlg-wide'; document.body.appendChild(d); d.addEventListener('close', function () { if (S.sq) S.sq.nw = null; }); }
+    return d;
+  }
+  function sqCloseDlg() { var d = document.getElementById('sq-dlg'); if (d && d.open) { if (d.close) d.close(); else d.removeAttribute('open'); } }
+  function closeAddMenu() { Array.prototype.forEach.call(document.querySelectorAll('.sq-addmenu[open]'), function (x) { x.removeAttribute('open'); }); }
+  document.addEventListener('click', function (e) { Array.prototype.forEach.call(document.querySelectorAll('.sq-addmenu[open]'), function (x) { if (!x.contains(e.target)) x.removeAttribute('open'); }); });
+  function sqDlgHead(title) {
+    return '<div class="dlg-tabs"><span class="dlg-cur">' + esc(title) + '</span><button type="button" class="btn-ghost" data-sq="dlg-close">' + esc(t('sq_close')) + '</button></div>';
+  }
+  function sqTop() { var top = 0; sqState().rows.forEach(function (m) { top = Math.max(top, m.sort || 0); }); return top; }
+  function sqAdded(name) { return t('sq_added').replace('{name}', name).replace('{squad}', sqState().squad); }
+  function sqOpenPick() {
+    var Q = sqState(), have = {};
+    Q.rows.forEach(function (m) { if (m.profile_id) have[m.profile_id] = 1; });
+    Q.pickList = (Q.prof || []).filter(function (p) { return !have[p.id]; });
+    var dlg = sqDlg();
+    dlg.className = 'dlg dlg-wide';
+    dlg.innerHTML = sqDlgHead(t('sq_pick_t')) + '<div class="form"><input id="sq-pickq" type="search" placeholder="' + esc(t('sq_pick_search')) + '" aria-label="' + esc(t('sq_pick_search')) + '" autocomplete="off">' +
+      '<ul class="sq-picklist" id="sq-picklist"></ul></div>';
+    sqFillPick(''); showDlg(dlg);
+    var i = document.getElementById('sq-pickq'); if (i) i.focus();
+  }
+  function sqFillPick(qs) {
+    var Q = sqState(), ul = document.getElementById('sq-picklist'); if (!ul) return;
+    var qn = norm(qs || ''), list = (Q.pickList || []).filter(function (p) {
+      return !qn || [p.nom_guerre, p.first_name, p.last_name, (p.first_name || '') + ' ' + (p.last_name || '')].some(function (x) { return x && norm(x).indexOf(qn) > -1; });
+    }).sort(function (a, b) { return dirName(a).localeCompare(dirName(b), S.lang); });
+    ul.innerHTML = list.length ? list.map(function (p) {
+      var full = ((p.first_name || '') + ' ' + (p.last_name || '')).trim();
+      return '<li><button type="button" class="sq-pickrow" data-sq="pick" data-id="' + p.id + '"><strong>' + esc(p.nom_guerre || full || '—') + '</strong>' +
+        (p.nom_guerre && full ? '<span>' + esc(full) + '</span>' : '') + '<em>' + esc(p.esquadra || '') + '</em></button></li>';
+    }).join('') : '<li class="muted sq-pickempty">' + esc(t('sq_pick_none')) + '</li>';
+  }
+  document.addEventListener('input', function (e) { if (e.target.id === 'sq-pickq') sqFillPick(e.target.value); });
+  function sqPick(pid) {
+    var Q = sqState(), p = (Q.prof || []).filter(function (x) { return x.id === pid; })[0]; if (!p) return;
+    var other = (Q.others || {})[pid], sort = sqTop() + 1, name = p.nom_guerre || ((p.first_name || '') + ' ' + (p.last_name || '')).trim();
+    sqCloseDlg();
+    var job = busy(t('sq_adding'));
+    (other ? sb.from('squad_members').update({ squad: Q.squad, sort: sort }).eq('id', other.id).then(q)
+      : sb.from('squad_members').insert({ squad: Q.squad, profile_id: pid, sort: sort }).select().single().then(q)).then(function () {
+      job.end(true, sqAdded(name)); Q.loaded = ''; loadSquad(true);
+    }).catch(function (er) { job.end(false); fail(er); });
+  }
+  function nwVis(k) { return (sqState().set.hide || []).indexOf(k) < 0; }
+  function sqDrawNew() {
+    var Q = sqState(), st = Q.nw.step, d = Q.nw.d, names = ['sq_s1', 'sq_s2', 'sq_s3'], dlg = sqDlg(), h = '', a = [];
+    dlg.className = 'dlg dlg-wide';
+    var stepper = '<ol class="stepper">' + names.map(function (k, i) {
+      return '<li class="' + (i < st ? 'done' : i === st ? 'on' : '') + '"' + (i === st ? ' aria-current="step"' : '') + '><span class="sp-n">' + (i < st ? '✓' : i + 1) + '</span><span class="sp-l">' + esc(t(k)) + '</span></li>';
+    }).join('') + '</ol>';
+    if (st === 0) {
+      if (nwVis('first_name')) a.push(field('first_name', t('first_name'), 'text', d.first_name, ' required maxlength="80" autocomplete="off"'));
+      if (nwVis('last_name')) a.push(field('last_name', t('last_name'), 'text', d.last_name, ' required maxlength="120" autocomplete="off"'));
+      if (a.length) h += '<div class="two">' + a.join('') + '</div>';
+      if (nwVis('email')) h += field('email', t('email') + ' (' + t('optional') + ')', 'email', d.email, ' maxlength="120" autocomplete="off"');
+      if (nwVis('birth_date')) h += field('birth_date', t('birth_date'), 'date', d.birth_date, ' required max="' + new Date().toISOString().slice(0, 10) + '" min="1900-01-01" autocomplete="off"');
+    } else if (st === 1) {
+      if (nwVis('nom_guerre')) a.push(field('nom_guerre', t('nom_guerre'), 'text', d.nom_guerre, ' required maxlength="80" autocomplete="off"'));
+      if (nwVis('rank')) a.push(rankField(d.rank, true));
+      if (a.length) h += '<div class="two">' + a.join('') + '</div>';
+      if (nwVis('joined_9e')) h += joinedFields(d.jy, d.jm);
+    } else {
+      (Q.set.extra || []).forEach(function (c) { h += field('x_' + c.id, c.label, 'text', d['x_' + c.id], ' maxlength="120" autocomplete="off"'); });
+      if (!h) { h = '<p class="muted">' + esc(t('sq_noextra')) + '</p>'; }
+    }
+    if (!h) h = '<p class="muted">' + esc(t('sq_nofields')) + '</p>';
+    dlg.innerHTML = sqDlgHead(t('sq_new_t').replace('{squad}', Q.squad)) + stepper + '<form class="form" id="f-sq-new" novalidate>' + h + '<p class="form-msg" role="status"></p>' +
+      '<p class="form-actions">' + (st > 0 ? '<button type="button" class="btn-ghost" data-sq="nw-back">' + esc(t('rg_back')) + '</button>' : '<button type="button" class="btn-ghost" data-sq="dlg-close">' + esc(t('cancel')) + '</button>') +
+      '<button class="btn" type="submit">' + esc(st === 2 ? t('sq_create') : t('next')) + '</button></p></form>';
+    var inp = dlg.querySelector('form input, form select'); if (inp) inp.focus();
+  }
+  function nwCollect(f) {
+    var d = sqState().nw.d;
+    Array.prototype.forEach.call(f.elements, function (el) { if (el.name && el.name !== 'jm' && el.name !== 'jy') d[el.name] = (el.value || '').trim(); });
+    if (f.jm) { d.jm = f.jm.value; d.jy = f.jy.value; }
+  }
+  function nwCheck(st, d) {
+    var today = new Date().toISOString().slice(0, 10);
+    if (st === 0) {
+      if ((nwVis('first_name') && !d.first_name) || (nwVis('last_name') && !d.last_name) || (nwVis('birth_date') && !d.birth_date)) return t('required');
+      if (d.email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(d.email)) return t('sq_email_bad');
+      if (nwVis('birth_date') && (d.birth_date > today || d.birth_date < '1900-01-01')) return t('rg_birth_bad');
+    } else if (st === 1) {
+      if ((nwVis('nom_guerre') && !d.nom_guerre) || (nwVis('rank') && !d.rank)) return t('required');
+      if (nwVis('joined_9e') && !!d.jm !== !!d.jy) return t('rg_joined_both');
+    }
+    return '';
+  }
+  function nwSave(f) {
+    var Q = sqState(), d = Q.nw.d, row = { squad: Q.squad, sort: sqTop() + 1, extra: {} };
+    ['first_name', 'last_name', 'nom_guerre', 'email', 'rank', 'birth_date'].forEach(function (k) { if (nwVis(k) && d[k]) row[k] = d[k]; });
+    if (nwVis('joined_9e') && d.jy && d.jm) row.joined_9e = d.jy + '-' + d.jm + '-01';
+    (Q.set.extra || []).forEach(function (c) { if (d['x_' + c.id]) row.extra[c.id] = d['x_' + c.id]; });
+    var name = row.nom_guerre || ((row.first_name || '') + ' ' + (row.last_name || '')).trim();
+    if (!name) { msg(f, t('required'), true); return; }
+    f.querySelector('button[type=submit]').disabled = true;
+    var job = busy(t('sq_adding'));
+    sb.from('squad_members').insert(row).select().single().then(q).then(function () {
+      sqCloseDlg(); job.end(true, sqAdded(name)); Q.loaded = ''; loadSquad(true);
+    }).catch(function (er) { job.end(false); fail(er); f.querySelector('button[type=submit]').disabled = false; });
+  }
+  document.addEventListener('submit', function (e) {
+    if (e.target.id !== 'f-sq-new' || !S.sq || !S.sq.nw) return;
+    e.preventDefault();
+    var f = e.target, Q = S.sq; nwCollect(f);
+    var bad = nwCheck(Q.nw.step, Q.nw.d);
+    if (bad) { msg(f, bad, true); return; }
+    if (Q.nw.step < 2) { Q.nw.step++; sqDrawNew(); return; }
+    nwSave(f);
   });
   window.__app = { S: S, render: render }; // for debugging and tests
   start();

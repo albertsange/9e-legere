@@ -592,3 +592,20 @@ form.sq-evform input[name=year]{flex:0 0 6.5rem;width:6.5rem}
 form.sq-evform input[name=country]{flex:0 1 13rem}
 table.sq-att input[data-ek=country]{max-width:12rem}
 table.sq-att input[data-ek=year]{max-width:6rem}
+
+/* adding members to a squad */
+.sq-addmenu{position:relative;display:inline-block}
+.sq-addmenu summary{list-style:none;cursor:pointer;display:inline-block}
+.sq-addmenu summary::-webkit-details-marker{display:none}
+.sq-addmenu summary::after{content:"▾";margin-left:.5rem}
+.sq-pop{right:auto;left:0;min-width:17rem}
+.sq-picklist{list-style:none;margin:.2rem 0 0;padding:0;max-height:min(50vh,22rem);overflow:auto;border:1px solid var(--line);border-radius:4px;background:var(--sheet)}
+.sq-picklist li + li{border-top:1px solid var(--line)}
+.sq-pickrow{display:flex;gap:.7rem;align-items:baseline;width:100%;text-align:left;padding:.6rem .8rem;border:0;background:none;font:inherit;color:var(--ink);cursor:pointer}
+.sq-pickrow:hover,.sq-pickrow:focus-visible{background:var(--quote-bg)}
+.sq-pickrow span{color:var(--muted);font-size:.9rem}
+.sq-pickrow em{margin-left:auto;font-style:normal;font-size:.8rem;color:var(--muted);white-space:nowrap}
+.sq-pickempty{padding:.8rem}
+#sq-pickq{font:inherit;color:var(--ink);background:var(--sheet);border:1px solid var(--line);border-radius:3px;padding:.5rem .7rem;width:100%;box-sizing:border-box}
+.sq-badge.unconf{border-color:#b8860b;color:var(--ink);background:color-mix(in srgb,#d9a521 18%,var(--sheet))}
+table.members tr.sq-unconf td{color:var(--muted)}
