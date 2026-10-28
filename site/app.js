@@ -1560,8 +1560,8 @@
   }
   function memLink(sid) {
     var m = memRowById('sq-' + sid); if (!m) return;
-    var Q = sqState(); Q.squad = m.esquadra; Q.loaded = '';
-    sqFetch(m.esquadra).then(function () { sqOpenPick(sid); }).catch(fail);
+    var Q = sqState(); if (Q.squads.indexOf(m.esquadra) < 0) sqSetSquads(Q.squads.concat(m.esquadra), false); Q.loaded = '';
+    sqFetch(Q.squads).then(function () { sqOpenPick(sid); }).catch(fail);
   }
   function memRowById(id) { return S.mem && S.mem.rows.filter(function (m) { return m.id === id; })[0]; }
   document.addEventListener('input', function (e) {
@@ -2656,8 +2656,19 @@
   var SQ_SECS = ['equipement', 'petit-equipement', 'entretien'];
   var KIT_VALS = ['ok', 'missing', 'wrong'];
   function sqState() {
-    if (!S.sq) S.sq = { squad: (S.profile && S.profile.esquadra) || ((S.squads[0] || {}).name) || '', view: 'list', aview: 'grid', sec: '', loaded: '', rows: [], events: [], set: {} };
+    if (!S.sq) {
+      S.sq = { view: 'list', aview: 'grid', sec: '', loaded: '', rows: [], events: [], set: {} };
+      var saved = [];
+      try { saved = JSON.parse(localStorage.getItem('sq-squads-' + (S.session ? S.session.user.id : '')) || '[]'); } catch (x) { saved = []; }
+      saved = (Array.isArray(saved) ? saved : []).filter(function (n) { return S.squads.some(function (s) { return s.name === n; }); });
+      sqSetSquads(saved.length ? saved : [(S.profile && S.profile.esquadra) || ((S.squads[0] || {}).name) || ''].filter(Boolean), false);
+    }
     return S.sq;
+  }
+  // one or more squads shown together; the first is the one new rows go to, the combination has its own column settings
+  function sqSetSquads(list, persist) {
+    var Q = S.sq; Q.squads = list; Q.squad = list[0] || ''; Q.key = list.join(' + ');
+    if (persist) { try { localStorage.setItem('sq-squads-' + (S.session ? S.session.user.id : ''), JSON.stringify(list)); } catch (x) { /* optional */ } }
   }
   function sqName(m) { return sqv(m, 'nom_guerre') || ((sqv(m, 'first_name') || '') + ' ' + (sqv(m, 'last_name') || '')).trim() || '—'; }
   function sqFull(m) { return ((sqv(m, 'first_name') || '') + ' ' + (sqv(m, 'last_name') || '')).trim(); }
@@ -2667,19 +2678,20 @@
   }
   function sqCols() {
     var Q = sqState(), st = (Q.medit ? Q.setE : Q.set) || {}, hide = st.hide || [];
-    return SQ_BASE.filter(function (k) { return hide.indexOf(k) < 0; }).map(function (k) { return { k: k, label: t(k === 'joined_9e' ? 'joined' : k), base: 1 }; })
+    return (Q.squads.length > 1 ? [{ k: '_sq', label: t('esquadra'), ro: 1 }] : [])
+      .concat(SQ_BASE.filter(function (k) { return hide.indexOf(k) < 0; }).map(function (k) { return { k: k, label: t(k === 'joined_9e' ? 'joined' : k), base: 1 }; }))
       .concat((st.extra || []).map(function (c) { return { k: c.id, label: c.label }; }));
   }
   function squadView(id) {
     var title = t('sq_my');
     if (!isAdmin()) return '<section class="view narrow"><h2 class="page-title" tabindex="-1">' + esc(title) + '</h2>' + lockedHtml() + '</section>';
     var Q = sqState(), names = S.squads.map(function (s) { return s.name; });
-    if (Q.squad && names.indexOf(Q.squad) < 0) names.push(Q.squad);
+    Q.squads.forEach(function (n) { if (names.indexOf(n) < 0) names.push(n); });
     var tabs = [['esquadra', 'members'], ['esquadra-assistencia', 'sq_attend'], ['esquadra-esdeveniments', 'sq_events']];
     return '<section class="view squad-view" data-view="' + id + '"><p class="crumb"><a href="#">' + esc(t('home')) + '</a> <span aria-hidden="true">/</span> ' + esc(title) + '</p>' +
       '<div class="sq-head"><h2 class="page-title" tabindex="-1">' + esc(title) + '</h2>' +
-      '<label class="sq-pick"><span>' + esc(t('esquadra')) + '</span><select id="sq-squad"><option value="">' + esc(t('choose')) + '</option>' +
-      names.map(function (n) { return '<option' + (n === Q.squad ? ' selected' : '') + '>' + esc(n) + '</option>'; }).join('') + '</select></label></div>' +
+      '<details class="sq-pick sq-sel"><summary>' + esc(t('esquadra')) + ': <strong>' + esc(Q.squads.join(' + ') || t('choose')) + '</strong></summary><div class="acct-pop sq-pop"><p class="muted">' + esc(t('sq_sel_hint')) + '</p>' +
+      names.map(function (n) { return '<label><input type="checkbox" data-sqsel="1" value="' + esc(n) + '"' + (Q.squads.indexOf(n) > -1 ? ' checked' : '') + '> ' + esc(n) + '</label>'; }).join('') + '</div></details></div>' +
       '<p class="muted sq-note">' + esc(t('sq_admin_only')) + '</p>' +
       '<nav class="tabs sq-tabs" aria-label="' + esc(title) + '">' + tabs.map(function (x) {
         return '<a href="#' + x[0] + '"' + (x[0] === id ? ' aria-current="page"' : '') + '>' + esc(t(x[1])) + '</a>';
@@ -2687,19 +2699,19 @@
       '<div id="sq" class="members-wide">' + (SQ_ROUTES[id] === 'events' ? '<p class="sq-soon">' + esc(t('sq_events_soon')) + '</p>' : '<p class="muted">' + esc(t('loading')) + '</p>') + '</div></section>';
   }
   function loadSquad(force) {
-    var Q = sqState(), sq = Q.squad, box = document.getElementById('sq');
+    var Q = sqState(), sq = Q.key, box = document.getElementById('sq');
     if (!box || SQ_ROUTES[routeId()] === 'events') return;
     if (!sq) { box.innerHTML = '<p class="muted">' + esc(t('sq_no_squad')) + '</p>'; return; }
     if (!force && Q.loaded === sq) { drawSquad(); return; }
-    sqFetch(sq).then(drawSquad).catch(fail);
+    sqFetch(Q.squads).then(drawSquad).catch(fail);
   }
   // loads the roster, events and accounts of one squad into the state (also used from the administration table)
-  function sqFetch(sq) {
-    var Q = sqState();
+  function sqFetch(sqs) {
+    var Q = sqState(), sq = sqs.join(' + ');
     return Promise.all([
       sb.from('squad_rosters').select('*').eq('squad', sq).maybeSingle(),
       sb.from('squad_members').select('*').order('sort').order('created_at'),
-      sb.from('squad_events').select('*').eq('squad', sq).order('year', { ascending: true, nullsFirst: true }).order('created_at'),
+      sb.from('squad_events').select('*').in('squad', sqs).order('year', { ascending: true, nullsFirst: true }).order('created_at'),
       sb.from('profiles').select('id,first_name,last_name,nom_guerre,rank,birth_date,joined_9e,email,esquadra,status').eq('status', 'approved')
     ]).then(function (r) {
       var set = q(r[0]), all = q(r[1]) || [], evs = q(r[2]) || [], prof = q(r[3]) || [];
@@ -2707,18 +2719,18 @@
       prof.forEach(function (p) { byP[p.id] = p; });
       Q.prof = prof; Q.others = {};
       all.forEach(function (m) {
-        if (m.profile_id) { linked[m.profile_id] = m; if (m.squad !== sq) Q.others[m.profile_id] = m; }
-        if (m.squad === sq) top = Math.max(top, m.sort || 0);
+        if (m.profile_id) { linked[m.profile_id] = m; if (sqs.indexOf(m.squad) < 0) Q.others[m.profile_id] = m; }
+        if (sqs.indexOf(m.squad) > -1) top = Math.max(top, m.sort || 0);
       });
       // web members whose account names this squad get a row of their own the first time the list is opened
       prof.forEach(function (p) {
-        if (p.esquadra === sq && !linked[p.id]) jobs.push(sb.from('squad_members').insert({ squad: sq, profile_id: p.id, sort: ++top }).select().single().then(q));
+        if (sqs.indexOf(p.esquadra) > -1 && !linked[p.id]) jobs.push(sb.from('squad_members').insert({ squad: p.esquadra, profile_id: p.id, sort: ++top }).select().single().then(q));
       });
       return Promise.all(jobs).then(function (added) {
         added.forEach(function (x) { if (x && x.id) all.push(x); });
-        if (sqState().squad !== sq) return;
+        if (sqState().key !== sq) return;
         Q.set = (set && set.settings) || {};
-        Q.rows = all.filter(function (m) { return m.squad === sq; }).map(function (m) { m._p = m.profile_id ? byP[m.profile_id] || null : null; return m; });
+        Q.rows = all.filter(function (m) { return sqs.indexOf(m.squad) > -1; }).map(function (m) { m._p = m.profile_id ? byP[m.profile_id] || null : null; return m; });
         // order of entry into the unit: earliest joining date first; people without a date after those with one, in list order
         Q.rows.sort(function (a, b) {
           var x = sqv(a, 'joined_9e') || '9999', y = sqv(b, 'joined_9e') || '9999';
@@ -2750,6 +2762,7 @@
     return (e.extra && k in e.extra) ? e.extra[k] : sqv(m, k);
   }
   function sqCell(m, c) {
+    if (c.ro) return esc(m.squad || '');
     var v = sqev(m, c.k), web = m._p && c.base;
     if (web || !sqState().medit) {
       if (c.k === 'birth_date') return esc(v ? fmtDate(v) : '');
@@ -2779,7 +2792,7 @@
       '<span class="sq-right">' + (ed ? '<button type="button" class="btn-ghost" data-sq="m-cancel">' + esc(t('cancel')) + '</button><button type="button" class="btn" data-sq="m-save">' + esc(t('save')) + '</button>'
         : '<button type="button" class="btn-ghost" data-sq="m-edit">' + esc(t('mem_edit')) + '</button>') + '</span></div>';
     var head = '<thead><tr>' + cols.map(function (c) {
-      return '<th scope="col"><span class="sq-th">' + esc(c.label) + (ed ? '<button type="button" class="mini del" data-sq="' + (c.base ? 'hide-col' : 'del-col') + '" data-k="' + esc(c.k) + '" title="' + esc(t(c.base ? 'sq_hide_col' : 'sq_del_col')) + '" aria-label="' + esc(t(c.base ? 'sq_hide_col' : 'sq_del_col') + ': ' + c.label) + '">×</button>' : '') + '</span></th>';
+      return '<th scope="col"><span class="sq-th">' + esc(c.label) + (ed && !c.ro ? '<button type="button" class="mini del" data-sq="' + (c.base ? 'hide-col' : 'del-col') + '" data-k="' + esc(c.k) + '" title="' + esc(t(c.base ? 'sq_hide_col' : 'sq_del_col')) + '" aria-label="' + esc(t(c.base ? 'sq_hide_col' : 'sq_del_col') + ': ' + c.label) + '">×</button>' : '') + '</span></th>';
     }).join('') + '<th scope="col"><span class="sr-only">' + esc(t('remove')) + '</span></th></tr></thead>';
     var body = '<tbody>' + (Q.rows.length ? Q.rows.map(function (m) {
       return '<tr data-sid="' + m.id + '" class="' + (m._p ? 'sq-webrow' : '') + (m._e ? ' dirty' : '') + '">' + cols.map(function (c) { return '<td>' + sqCell(m, c) + '</td>'; }).join('') +
@@ -2844,6 +2857,7 @@
       '<input name="name" required maxlength="120" placeholder="' + esc(t('sq_event')) + '" aria-label="' + esc(t('sq_event')) + '">' +
       '<input name="year" type="number" min="1900" max="2100" value="' + new Date().getFullYear() + '" aria-label="' + esc(t('year')) + '">' +
       '<input name="country" maxlength="60" placeholder="' + esc(t('sq_country')) + '" aria-label="' + esc(t('sq_country')) + '">' +
+      (Q.squads.length > 1 ? sqSquadSel('squad', Q.squad) : '') +
       '<button class="btn" type="submit">' + esc(t('sq_add_ev')) + '</button></form>';
     var head = '<thead><tr><th scope="col" class="sq-stick c1">' + esc(t('sq_event')) + '</th><th scope="col" class="sq-stick c2">' + esc(t('year')) + '</th><th scope="col" class="sq-stick c3">' + esc(t('sq_country')) + '</th>' +
       rows.map(function (m) { return '<th scope="col" class="sq-mem"><strong>' + esc(sqName(m)) + '</strong>' + (sqv(m, 'nom_guerre') && sqFull(m) ? '<span>' + esc(sqFull(m)) + '</span>' : '') + '</th>'; }).join('') +
@@ -2902,7 +2916,7 @@
   function sqDropEdit() { var Q = sqState(); Q.rows.forEach(function (x) { delete x._e; }); Q.medit = false; Q.setE = null; }
   function sqSaveSet() {
     var Q = sqState();
-    return track(t('saving'), sb.from('squad_rosters').upsert({ squad: Q.squad, settings: Q.set }, { onConflict: 'squad' }).then(q)).then(drawSquad).catch(fail);
+    return track(t('saving'), sb.from('squad_rosters').upsert({ squad: Q.key, settings: Q.set }, { onConflict: 'squad' }).then(q)).then(drawSquad).catch(fail);
   }
   document.addEventListener('click', function (e) {
     var el = e.target.closest && e.target.closest('[data-sq]'); if (!el || !S.sq) return;
@@ -2925,7 +2939,7 @@
       var mrows = Q.rows.filter(function (x) { return x._e; }), setChg = JSON.stringify(Q.setE || {}) !== JSON.stringify(Q.set || {});
       if (!mrows.length && !setChg) { sqDropEdit(); drawSquad(); return; }
       var jobs = mrows.map(function (x) { return sb.from('squad_members').update(x._e).eq('id', x.id).then(q); });
-      if (setChg) jobs.push(sb.from('squad_rosters').upsert({ squad: Q.squad, settings: Q.setE }, { onConflict: 'squad' }).then(q));
+      if (setChg) jobs.push(sb.from('squad_rosters').upsert({ squad: Q.key, settings: Q.setE }, { onConflict: 'squad' }).then(q));
       track(t('saving'), Promise.all(jobs)).then(function () {
         mrows.forEach(function (x) { Object.keys(x._e).forEach(function (f) { x[f] = x._e[f]; }); delete x._e; });
         if (setChg) Q.set = Q.setE;
@@ -2998,7 +3012,14 @@
   document.addEventListener('change', function (e) {
     var el = e.target; if (!S.sq || !el.closest || !el.closest('#sq, .sq-head')) return;
     var Q = S.sq;
-    if (el.id === 'sq-squad') { sqDropEdit(); Q.squad = el.value; Q.loaded = ''; Q.aedit = false; loadSquad(true); return; }
+    if (el.getAttribute && el.getAttribute('data-sqsel')) {
+      sqDropEdit();
+      var list = Array.prototype.map.call(document.querySelectorAll('[data-sqsel]:checked'), function (c) { return c.value; });
+      if (!list.length) { el.checked = true; return; }
+      sqSetSquads(S.squads.map(function (s) { return s.name; }).concat(Q.squads).filter(function (n, i, a) { return list.indexOf(n) > -1 && a.indexOf(n) === i; }), true);
+      Q.loaded = ''; Q.aedit = false; var sel = document.querySelector('.sq-sel strong'); if (sel) sel.textContent = Q.squads.join(' + ');
+      loadSquad(true); return;
+    }
     var sk = el.getAttribute('data-sk'), kk = el.getAttribute('data-kk'), ek = el.getAttribute('data-ek'), att = el.getAttribute('data-att'), m, upd = {};
     if (sk) {
       m = sqRow(el); if (!m) return;
@@ -3042,7 +3063,7 @@
     if (e.target.id !== 'f-sq-ev' || !S.sq) return;
     e.preventDefault();
     var f = e.target.elements, Q = S.sq, name = f.name.value.trim(); if (!name) return;
-    var row = { squad: Q.squad, name: name, year: parseInt(f.year.value, 10) || null, country: f.country.value.trim() || null };
+    var row = { squad: (f.squad && f.squad.value) || Q.squad, name: name, year: parseInt(f.year.value, 10) || null, country: f.country.value.trim() || null };
     track(t('saving'), sb.from('squad_events').insert(row).select().single().then(q)).then(function (ev) {
       Q.events.push(ev);
       Q.events.sort(function (a, b) { return (a.year || 0) - (b.year || 0); });
@@ -3063,7 +3084,7 @@
     return '<div class="dlg-tabs"><span class="dlg-cur">' + esc(title) + '</span><button type="button" class="btn-ghost" data-sq="dlg-close">' + esc(t('sq_close')) + '</button></div>';
   }
   function sqTop() { var top = 0; sqState().rows.forEach(function (m) { top = Math.max(top, m.sort || 0); }); return top; }
-  function sqAdded(name) { return t('sq_added').replace('{name}', name).replace('{squad}', sqState().squad); }
+  function sqAdded(name) { return t('sq_added').replace('{name}', name).replace('{squad}', sqState().key); }
   // confirmation / short question in the site's own pop-up style (replaces the browser's confirm and prompt)
   function sqAsk(o) {
     return new Promise(function (res) {
@@ -3124,8 +3145,9 @@
     var other = (Q.others || {})[pid], sort = sqTop() + 1, name = p.nom_guerre || ((p.first_name || '') + ' ' + (p.last_name || '')).trim();
     sqCloseDlg();
     var job = busy(t('sq_adding'));
-    (other ? sb.from('squad_members').update({ squad: Q.squad, sort: sort }).eq('id', other.id).then(q)
-      : sb.from('squad_members').insert({ squad: Q.squad, profile_id: pid, sort: sort }).select().single().then(q)).then(function () {
+    var tgt = Q.squads.indexOf(p.esquadra) > -1 ? p.esquadra : Q.squad;
+    (other ? sb.from('squad_members').update({ squad: tgt, sort: sort }).eq('id', other.id).then(q)
+      : sb.from('squad_members').insert({ squad: tgt, profile_id: pid, sort: sort }).select().single().then(q)).then(function () {
       job.end(true, sqAdded(name)); Q.loaded = ''; loadSquad(true);
     }).catch(function (er) { job.end(false); fail(er); });
   }
@@ -3177,15 +3199,19 @@
       if (nwVis('rank')) a.push(rankField(d.rank, true));
       if (a.length) h += '<div class="two">' + a.join('') + '</div>';
       if (nwVis('joined_9e')) h += joinedFields(d.jy, d.jm);
+      if (Q.squads.length > 1) h += sqSquadSel('sq', d.sq || Q.squad);
     } else {
       (Q.set.extra || []).forEach(function (c) { h += field('x_' + c.id, c.label, 'text', d['x_' + c.id], ' maxlength="120" autocomplete="off"'); });
       if (!h) { h = '<p class="muted">' + esc(t('sq_noextra')) + '</p>'; }
     }
     if (!h) h = '<p class="muted">' + esc(t('sq_nofields')) + '</p>';
-    dlg.innerHTML = sqDlgHead(t('sq_new_t').replace('{squad}', Q.squad)) + stepper + '<form class="form" id="f-sq-new" novalidate>' + h + '<p class="form-msg" role="status"></p>' +
+    dlg.innerHTML = sqDlgHead(t('sq_new_t').replace('{squad}', Q.key)) + stepper + '<form class="form" id="f-sq-new" novalidate>' + h + '<p class="form-msg" role="status"></p>' +
       '<p class="form-actions">' + (st > 0 ? '<button type="button" class="btn-ghost" data-sq="nw-back">' + esc(t('rg_back')) + '</button>' : '<button type="button" class="btn-ghost" data-sq="dlg-close">' + esc(t('cancel')) + '</button>') +
       '<button class="btn" type="submit">' + esc(st === 2 ? t('sq_create') : t('next')) + '</button></p></form>';
     var inp = dlg.querySelector('form input, form select'); if (inp) inp.focus();
+  }
+  function sqSquadSel(name, cur) {
+    return '<label class="field"><span>' + esc(t('esquadra')) + '</span><select name="' + name + '">' + sqState().squads.map(function (n) { return '<option' + (n === cur ? ' selected' : '') + '>' + esc(n) + '</option>'; }).join('') + '</select></label>';
   }
   function nwCollect(f) {
     var d = sqState().nw.d;
@@ -3205,7 +3231,7 @@
     return '';
   }
   function nwSave(f) {
-    var Q = sqState(), d = Q.nw.d, row = { squad: Q.squad, sort: sqTop() + 1, extra: {} };
+    var Q = sqState(), d = Q.nw.d, row = { squad: (d.sq && Q.squads.indexOf(d.sq) > -1) ? d.sq : Q.squad, sort: sqTop() + 1, extra: {} };
     ['first_name', 'last_name', 'nom_guerre', 'email', 'rank', 'birth_date'].forEach(function (k) { if (nwVis(k) && d[k]) row[k] = d[k]; });
     if (nwVis('joined_9e') && d.jy && d.jm) row.joined_9e = d.jy + '-' + d.jm + '-01';
     (Q.set.extra || []).forEach(function (c) { if (d['x_' + c.id]) row.extra[c.id] = d['x_' + c.id]; });

@@ -412,6 +412,7 @@ window.I18N = (function () {
     sq_notice: U("{name} té el mateix correu que el compte web de {account}.", "{name} has the same e-mail as the web account of {account}.", "{name} ha la stessa e-mail dell'account web di {account}.", "{name} a le même e-mail que le compte du site de {account}.", "{name} hat dieselbe E-Mail wie das Web-Konto von {account}."),
     sq_link_both: U("Vincula'ls", "Link them", "Collegali", "Les lier", "Verknüpfen"),
     sq_discard: U("Descarta els canvis", "Discard changes", "Scarta le modifiche", "Abandonner les modifications", "Änderungen verwerfen"),
+    sq_sel_hint: U("Tria una o més esquadres; es mostren juntes.", "Choose one or more squads; they are shown together.", "Scegli una o più squadre; vengono mostrate insieme.", "Choisissez une ou plusieurs escouades ; elles sont affichées ensemble.", "Wähle eine oder mehrere Gruppen; sie werden zusammen angezeigt."),
     sq_admin_only: U("De moment només ho veuen els administradors.", "For now only administrators can see this.", "Per ora la vedono solo gli amministratori.", "Pour l'instant, seuls les administrateurs la voient.", "Vorerst nur für Administratoren sichtbar.")
   };
 })();

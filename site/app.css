@@ -636,3 +636,9 @@ table.sq-att tbody tr:hover td,table.sq-att tbody tr:hover .sq-stick{background:
 table.sq-att tbody tr.dirty:hover td,table.sq-att tbody tr.dirty:hover .sq-stick{background:var(--quote-bg)}
 .sq-yes{color:var(--bleu);font-weight:700;font-size:1.05rem}
 table.sq-att td.sq-chk{min-width:6.5rem}
+
+.sq-sel{position:relative}
+.sq-sel summary{cursor:pointer;list-style:none;border:1px solid var(--line);border-radius:3px;padding:.4rem .7rem;background:var(--sheet)}
+.sq-sel summary::-webkit-details-marker{display:none}
+.sq-sel .sq-pop{position:absolute;right:0;z-index:30;min-width:15rem;padding:.6rem .8rem;display:flex;flex-direction:column;gap:.4rem}
+.sq-sel .sq-pop label{display:flex;gap:.5rem;align-items:center;font-family:var(--label)}
