@@ -1373,7 +1373,7 @@
       S.squads.map(function (s) { return '<option' + (s.name === val ? ' selected' : '') + '>' + esc(s.name) + '</option>'; }).join('') +
       (val && !S.squads.some(function (s) { return s.name === val; }) ? '<option selected>' + esc(val) + '</option>' : '') + '</select></label>';
   }
-  var RANKS = ['Velite', 'Chasseur', 'Caporal', 'Caporal Fourrier', 'Sargeant', 'Sargeant Major', 'Sous Luitenant', 'Luitenant', 'Capitain'];
+  var RANKS = ['Velite', 'Chasseur', 'Caporal', 'Caporal Fourrier', 'Sargeant', 'Sargeant Major', 'Sous Luitenant', 'Luitenant', 'Capitain', 'Vivandière'];
   function rankField(val, req) {
     return '<label class="fld"><span>' + esc(t('rank')) + '</span><select name="rank"' + (req ? ' required' : '') + '><option value="">' + esc(t('choose')) + '</option>' +
       RANKS.map(function (r) { return '<option' + (r === val ? ' selected' : '') + '>' + esc(r) + '</option>'; }).join('') + '</select></label>';
