@@ -2666,7 +2666,7 @@
     return (m.extra || {})[k];
   }
   function sqCols() {
-    var st = sqState().set || {}, hide = st.hide || [];
+    var Q = sqState(), st = (Q.medit ? Q.setE : Q.set) || {}, hide = st.hide || [];
     return SQ_BASE.filter(function (k) { return hide.indexOf(k) < 0; }).map(function (k) { return { k: k, label: t(k === 'joined_9e' ? 'joined' : k), base: 1 }; })
       .concat((st.extra || []).map(function (c) { return { k: c.id, label: c.label }; }));
   }
@@ -2743,9 +2743,15 @@
     }).join('') + '</div>';
   }
   /* member list */
+  // value shown in the list: the pending edit (m._e) wins while the table is in edit mode
+  function sqev(m, k) {
+    var e = m._e || {};
+    if (SQ_BASE.indexOf(k) > -1) return (!m._p && k in e) ? e[k] : sqv(m, k);
+    return (e.extra && k in e.extra) ? e.extra[k] : sqv(m, k);
+  }
   function sqCell(m, c) {
-    var v = sqv(m, c.k), web = m._p && c.base;
-    if (web) {
+    var v = sqev(m, c.k), web = m._p && c.base;
+    if (web || !sqState().medit) {
       if (c.k === 'birth_date') return esc(v ? fmtDate(v) : '');
       if (c.k === 'joined_9e') return esc(v ? new Date(String(v).slice(0, 7) + '-01T12:00:00').toLocaleDateString(S.lang, { month: 'short', year: 'numeric' }) : '');
       return esc(v || '');
@@ -2762,20 +2768,23 @@
     return '<input type="' + (c.k === 'email' ? 'email' : 'text') + '"' + ar + ' value="' + esc(v || '') + '" maxlength="120">';
   }
   function sqListHtml() {
-    var Q = sqState(), cols = sqCols(), hide = (Q.set.hide || []);
+    // read-only until "Edit table"; column and cell changes are kept as a draft and written together with Save
+    var Q = sqState(), ed = !!Q.medit, cols = sqCols(), hide = ((ed ? Q.setE : Q.set).hide || []);
     var bar = '<div class="sq-bar">' + sqSwitch(['list', 'sq_list'], ['kit', 'sq_kit'], 'list', 'view') +
-      '<details class="sq-addmenu"><summary class="btn">+ ' + esc(t('sq_add_row')) + '</summary><div class="acct-pop sq-pop">' +
+      (ed ? '<button type="button" class="btn-ghost" data-sq="add-col">+ ' + esc(t('sq_add_col')) + '</button>' +
+        hide.map(function (k) { return '<button type="button" class="btn-small" data-sq="show-col" data-k="' + k + '">' + esc(t('sq_show')) + ': ' + esc(t(k === 'joined_9e' ? 'joined' : k)) + '</button>'; }).join('')
+        : '<details class="sq-addmenu"><summary class="btn">+ ' + esc(t('sq_add_row')) + '</summary><div class="acct-pop sq-pop">' +
         '<button type="button" data-sq="add-existing">' + esc(t('sq_add_existing')) + '</button>' +
-        '<button type="button" data-sq="add-new">' + esc(t('sq_add_new')) + '</button></div></details>' +
-      '<button type="button" class="btn-ghost" data-sq="add-col">+ ' + esc(t('sq_add_col')) + '</button>' +
-      hide.map(function (k) { return '<button type="button" class="btn-small" data-sq="show-col" data-k="' + k + '">' + esc(t('sq_show')) + ': ' + esc(t(k === 'joined_9e' ? 'joined' : k)) + '</button>'; }).join('') + '</div>';
+        '<button type="button" data-sq="add-new">' + esc(t('sq_add_new')) + '</button></div></details>') +
+      '<span class="sq-right">' + (ed ? '<button type="button" class="btn-ghost" data-sq="m-cancel">' + esc(t('cancel')) + '</button><button type="button" class="btn" data-sq="m-save">' + esc(t('save')) + '</button>'
+        : '<button type="button" class="btn-ghost" data-sq="m-edit">' + esc(t('mem_edit')) + '</button>') + '</span></div>';
     var head = '<thead><tr>' + cols.map(function (c) {
-      return '<th scope="col"><span class="sq-th">' + esc(c.label) + '<button type="button" class="mini del" data-sq="' + (c.base ? 'hide-col' : 'del-col') + '" data-k="' + esc(c.k) + '" title="' + esc(t(c.base ? 'sq_hide_col' : 'sq_del_col')) + '" aria-label="' + esc(t(c.base ? 'sq_hide_col' : 'sq_del_col') + ': ' + c.label) + '">×</button></span></th>';
+      return '<th scope="col"><span class="sq-th">' + esc(c.label) + (ed ? '<button type="button" class="mini del" data-sq="' + (c.base ? 'hide-col' : 'del-col') + '" data-k="' + esc(c.k) + '" title="' + esc(t(c.base ? 'sq_hide_col' : 'sq_del_col')) + '" aria-label="' + esc(t(c.base ? 'sq_hide_col' : 'sq_del_col') + ': ' + c.label) + '">×</button>' : '') + '</span></th>';
     }).join('') + '<th scope="col"><span class="sr-only">' + esc(t('remove')) + '</span></th></tr></thead>';
     var body = '<tbody>' + (Q.rows.length ? Q.rows.map(function (m) {
-      return '<tr data-sid="' + m.id + '"' + (m._p ? ' class="sq-webrow"' : '') + '>' + cols.map(function (c) { return '<td>' + sqCell(m, c) + '</td>'; }).join('') +
+      return '<tr data-sid="' + m.id + '" class="' + (m._p ? 'sq-webrow' : '') + (m._e ? ' dirty' : '') + '">' + cols.map(function (c) { return '<td>' + sqCell(m, c) + '</td>'; }).join('') +
         '<td class="sq-act">' + (m._p ? '<span class="sq-badge" title="' + esc(t('sq_web_hint')) + '">' + esc(t('sq_web')) + '</span>'
-          : '<span class="sq-badge unconf" title="' + esc(t('sq_unconf_hint')) + '">' + esc(t('st_unconfirmed')) + '</span> <button type="button" class="btn-small" data-sq="link-row" title="' + esc(t('sq_link_t')) + '">' + esc(t('sq_link')) + '</button> <button type="button" class="mini del" data-sq="del-row" title="' + esc(t('sq_del_row')) + '" aria-label="' + esc(t('sq_del_row')) + '">🗑</button>') + '</td></tr>';
+          : '<span class="sq-badge unconf" title="' + esc(t('sq_unconf_hint')) + '">' + esc(t('st_unconfirmed')) + '</span> <button type="button" class="btn-small" data-sq="link-row" title="' + esc(t('sq_link_t')) + '">' + esc(t('sq_link')) + '</button>' + (ed ? ' <button type="button" class="mini del" data-sq="del-row" title="' + esc(t('sq_del_row')) + '" aria-label="' + esc(t('sq_del_row')) + '">🗑</button>' : '')) + '</td></tr>';
     }).join('') : '<tr><td colspan="' + (cols.length + 1) + '" class="muted">' + esc(t('no_members')) + '</td></tr>') + '</tbody>';
     return bar + sqNoticeHtml() + '<div class="table-wrap"><table class="members sq-table">' + head + body + '</table></div>';
   }
@@ -2889,6 +2898,8 @@
   }
   function sqRow(el) { var tr = el.closest && el.closest('[data-sid]'), Q = sqState(); return tr && Q.rows.filter(function (m) { return m.id === tr.getAttribute('data-sid'); })[0]; }
   function sqEv(el) { var tr = el.closest && el.closest('[data-eid]'), Q = sqState(); return tr && Q.events.filter(function (e) { return e.id === tr.getAttribute('data-eid'); })[0]; }
+  function sqDirty() { var Q = sqState(); return Q.rows.some(function (x) { return x._e; }) || JSON.stringify(Q.setE || {}) !== JSON.stringify(Q.set || {}); }
+  function sqDropEdit() { var Q = sqState(); Q.rows.forEach(function (x) { delete x._e; }); Q.medit = false; Q.setE = null; }
   function sqSaveSet() {
     var Q = sqState();
     return track(t('saving'), sb.from('squad_rosters').upsert({ squad: Q.squad, settings: Q.set }, { onConflict: 'squad' }).then(q)).then(drawSquad).catch(fail);
@@ -2903,6 +2914,25 @@
     if (act === 'add-new') { closeAddMenu(); Q.nw = { step: 0, d: {} }; sqDrawNew(); showDlg(sqDlg()); return; }
     if (act === 'dlg-close') { sqCloseDlg(); return; }
     if (act === 'a-edit') { Q.aedit = true; drawSquad(); return; }
+    if (act === 'm-edit') { Q.medit = true; Q.setE = JSON.parse(JSON.stringify(Q.set || {})); drawSquad(); return; }
+    if (act === 'm-cancel') {
+      var mleave = function () { sqDropEdit(); drawSquad(); };
+      if (!sqDirty()) { mleave(); return; }
+      sqAsk({ title: t('cancel'), text: t('mem_discard_q'), ok: t('sq_discard') }).then(function (ok) { if (ok) mleave(); });
+      return;
+    }
+    if (act === 'm-save') {
+      var mrows = Q.rows.filter(function (x) { return x._e; }), setChg = JSON.stringify(Q.setE || {}) !== JSON.stringify(Q.set || {});
+      if (!mrows.length && !setChg) { sqDropEdit(); drawSquad(); return; }
+      var jobs = mrows.map(function (x) { return sb.from('squad_members').update(x._e).eq('id', x.id).then(q); });
+      if (setChg) jobs.push(sb.from('squad_rosters').upsert({ squad: Q.squad, settings: Q.setE }, { onConflict: 'squad' }).then(q));
+      track(t('saving'), Promise.all(jobs)).then(function () {
+        mrows.forEach(function (x) { Object.keys(x._e).forEach(function (f) { x[f] = x._e[f]; }); delete x._e; });
+        if (setChg) Q.set = Q.setE;
+        Q.medit = false; Q.setE = null; drawSquad();
+      }).catch(fail);
+      return;
+    }
     if (act === 'a-cancel') {
       var dirtyEv = Q.events.some(function (x) { return x._e; });
       var leave = function () { Q.events.forEach(function (x) { delete x._e; }); Q.aedit = false; drawSquad(); };
@@ -2936,23 +2966,25 @@
       return;
     }
     if (act === 'add-col') {
+      if (!Q.medit) return;
       sqAsk({ title: t('sq_add_col'), label: t('sq_col_name'), input: true, ok: t('add') }).then(function (name) {
         if (!name) return;
-        Q.set.extra = (Q.set.extra || []).concat([{ id: 'c' + Date.now().toString(36), label: name.slice(0, 60) }]);
-        sqSaveSet();
+        Q.setE.extra = (Q.setE.extra || []).concat([{ id: 'c' + Date.now().toString(36), label: name.slice(0, 60) }]);
+        drawSquad();
       });
       return;
     }
     if (act === 'del-col') {
+      if (!Q.medit) return;
       sqAsk({ title: t('sq_del_col'), text: t('sq_del_col_q'), ok: t('remove'), danger: true }).then(function (ok) {
         if (!ok) return;
-        Q.set.extra = (Q.set.extra || []).filter(function (c) { return c.id !== k; });
-        sqSaveSet();
+        Q.setE.extra = (Q.setE.extra || []).filter(function (c) { return c.id !== k; });
+        drawSquad();
       });
       return;
     }
-    if (act === 'hide-col') { Q.set.hide = (Q.set.hide || []).concat([k]); sqSaveSet(); return; }
-    if (act === 'show-col') { Q.set.hide = (Q.set.hide || []).filter(function (x) { return x !== k; }); sqSaveSet(); return; }
+    if (act === 'hide-col') { if (!Q.medit) return; Q.setE.hide = (Q.setE.hide || []).concat([k]); drawSquad(); return; }
+    if (act === 'show-col') { if (!Q.medit) return; Q.setE.hide = (Q.setE.hide || []).filter(function (x) { return x !== k; }); drawSquad(); return; }
     if (act === 'del-ev') {
       var ev = sqEv(el); if (!ev) return;
       sqAsk({ title: t('remove'), text: t('sq_del_ev_q'), ok: t('remove'), danger: true }).then(function (ok) {
@@ -2966,7 +2998,7 @@
   document.addEventListener('change', function (e) {
     var el = e.target; if (!S.sq || !el.closest || !el.closest('#sq, .sq-head')) return;
     var Q = S.sq;
-    if (el.id === 'sq-squad') { Q.squad = el.value; Q.loaded = ''; Q.aedit = false; loadSquad(true); return; }
+    if (el.id === 'sq-squad') { sqDropEdit(); Q.squad = el.value; Q.loaded = ''; Q.aedit = false; loadSquad(true); return; }
     var sk = el.getAttribute('data-sk'), kk = el.getAttribute('data-kk'), ek = el.getAttribute('data-ek'), att = el.getAttribute('data-att'), m, upd = {};
     if (sk) {
       m = sqRow(el); if (!m) return;
@@ -2975,8 +3007,10 @@
         if ((jm && !jy) || (jy && !jm)) return; // wait until both are chosen
         upd.joined_9e = jm ? jy + '-' + jm + '-01' : null;
       } else if (SQ_BASE.indexOf(sk) > -1) upd[sk] = el.value.trim() || null;
-      else { var ex = {}; Object.keys(m.extra || {}).forEach(function (x) { ex[x] = m.extra[x]; }); ex[sk] = el.value.trim(); upd.extra = ex; }
-      track(t('saving'), sb.from('squad_members').update(upd).eq('id', m.id).then(q)).then(function () { Object.keys(upd).forEach(function (x) { m[x] = upd[x]; }); }).catch(fail);
+      else { var ex = {}, ex0 = (m._e && m._e.extra) || m.extra || {}; Object.keys(ex0).forEach(function (x) { ex[x] = ex0[x]; }); ex[sk] = el.value.trim(); upd.extra = ex; }
+      if (!Q.medit) return;
+      m._e = m._e || {}; Object.keys(upd).forEach(function (x) { m._e[x] = upd[x]; });
+      el.closest('tr').classList.add('dirty');
       return;
     }
     if (kk) {
