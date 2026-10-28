@@ -2670,7 +2670,7 @@
     Promise.all([
       sb.from('squad_rosters').select('*').eq('squad', sq).maybeSingle(),
       sb.from('squad_members').select('*').order('sort').order('created_at'),
-      sb.from('squad_events').select('*').eq('squad', sq).order('year', { ascending: true }).order('created_at'),
+      sb.from('squad_events').select('*').eq('squad', sq).order('year', { ascending: true, nullsFirst: true }).order('created_at'),
       sb.from('profiles').select('id,first_name,last_name,nom_guerre,rank,birth_date,joined_9e,email,esquadra,status').eq('status', 'approved')
     ]).then(function (r) {
       var set = q(r[0]), all = q(r[1]) || [], evs = q(r[2]) || [], prof = q(r[3]) || [];
