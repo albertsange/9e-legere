@@ -614,3 +614,6 @@ table.members tr.sq-unconf td{color:var(--muted)}
 .sq-linkfor{margin:0 0 .6rem;font-family:var(--label);letter-spacing:.03em;color:var(--bleu)}
 .sq-notice{list-style:none;margin:0 0 .8rem;padding:0;display:grid;gap:.4rem}
 .sq-notice li{display:flex;flex-wrap:wrap;gap:.5rem .8rem;align-items:center;padding:.6rem .8rem;border:1px solid var(--bleu);border-left-width:4px;border-radius:4px;background:var(--sheet)}
+
+.cf-text{margin:0 0 1rem;line-height:1.5}
+.dlg .form-actions .btn-danger{margin-top:0}

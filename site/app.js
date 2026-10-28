@@ -1461,7 +1461,8 @@
   function memInput(m, k, canEdit, me) {
     var v = memVal(m, k);
     if (m._sq && k === 'status') return '<span class="sq-badge unconf">' + esc(memLabel(m, k)) + '</span>';
-    if (!canEdit || k === 'email' || k === 'created_at' || ((k === 'status' || k === 'role') && me)) return esc(memLabel(m, k));
+    if (m._sq && (!canEdit || k === 'role' || k === 'created_at')) return esc(memLabel(m, k));
+    if (!m._sq && (!canEdit || k === 'email' || k === 'created_at' || ((k === 'status' || k === 'role') && me))) return esc(memLabel(m, k));
     var ar = ' data-k="' + k + '" aria-label="' + esc(t(k === 'joined_9e' ? 'joined' : k === 'created_at' ? 'mem_created' : k)) + '"';
     if (k === 'esquadra') {
       var sq = S.squads.map(function (x) { return x.name; }); if (v && sq.indexOf(v) < 0) sq.push(v);
@@ -1481,8 +1482,8 @@
   }
   function drawMembers() {
     var M = S.mem, box = document.getElementById('members'); if (!box) return;
-    var canEdit = isColonel() && !!M.edit, rows = memRows(), pendEd = isColonel() && rows.some(function (m) { return m.status === 'pending'; }), showAct = !canEdit && pendEd;
-    var cellEd = function (m, k) { return !m._sq && (canEdit || (isColonel() && m.status === 'pending' && (k === 'status' || k === 'role'))); };
+    var canEdit = isColonel() && !!M.edit, rows = memRows(), pendEd = isColonel() && rows.some(function (m) { return m.status === 'pending'; }), hasSq = rows.some(function (m) { return m._sq; }), showAct = hasSq || (!canEdit && pendEd);
+    var cellEd = function (m, k) { return canEdit || (!m._sq && isColonel() && m.status === 'pending' && (k === 'status' || k === 'role')); };
     var opt = function (arr, cur, lab) { return arr.map(function (x) { return '<option value="' + esc(x[0]) + '"' + (x[0] === cur ? ' selected' : '') + '>' + esc(x[1]) + '</option>'; }).join(''); };
     var sqs = S.squads.map(function (s) { return [s.name, s.name]; });
     var filters = '<div class="mem-filters"><input id="mem-q" type="search" value="' + esc(M.f.q || '') + '" placeholder="' + esc(t('mem_search')) + '" aria-label="' + esc(t('mem_search')) + '">' +
@@ -1500,7 +1501,8 @@
       var me = S.session && m.id === S.session.user.id;
       return '<tr data-id="' + m.id + '"' + (me ? ' data-me="1"' : '') + ' class="' + (m.status === 'pending' ? 'new ' : '') + (m._sq ? 'sq-unconf ' : '') + (m._e ? 'dirty' : '') + '">' + MEM_COLS.map(function (c) {
         return '<td>' + memInput(m, c[0], cellEd(m, c[0]), me) + (c[0] === 'first_name' && me ? ' <span class="muted">(' + esc(t('you')) + ')</span>' : '') + '</td>';
-      }).join('') + (showAct ? '<td>' + (m.status === 'pending' && !me ? '<button type="button" class="btn-small" data-act="save-member">' + esc(t('save')) + '</button>' : '') + '</td>' : '') + '</tr>';
+      }).join('') + (showAct ? '<td class="sq-act">' + (m._sq ? '<button type="button" class="btn-small" data-act="mem-link" title="' + esc(t('sq_link_t')) + '">' + esc(t('sq_link')) + '</button>'
+        : (!canEdit && m.status === 'pending' && !me ? '<button type="button" class="btn-small" data-act="save-member">' + esc(t('save')) + '</button>' : '')) + '</td>' : '') + '</tr>';
     }).join('') : '<tr><td colspan="12" class="muted">' + esc(t('no_members')) + '</td></tr>') + '</tbody>';
     var kf = document.activeElement && document.activeElement.id === 'mem-q';
     box.innerHTML = filters + '<div class="table-wrap"><table class="members">' + head + body + '</table></div>';
@@ -1533,12 +1535,33 @@
   function memPrepare(m) {
     var upd = {}; Object.keys(m._e).forEach(function (k) { upd[k] = m._e[k]; });
     if (upd.joined_9e === '?') return { err: t('rg_joined_both') };
+    if (m._sq) {
+      // hand-made member of a squad list: any text field may be left empty, but not all the names
+      ['first_name', 'last_name', 'nom_guerre', 'email', 'rank', 'birth_date', 'joined_9e'].forEach(function (k) { if (k in upd && !String(upd[k] || '').trim()) upd[k] = null; });
+      var nm = function (k) { return k in upd ? upd[k] : m[k]; };
+      if (!nm('first_name') && !nm('last_name') && !nm('nom_guerre')) return { err: t('required') };
+      if (upd.email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(upd.email)) return { err: t('sq_email_bad') };
+      return { m: m, upd: upd };
+    }
     var bad = ['first_name', 'last_name', 'nom_guerre'].some(function (k) { return k in upd && !String(upd[k]).trim(); });
     if (bad) return { err: t('required') };
     if ('rank' in upd && upd.rank === '') upd.rank = null;
     if (upd.birth_date === '') upd.birth_date = null;
     if (S.session && m.id === S.session.user.id) { delete upd.status; delete upd.role; }
     return { m: m, upd: upd };
+  }
+  // writes one prepared row: profiles for web accounts, squad_members for people added by hand
+  function memStore(jb) {
+    if (S.sq) S.sq.loaded = ''; // the squad lists must be read again after any change here
+    if (!jb.m._sq) return sb.from('profiles').update(jb.upd).eq('id', jb.m.id).then(q);
+    var u = {}; Object.keys(jb.upd).forEach(function (k) { u[k === 'esquadra' ? 'squad' : k] = jb.upd[k]; });
+    delete u.status; delete u.role; delete u.created_at;
+    return sb.from('squad_members').update(u).eq('id', jb.m.id.slice(3)).then(q);
+  }
+  function memLink(sid) {
+    var m = memRowById('sq-' + sid); if (!m) return;
+    var Q = sqState(); Q.squad = m.esquadra; Q.loaded = '';
+    sqFetch(m.esquadra).then(function () { sqOpenPick(sid); }).catch(fail);
   }
   function memRowById(id) { return S.mem && S.mem.rows.filter(function (m) { return m.id === id; })[0]; }
   document.addEventListener('input', function (e) {
@@ -2036,6 +2059,7 @@
         if (so.k === sk) { if (so.dir > 0) so.dir = -1; else { so.k = ''; so.dir = 1; } } else { so.k = sk; so.dir = 1; }
         drawMembers(); return;
       }
+      if (act === 'mem-link') { var lt = el.closest('tr'); if (lt) memLink(lt.getAttribute('data-id').slice(3)); return; }
       if (act === 'mem-edit') { S.mem.edit = true; drawMembers(); return; }
       if (act === 'mem-cancel') {
         if (S.mem.rows.some(function (m) { return m._e; })) { if (!window.confirm(t('mem_discard_q'))) return; S.mem.rows.forEach(function (m) { delete m._e; }); }
@@ -2046,7 +2070,7 @@
         if (!dirty.length) { S.mem.edit = false; drawMembers(); return; }
         var jobs = [];
         for (var di = 0; di < dirty.length; di++) { var jb = memPrepare(dirty[di]); if (jb.err) { toast(jb.err, true); return; } jobs.push(jb); }
-        track(t('saving'), Promise.all(jobs.map(function (jb2) { return sb.from('profiles').update(jb2.upd).eq('id', jb2.m.id).then(q); }))).then(function () {
+        track(t('saving'), Promise.all(jobs.map(function (jb2) { return memStore(jb2); }))).then(function () {
           var meSaved = false;
           jobs.forEach(function (jb2) { Object.keys(jb2.upd).forEach(function (k) { jb2.m[k] = jb2.upd[k]; }); delete jb2.m._e; if (S.session && jb2.m.id === S.session.user.id) meSaved = true; });
           S.mem.edit = false; drawMembers();
@@ -2060,7 +2084,7 @@
         if (!mm || !mm._e) return;
         var jb = memPrepare(mm);
         if (jb.err) { toast(jb.err, true); return; }
-        track(t('saving'), sb.from('profiles').update(jb.upd).eq('id', mm.id).then(q)).then(function () {
+        track(t('saving'), memStore(jb)).then(function () {
           Object.keys(jb.upd).forEach(function (k) { mm[k] = jb.upd[k]; }); delete mm._e; drawMembers();
           if (S.session && mm.id === S.session.user.id) loadProfile().then(renderChrome);
         }).catch(fail);
@@ -2667,7 +2691,12 @@
     if (!box || SQ_ROUTES[routeId()] === 'events') return;
     if (!sq) { box.innerHTML = '<p class="muted">' + esc(t('sq_no_squad')) + '</p>'; return; }
     if (!force && Q.loaded === sq) { drawSquad(); return; }
-    Promise.all([
+    sqFetch(sq).then(drawSquad).catch(fail);
+  }
+  // loads the roster, events and accounts of one squad into the state (also used from the administration table)
+  function sqFetch(sq) {
+    var Q = sqState();
+    return Promise.all([
       sb.from('squad_rosters').select('*').eq('squad', sq).maybeSingle(),
       sb.from('squad_members').select('*').order('sort').order('created_at'),
       sb.from('squad_events').select('*').eq('squad', sq).order('year', { ascending: true, nullsFirst: true }).order('created_at'),
@@ -2692,9 +2721,8 @@
         Q.rows = all.filter(function (m) { return m.squad === sq; }).map(function (m) { m._p = m.profile_id ? byP[m.profile_id] || null : null; return m; });
         Q.events = evs;
         Q.loaded = sq;
-        drawSquad();
       });
-    }).catch(fail);
+    });
   }
   function drawSquad() {
     var Q = sqState(), box = document.getElementById('sq'), part = SQ_ROUTES[routeId()];
@@ -2864,29 +2892,41 @@
     if (act === 'pick') { sqPick(el.getAttribute('data-id')); return; }
     if (act === 'nw-back') { var nf = document.getElementById('f-sq-new'); if (nf) nwCollect(nf); Q.nw.step = Math.max(0, Q.nw.step - 1); sqDrawNew(); return; }
     if (act === 'del-row') {
-      var m = sqRow(el); if (!m || !window.confirm(t('sq_del_row_q'))) return;
-      track(t('deleting'), sb.from('squad_members').delete().eq('id', m.id).then(q)).then(function () {
-        Q.rows = Q.rows.filter(function (x) { return x !== m; }); drawSquad();
-      }).catch(fail);
+      var m = sqRow(el); if (!m) return;
+      sqAsk({ title: t('sq_del_row'), text: t('sq_del_row_q'), ok: t('remove'), danger: true }).then(function (ok) {
+        if (!ok) return;
+        track(t('deleting'), sb.from('squad_members').delete().eq('id', m.id).then(q)).then(function () {
+          Q.rows = Q.rows.filter(function (x) { return x !== m; }); drawSquad();
+        }).catch(fail);
+      });
       return;
     }
     if (act === 'add-col') {
-      var name = (window.prompt(t('sq_col_name')) || '').trim(); if (!name) return;
-      Q.set.extra = (Q.set.extra || []).concat([{ id: 'c' + Date.now().toString(36), label: name.slice(0, 60) }]);
-      sqSaveSet(); return;
+      sqAsk({ title: t('sq_add_col'), label: t('sq_col_name'), input: true, ok: t('add') }).then(function (name) {
+        if (!name) return;
+        Q.set.extra = (Q.set.extra || []).concat([{ id: 'c' + Date.now().toString(36), label: name.slice(0, 60) }]);
+        sqSaveSet();
+      });
+      return;
     }
     if (act === 'del-col') {
-      if (!window.confirm(t('sq_del_col_q'))) return;
-      Q.set.extra = (Q.set.extra || []).filter(function (c) { return c.id !== k; });
-      sqSaveSet(); return;
+      sqAsk({ title: t('sq_del_col'), text: t('sq_del_col_q'), ok: t('remove'), danger: true }).then(function (ok) {
+        if (!ok) return;
+        Q.set.extra = (Q.set.extra || []).filter(function (c) { return c.id !== k; });
+        sqSaveSet();
+      });
+      return;
     }
     if (act === 'hide-col') { Q.set.hide = (Q.set.hide || []).concat([k]); sqSaveSet(); return; }
     if (act === 'show-col') { Q.set.hide = (Q.set.hide || []).filter(function (x) { return x !== k; }); sqSaveSet(); return; }
     if (act === 'del-ev') {
-      var ev = sqEv(el); if (!ev || !window.confirm(t('sq_del_ev_q'))) return;
-      track(t('deleting'), sb.from('squad_events').delete().eq('id', ev.id).then(q)).then(function () {
-        Q.events = Q.events.filter(function (x) { return x !== ev; }); drawSquad();
-      }).catch(fail);
+      var ev = sqEv(el); if (!ev) return;
+      sqAsk({ title: t('remove'), text: t('sq_del_ev_q'), ok: t('remove'), danger: true }).then(function (ok) {
+        if (!ok) return;
+        track(t('deleting'), sb.from('squad_events').delete().eq('id', ev.id).then(q)).then(function () {
+          Q.events = Q.events.filter(function (x) { return x !== ev; }); drawSquad();
+        }).catch(fail);
+      });
     }
   });
   document.addEventListener('change', function (e) {
@@ -2957,6 +2997,24 @@
   }
   function sqTop() { var top = 0; sqState().rows.forEach(function (m) { top = Math.max(top, m.sort || 0); }); return top; }
   function sqAdded(name) { return t('sq_added').replace('{name}', name).replace('{squad}', sqState().squad); }
+  // confirmation / short question in the site's own pop-up style (replaces the browser's confirm and prompt)
+  function sqAsk(o) {
+    return new Promise(function (res) {
+      var d = document.getElementById('cf-dlg'), done = false;
+      if (!d) { d = document.createElement('dialog'); d.id = 'cf-dlg'; d.className = 'dlg'; document.body.appendChild(d); }
+      d.innerHTML = '<div class="dlg-tabs"><span class="dlg-cur">' + esc(o.title) + '</span></div><form class="form" id="f-cf" novalidate>' +
+        (o.text ? '<p class="cf-text">' + esc(o.text) + '</p>' : '') + (o.input ? field('v', o.label || '', 'text', '', ' required maxlength="60" autocomplete="off"') : '') +
+        '<p class="form-actions"><button type="button" class="btn-ghost" data-cf="no">' + esc(t('cancel')) + '</button>' +
+        '<button type="submit" class="' + (o.danger ? 'btn-danger' : 'btn') + '">' + esc(o.ok || t('rg_ok')) + '</button></p></form>';
+      var form = d.querySelector('form');
+      function fin(v) { if (done) return; done = true; if (d.open) { if (d.close) d.close(); else d.removeAttribute('open'); } res(v); }
+      form.addEventListener('submit', function (e) { e.preventDefault(); if (o.input) { var v = form.elements.v.value.trim(); if (!v) { form.elements.v.focus(); return; } fin(v); } else fin(true); });
+      d.querySelector('[data-cf=no]').addEventListener('click', function () { fin(o.input ? '' : false); });
+      d.addEventListener('close', function () { fin(o.input ? '' : false); }, { once: true });
+      showDlg(d);
+      var f = d.querySelector('input'); if (f) f.focus(); else d.querySelector('button[type=submit]').focus();
+    });
+  }
   function sqRowName(m) { return sqv(m, 'nom_guerre') || sqFull(m) || '—'; }
   function sqEmpty(m, att) { return !att[m.id] && !Object.keys(m.kit || {}).length && !Object.keys(m.extra || {}).some(function (k) { return m.extra[k]; }); }
   // web accounts a hand-made member can be linked to: no row yet, or only the empty row the site created by itself
@@ -3009,15 +3067,19 @@
     var Q = sqState(), m = Q.rows.filter(function (x) { return x.id === rowId; })[0], p = (Q.prof || []).filter(function (x) { return x.id === pid; })[0];
     if (!m || !p) return;
     var acc = p.nom_guerre || ((p.first_name || '') + ' ' + (p.last_name || '')).trim(), who = sqRowName(m);
-    if (!window.confirm(t('sq_link_q').replace('{name}', who).replace('{account}', acc))) return;
     var dup = Q.rows.filter(function (x) { return x.profile_id === pid && x.id !== rowId; })[0];
-    sqCloseDlg();
-    var job = busy(t('sq_linking'));
-    (dup ? sb.from('squad_members').delete().eq('id', dup.id).then(q) : Promise.resolve()).then(function () {
-      return sb.from('squad_members').update({ profile_id: pid }).eq('id', rowId).then(q);
-    }).then(function () {
-      job.end(true, t('sq_linked').replace('{name}', who).replace('{account}', acc)); Q.loaded = ''; loadSquad(true);
-    }).catch(function (er) { job.end(false); fail(er); });
+    sqAsk({ title: t('sq_link_t'), text: t('sq_link_q').replace('{name}', who).replace('{account}', acc), ok: t('sq_link') }).then(function (ok) {
+      if (!ok) return;
+      sqCloseDlg();
+      var job = busy(t('sq_linking'));
+      (dup ? sb.from('squad_members').delete().eq('id', dup.id).then(q) : Promise.resolve()).then(function () {
+        return sb.from('squad_members').update({ profile_id: pid }).eq('id', rowId).then(q);
+      }).then(function () {
+        job.end(true, t('sq_linked').replace('{name}', who).replace('{account}', acc)); Q.loaded = '';
+        if (document.getElementById('sq')) loadSquad(true);
+        if (document.getElementById('members')) loadMembers();
+      }).catch(function (er) { job.end(false); fail(er); });
+    });
   }
   // an account registered with the e-mail of a hand-made member is offered as a match
   function sqNoticeHtml() {
