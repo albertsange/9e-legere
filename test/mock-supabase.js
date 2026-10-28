@@ -19,10 +19,10 @@
     site: Object.keys(seed.site).map(function (k) { return { key: k, value: JSON.parse(JSON.stringify(seed.site[k])) }; }),
     squads: [{ id: 1, name: 'Esquadra A' }, { id: 2, name: 'Esquadra B' }],
     page_edits: [{ id: 1, page_id: 'shako', editor_name: 'La Tour', edited_at: '2026-10-21T15:00:00Z', fields: ['desc', 'std'] }, { id: 2, page_id: 'shako', editor_name: 'Bonaparte', edited_at: '2026-10-20T10:00:00Z', fields: ['info'] }],
-    comments: [], notifications: [],
+    comments: [], notifications: [], inspection_findings: [], squad_rosters: [], squad_members: [], squad_events: [],
     profiles: USERS.map(function (u) { var p = JSON.parse(JSON.stringify(u.profile)); p.id = u.id; p.email = u.email; p.created_at = new Date().toISOString(); return p; })
   };
-  var KEY = { inspections: 'id', page_edits: 'id', pages: 'id', page_private: 'page_id', site: 'key', squads: 'id', profiles: 'id', comments: 'id', notifications: 'id' };
+  var KEY = { inspections: 'id', page_edits: 'id', pages: 'id', page_private: 'page_id', site: 'key', squads: 'id', profiles: 'id', comments: 'id', notifications: 'id', squad_rosters: 'squad', squad_members: 'id', squad_events: 'id' };
   var storage = {}; // path -> url
   var session = null, listeners = [];
   var log = window.__MOCKLOG = [];
@@ -103,10 +103,12 @@
     for (var i = 0; i < vals.length; i++) {
       var v = clone(vals[i]);
       if (t === 'squads' && v.id == null) v.id = Date.now() + i;
+      if (/^squad_(members|events)$/.test(t) && v.id == null) { v.id = 'r' + Math.random().toString(36).slice(2, 10); v.created_at = new Date().toISOString(); v.extra = v.extra || {}; v.kit = v.kit || {}; if (t === 'squad_events') v.attendees = v.attendees || []; }
       var ex = rows.filter(function (r) { return r[k] === v[k]; })[0];
       if (ex && this.op === 'insert') return { data: null, error: { message: 'duplicate key value violates unique constraint' } };
       if (ex) Object.assign(ex, v); else rows.push(Object.assign({ sort: 0, related: [], content: {} }, t === 'pages' ? {} : {}, v));
       if (t === 'pages' && !ex && !db.page_private.some(function (r) { return r.page_id === v.id; })) db.page_private.push({ page_id: v.id, content: {} });
+      if (/^squad_/.test(t) && vals.length === 1) return { data: clone(ex || rows[rows.length - 1]), error: null };
     }
     return { data: null, error: null };
   };

@@ -104,7 +104,7 @@
     return String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
       .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60);
   }
-  function chip(status) { return '<span class="chip ' + (status === 'pending' ? 'pending' : 'proposed') + '">' + t(status === 'pending' ? 'pending' : 'proposed') + '</span>'; }
+  function chip(status) { return '<span class="sq-chip ' + (status === 'pending' ? 'pending' : 'proposed') + '">' + t(status === 'pending' ? 'pending' : 'proposed') + '</span>'; }
   function imgSrc(v) { return v ? esc(v) : ''; }
 
   /* ------------------------------------------------------------------ automatic links between item pages */
@@ -309,7 +309,11 @@
       return '<li><a href="#' + id + '" data-sec="' + id + '"><span lang="fr">' + esc(p.name || id) + '</span></a></li>' + kids.map(nav).join('');
     }
     document.getElementById('menu-body').innerHTML =
-      '<ol class="extra top-link"><li><a href="#" data-sec="home"><span class="n">⌂</span><span>' + esc(t('home')) + '</span></a></li></ol>' +
+      '<ol class="extra top-link"><li><a href="#" data-sec="home"><span class="n">⌂</span><span>' + esc(t('home')) + '</span></a></li>' +
+      (isAdmin() ? '<li class="has-kids sq-menu"><a href="#esquadra" data-sec="esquadra-top"><span class="n">⚑</span><span>' + esc(t('sq_my')) + '</span></a><ol class="sub">' +
+        [['esquadra', 'members'], ['esquadra-assistencia', 'sq_attend'], ['esquadra-esdeveniments', 'sq_events']].map(function (x) {
+          return '<li><a href="#' + x[0] + '" data-sec="' + x[0] + '"><span>' + esc(t(x[1])) + '</span></a></li>';
+        }).join('') + '</ol></li>' : '') + '</ol>' +
       '<p>' + esc(t('index')) + '</p><ol class="menu-items">' + S.children[''].map(nav).join('') + '</ol>' +
       '<ol class="extra"><li><a href="#regulacions" data-sec="regulacions"><span class="n">§</span><span>' + esc(L((S.site.regs || {}).title) || t('regs_page')) + '</span></a></li>' +
       '<li><a href="#decisions" data-sec="decisions"><span class="n">·</span><span>' + esc(L((S.site.decisions || {}).title) || t('decisions')) + '</span></a></li>' +
@@ -465,6 +469,7 @@
     else if (id === 'registre') { html = homeView(); setTimeout(function () { history.replaceState(null, '', location.pathname); openRegister(); }, 0); }
     else if (id === 'compte') html = accountView();
     else if (id === 'gestio') html = adminView();
+    else if (SQ_ROUTES[id]) html = squadView(id);
     else if (id === 'nova') html = newPageView();
     else if (id === 'contrasenya') html = newPasswordView();
     else if (S.byId[id]) html = isSection(id) ? sectionView(id) : pageView(id);
@@ -481,6 +486,7 @@
     fillEditMeta();
     cmMount(id);
     if (id === 'gestio' && isAdmin()) loadMembers();
+    if (SQ_ROUTES[id] && isAdmin()) loadSquad();
     document.title = (S.byId[id] ? (S.byId[id].name + ' · ') : '') + '9e Légère';
   }
 
@@ -516,7 +522,7 @@
     }).join('') + '</p>';
     var decLink = '<p class="about-link"><a class="tlink" href="#decisions">' + esc(L((S.site.decisions || {}).title) || t('decisions')) + '</a></p>';
     var srcLink = '<p class="about-link"><a class="tlink" href="#fonts">' + esc(L((S.site.fonts || {}).title) || t('sources')) + '</a> <a class="tlink" href="#regulacions">' + esc(L((S.site.regs || {}).title) || t('regs_page')) + '</a></p>';
-    var chips = '<p class="about-tabs">' + chip('proposed') + chip('pending') + '<span class="chip gaps">' + esc(t('t_gaps')) + '</span></p>';
+    var chips = '<p class="about-tabs">' + chip('proposed') + chip('pending') + '<span class="sq-chip gaps">' + esc(t('t_gaps')) + '</span></p>';
     return '<section class="view home" data-view="home">' +
       '<header class="home-hero">' + '<span class="mark mark-lg" aria-hidden="true"></span>' +
       F(P('eyebrow'), V('eyebrow'), 'div', 'eyebrow', { raw: 1, single: 1 }) +
@@ -2586,7 +2592,7 @@
     return loadProfile().then(loadPrivate).then(function () {
       searchIndex = null;
       if (!isAdmin()) { S.edit = false; S.draft = null; }
-      S.dir = null; S.cmts = {};
+      S.dir = null; S.cmts = {}; S.sq = null;
       render(); loadNotifs();
     }).catch(fail);
   }
@@ -2611,6 +2617,322 @@
       }, 0);
     });
   }
+  /* ------------------------------------------------------------------ my squad (administrators only for now) */
+  // a list per squad: people with a web account are added automatically, others are entered by hand
+  var SQ_BASE = ['first_name', 'last_name', 'nom_guerre', 'rank', 'birth_date', 'joined_9e', 'email'];
+  var SQ_ROUTES = { esquadra: 'members', 'esquadra-assistencia': 'attend', 'esquadra-esdeveniments': 'events' };
+  var SQ_SECS = ['equipement', 'petit-equipement', 'entretien'];
+  var KIT_VALS = ['ok', 'missing', 'wrong'];
+  function sqState() {
+    if (!S.sq) S.sq = { squad: (S.profile && S.profile.esquadra) || ((S.squads[0] || {}).name) || '', view: 'list', aview: 'grid', sec: '', loaded: '', rows: [], events: [], set: {} };
+    return S.sq;
+  }
+  function sqName(m) { return sqv(m, 'nom_guerre') || ((sqv(m, 'first_name') || '') + ' ' + (sqv(m, 'last_name') || '')).trim() || '—'; }
+  function sqFull(m) { return ((sqv(m, 'first_name') || '') + ' ' + (sqv(m, 'last_name') || '')).trim(); }
+  function sqv(m, k) {
+    if (SQ_BASE.indexOf(k) > -1) return m._p ? m._p[k] : m[k];
+    return (m.extra || {})[k];
+  }
+  function sqCols() {
+    var st = sqState().set || {}, hide = st.hide || [];
+    return SQ_BASE.filter(function (k) { return hide.indexOf(k) < 0; }).map(function (k) { return { k: k, label: t(k === 'joined_9e' ? 'joined' : k), base: 1 }; })
+      .concat((st.extra || []).map(function (c) { return { k: c.id, label: c.label }; }));
+  }
+  function squadView(id) {
+    var title = t('sq_my');
+    if (!isAdmin()) return '<section class="view narrow"><h2 class="page-title" tabindex="-1">' + esc(title) + '</h2>' + lockedHtml() + '</section>';
+    var Q = sqState(), names = S.squads.map(function (s) { return s.name; });
+    if (Q.squad && names.indexOf(Q.squad) < 0) names.push(Q.squad);
+    var tabs = [['esquadra', 'members'], ['esquadra-assistencia', 'sq_attend'], ['esquadra-esdeveniments', 'sq_events']];
+    return '<section class="view squad-view" data-view="' + id + '"><p class="crumb"><a href="#">' + esc(t('home')) + '</a> <span aria-hidden="true">/</span> ' + esc(title) + '</p>' +
+      '<div class="sq-head"><h2 class="page-title" tabindex="-1">' + esc(title) + '</h2>' +
+      '<label class="sq-pick"><span>' + esc(t('esquadra')) + '</span><select id="sq-squad"><option value="">' + esc(t('choose')) + '</option>' +
+      names.map(function (n) { return '<option' + (n === Q.squad ? ' selected' : '') + '>' + esc(n) + '</option>'; }).join('') + '</select></label></div>' +
+      '<p class="muted sq-note">' + esc(t('sq_admin_only')) + '</p>' +
+      '<nav class="tabs sq-tabs" aria-label="' + esc(title) + '">' + tabs.map(function (x) {
+        return '<a href="#' + x[0] + '"' + (x[0] === id ? ' aria-current="page"' : '') + '>' + esc(t(x[1])) + '</a>';
+      }).join('') + '</nav>' +
+      '<div id="sq" class="members-wide">' + (SQ_ROUTES[id] === 'events' ? '<p class="sq-soon">' + esc(t('sq_events_soon')) + '</p>' : '<p class="muted">' + esc(t('loading')) + '</p>') + '</div></section>';
+  }
+  function loadSquad(force) {
+    var Q = sqState(), sq = Q.squad, box = document.getElementById('sq');
+    if (!box || SQ_ROUTES[routeId()] === 'events') return;
+    if (!sq) { box.innerHTML = '<p class="muted">' + esc(t('sq_no_squad')) + '</p>'; return; }
+    if (!force && Q.loaded === sq) { drawSquad(); return; }
+    Promise.all([
+      sb.from('squad_rosters').select('*').eq('squad', sq).maybeSingle(),
+      sb.from('squad_members').select('*').order('sort').order('created_at'),
+      sb.from('squad_events').select('*').eq('squad', sq).order('year', { ascending: true }).order('created_at'),
+      sb.from('profiles').select('id,first_name,last_name,nom_guerre,rank,birth_date,joined_9e,email,esquadra,status').eq('status', 'approved')
+    ]).then(function (r) {
+      var set = q(r[0]), all = q(r[1]) || [], evs = q(r[2]) || [], prof = q(r[3]) || [];
+      var byP = {}, linked = {}, jobs = [], top = 0;
+      prof.forEach(function (p) { byP[p.id] = p; });
+      all.forEach(function (m) { if (m.profile_id) linked[m.profile_id] = m; if (m.squad === sq) top = Math.max(top, m.sort || 0); });
+      // web members of this squad get a row; a row with a web account follows the squad of that account
+      prof.forEach(function (p) {
+        if (p.esquadra === sq && !linked[p.id]) jobs.push(sb.from('squad_members').insert({ squad: sq, profile_id: p.id, sort: ++top }).select().single().then(q));
+      });
+      all.forEach(function (m) {
+        var p = m.profile_id && byP[m.profile_id];
+        if (p && p.esquadra && p.esquadra !== m.squad) { jobs.push(sb.from('squad_members').update({ squad: p.esquadra }).eq('id', m.id).then(q)); m.squad = p.esquadra; }
+      });
+      return Promise.all(jobs).then(function (added) {
+        added.forEach(function (x) { if (x && x.id) all.push(x); });
+        if (sqState().squad !== sq) return;
+        Q.set = (set && set.settings) || {};
+        Q.rows = all.filter(function (m) { return m.squad === sq; }).map(function (m) { m._p = m.profile_id ? byP[m.profile_id] || null : null; return m; });
+        Q.events = evs;
+        Q.loaded = sq;
+        drawSquad();
+      });
+    }).catch(fail);
+  }
+  function drawSquad() {
+    var Q = sqState(), box = document.getElementById('sq'), part = SQ_ROUTES[routeId()];
+    if (!box || !part || part === 'events') return;
+    var html = part === 'members' ? (Q.view === 'kit' ? sqKitHtml() : sqListHtml()) : (Q.aview === 'stats' ? sqStatsHtml() : sqAttendHtml());
+    var sx = box.querySelector('.table-wrap'), left = sx ? sx.scrollLeft : 0;
+    box.innerHTML = html;
+    sx = box.querySelector('.table-wrap'); if (sx) sx.scrollLeft = left;
+  }
+  function sqSwitch(a, b, cur, act) {
+    return '<div class="sq-switch" role="group">' + [a, b].map(function (x) {
+      return '<button type="button" class="seg' + (x[0] === cur ? ' on' : '') + '" aria-pressed="' + (x[0] === cur) + '" data-sq="' + act + '" data-v="' + x[0] + '">' + esc(t(x[1])) + '</button>';
+    }).join('') + '</div>';
+  }
+  /* member list */
+  function sqCell(m, c) {
+    var v = sqv(m, c.k), web = m._p && c.base;
+    if (web) {
+      if (c.k === 'birth_date') return esc(v ? fmtDate(v) : '');
+      if (c.k === 'joined_9e') return esc(v ? new Date(String(v).slice(0, 7) + '-01T12:00:00').toLocaleDateString(S.lang, { month: 'short', year: 'numeric' }) : '');
+      return esc(v || '');
+    }
+    var ar = ' data-sk="' + esc(c.k) + '" aria-label="' + esc(c.label) + '"';
+    if (c.k === 'rank') return '<select' + ar + '><option value=""></option>' + RANKS.map(function (r) { return '<option' + (r === v ? ' selected' : '') + '>' + esc(r) + '</option>'; }).join('') + (v && RANKS.indexOf(v) < 0 ? '<option selected>' + esc(v) + '</option>' : '') + '</select>';
+    if (c.k === 'birth_date') return '<input type="date"' + ar + ' value="' + esc(v || '') + '" min="1900-01-01" max="' + new Date().toISOString().slice(0, 10) + '">';
+    if (c.k === 'joined_9e') {
+      var y0 = new Date().getFullYear(), cy = (v || '').slice(0, 4), cm = (v || '').slice(5, 7), ys = '', ms = '', i;
+      for (i = y0; i >= 1970; i--) ys += '<option' + (String(i) === cy ? ' selected' : '') + '>' + i + '</option>';
+      for (i = 1; i <= 12; i++) { var mm = (i < 10 ? '0' : '') + i; ms += '<option value="' + mm + '"' + (mm === cm ? ' selected' : '') + '>' + esc(new Date(2000, i - 1, 1).toLocaleDateString(S.lang, { month: 'short' })) + '</option>'; }
+      return '<span class="mem-joined"><select data-sk="jm" aria-label="' + esc(t('month')) + '"><option value=""></option>' + ms + '</select><select data-sk="jy" aria-label="' + esc(t('year')) + '"><option value=""></option>' + ys + '</select></span>';
+    }
+    return '<input type="' + (c.k === 'email' ? 'email' : 'text') + '"' + ar + ' value="' + esc(v || '') + '" maxlength="120">';
+  }
+  function sqListHtml() {
+    var Q = sqState(), cols = sqCols(), hide = (Q.set.hide || []);
+    var bar = '<div class="sq-bar">' + sqSwitch(['list', 'sq_list'], ['kit', 'sq_kit'], 'list', 'view') +
+      '<button type="button" class="btn" data-sq="add-row">+ ' + esc(t('sq_add_row')) + '</button>' +
+      '<button type="button" class="btn-ghost" data-sq="add-col">+ ' + esc(t('sq_add_col')) + '</button>' +
+      hide.map(function (k) { return '<button type="button" class="btn-small" data-sq="show-col" data-k="' + k + '">' + esc(t('sq_show')) + ': ' + esc(t(k === 'joined_9e' ? 'joined' : k)) + '</button>'; }).join('') + '</div>';
+    var head = '<thead><tr>' + cols.map(function (c) {
+      return '<th scope="col"><span class="sq-th">' + esc(c.label) + '<button type="button" class="mini del" data-sq="' + (c.base ? 'hide-col' : 'del-col') + '" data-k="' + esc(c.k) + '" title="' + esc(t(c.base ? 'sq_hide_col' : 'sq_del_col')) + '" aria-label="' + esc(t(c.base ? 'sq_hide_col' : 'sq_del_col') + ': ' + c.label) + '">×</button></span></th>';
+    }).join('') + '<th scope="col"><span class="sr-only">' + esc(t('remove')) + '</span></th></tr></thead>';
+    var body = '<tbody>' + (Q.rows.length ? Q.rows.map(function (m) {
+      return '<tr data-sid="' + m.id + '"' + (m._p ? ' class="sq-webrow"' : '') + '>' + cols.map(function (c) { return '<td>' + sqCell(m, c) + '</td>'; }).join('') +
+        '<td class="sq-act">' + (m._p ? '<span class="sq-badge" title="' + esc(t('sq_web_hint')) + '">' + esc(t('sq_web')) + '</span>'
+          : '<button type="button" class="mini del" data-sq="del-row" title="' + esc(t('sq_del_row')) + '" aria-label="' + esc(t('sq_del_row')) + '">🗑</button>') + '</td></tr>';
+    }).join('') : '<tr><td colspan="' + (cols.length + 1) + '" class="muted">' + esc(t('no_members')) + '</td></tr>') + '</tbody>';
+    return bar + '<div class="table-wrap"><table class="members sq-table">' + head + body + '</table></div>';
+  }
+  /* uniform level: one group of columns per item (shako), one column for the item and each of its sub-pieces (cordon, plaque…) */
+  function sqKitGroups() {
+    var Q = sqState(), secs = (Q.sec ? [Q.sec] : SQ_SECS).filter(function (s) { return S.byId[s]; }), out = [];
+    function desc(id) { var r = []; (S.children[id] || []).forEach(function (x) { if (!isSection(x)) { r.push(x); r = r.concat(desc(x)); } }); return r; }
+    function walk(sec) {
+      (S.children[sec] || []).forEach(function (id) {
+        if (isSection(id)) { walk(id); return; }
+        var ids = [id].concat(desc(id));
+        out.push({ id: id, name: S.byId[id].name || id, cols: ids.map(function (x) { return { key: x, label: ids.length > 1 ? (S.byId[x].name || x) : '' }; }) });
+      });
+    }
+    secs.forEach(walk);
+    return out;
+  }
+  function sqKitSel(m, key, label) {
+    var v = (m.kit || {})[key] || '';
+    return '<select class="kit k-' + (v || 'none') + '" data-kk="' + esc(key) + '" aria-label="' + esc(sqName(m) + ' · ' + label) + '"><option value="">·</option>' +
+      KIT_VALS.map(function (x) { return '<option value="' + x + '"' + (x === v ? ' selected' : '') + '>' + esc(t('sq_' + x)) + '</option>'; }).join('') + '</select>';
+  }
+  function sqKitHtml() {
+    var Q = sqState(), groups = sqKitGroups(), keys = [];
+    groups.forEach(function (g) { g.cols.forEach(function (c) { keys.push(c.key); }); });
+    var chips = [['', t('sq_all')]].concat(SQ_SECS.filter(function (s) { return S.byId[s]; }).map(function (s) { return [s, plain(L((S.byId[s].content || {}).h2)) || S.byId[s].name]; }));
+    var bar = '<div class="sq-bar">' + sqSwitch(['list', 'sq_list'], ['kit', 'sq_kit'], 'kit', 'view') +
+      '<div class="sq-chips" role="group">' + chips.map(function (c) {
+        return '<button type="button" class="sq-chip' + (Q.sec === c[0] ? ' on' : '') + '" aria-pressed="' + (Q.sec === c[0]) + '" data-sq="sec" data-v="' + c[0] + '">' + esc(c[1]) + '</button>';
+      }).join('') + '</div>' +
+      '<p class="sq-legend"><span class="k-ok">' + esc(t('sq_ok')) + '</span><span class="k-missing">' + esc(t('sq_missing')) + '</span><span class="k-wrong">' + esc(t('sq_wrong')) + '</span></p></div>';
+    var h1 = '<tr><th scope="col" rowspan="2" class="sq-stick">' + esc(t('sq_soldier')) + '</th><th scope="col" rowspan="2" class="sq-score">' + esc(t('sq_ok')) + '</th>' +
+      groups.map(function (g) {
+        var one = g.cols.length === 1 && !g.cols[0].label;
+        return '<th scope="colgroup" class="grp"' + (one ? ' rowspan="2"' : ' colspan="' + g.cols.length + '"') + '><a href="#' + g.id + '" lang="fr">' + esc(g.name) + '</a></th>';
+      }).join('') + '</tr>';
+    var h2 = '<tr>' + groups.map(function (g) {
+      return g.cols.length === 1 && !g.cols[0].label ? '' : g.cols.map(function (c, i) { return '<th scope="col" class="sub' + (i === 0 ? ' g0' : '') + '"><a href="#' + c.key + '" lang="fr">' + esc(c.label) + '</a></th>'; }).join('');
+    }).join('') + '</tr>';
+    var body = Q.rows.length ? Q.rows.map(function (m) {
+      var ok = keys.filter(function (k) { return (m.kit || {})[k] === 'ok'; }).length;
+      return '<tr data-sid="' + m.id + '"><th scope="row" class="sq-stick"><strong>' + esc(sqName(m)) + '</strong>' + (sqv(m, 'nom_guerre') && sqFull(m) ? '<span>' + esc(sqFull(m)) + '</span>' : '') + '</th>' +
+        '<td class="sq-score">' + ok + '/' + keys.length + '</td>' +
+        groups.map(function (g) { return g.cols.map(function (c, i) { return '<td' + (i === 0 ? ' class="g0"' : '') + '>' + sqKitSel(m, c.key, g.name + (c.label ? ' · ' + c.label : '')) + '</td>'; }).join(''); }).join('') + '</tr>';
+    }).join('') : '<tr><td colspan="' + (keys.length + 2) + '" class="muted">' + esc(t('no_members')) + '</td></tr>';
+    return bar + '<p class="muted sq-hint">' + esc(t('sq_kit_hint')) + '</p><div class="table-wrap sq-kitwrap"><table class="sq-kit"><thead>' + h1 + h2 + '</thead><tbody>' + body + '</tbody></table></div>';
+  }
+  /* attendance: events in rows, members in columns */
+  function sqAttendHtml() {
+    var Q = sqState(), ev = Q.events, rows = Q.rows;
+    var bar = '<div class="sq-bar">' + sqSwitch(['grid', 'sq_grid'], ['stats', 'sq_analysis'], 'grid', 'aview') + '</div>';
+    var add = '<form class="form inline sq-evform" id="f-sq-ev"><strong>' + esc(t('sq_new_ev')) + '</strong>' +
+      '<input name="name" required maxlength="120" placeholder="' + esc(t('sq_event')) + '" aria-label="' + esc(t('sq_event')) + '">' +
+      '<input name="year" type="number" min="1900" max="2100" value="' + new Date().getFullYear() + '" aria-label="' + esc(t('year')) + '">' +
+      '<input name="country" maxlength="60" placeholder="' + esc(t('sq_country')) + '" aria-label="' + esc(t('sq_country')) + '">' +
+      '<button class="btn" type="submit">' + esc(t('sq_add_ev')) + '</button></form>';
+    var head = '<thead><tr><th scope="col" class="sq-stick">' + esc(t('sq_event')) + '</th><th scope="col">' + esc(t('year')) + '</th><th scope="col">' + esc(t('sq_country')) + '</th>' +
+      rows.map(function (m) { return '<th scope="col" class="sq-mem"><strong>' + esc(sqName(m)) + '</strong>' + (sqv(m, 'nom_guerre') && sqFull(m) ? '<span>' + esc(sqFull(m)) + '</span>' : '') + '</th>'; }).join('') +
+      '<th scope="col">' + esc(t('sq_total')) + '</th><th scope="col"><span class="sr-only">' + esc(t('remove')) + '</span></th></tr></thead>';
+    var body = ev.length ? ev.map(function (e) {
+      var att = e.attendees || [], n = rows.filter(function (m) { return att.indexOf(m.id) > -1; }).length;
+      return '<tr data-eid="' + e.id + '"><th scope="row" class="sq-stick"><input data-ek="name" value="' + esc(e.name || '') + '" maxlength="120" aria-label="' + esc(t('sq_event')) + '"></th>' +
+        '<td><input data-ek="year" type="number" min="1900" max="2100" value="' + esc(e.year || '') + '" aria-label="' + esc(t('year')) + '" class="sq-year"></td>' +
+        '<td><input data-ek="country" value="' + esc(e.country || '') + '" maxlength="60" aria-label="' + esc(t('sq_country')) + '"></td>' +
+        rows.map(function (m) { return '<td class="sq-chk"><input type="checkbox" data-att="' + m.id + '"' + (att.indexOf(m.id) > -1 ? ' checked' : '') + ' aria-label="' + esc(sqName(m) + ' · ' + (e.name || '')) + '"></td>'; }).join('') +
+        '<td class="sq-num">' + n + '</td><td class="sq-act"><button type="button" class="mini del" data-sq="del-ev" title="' + esc(t('remove')) + '" aria-label="' + esc(t('remove')) + '">🗑</button></td></tr>';
+    }).join('') : '<tr><td colspan="' + (rows.length + 5) + '" class="muted">' + esc(t('sq_no_events')) + '</td></tr>';
+    return bar + add + '<div class="table-wrap"><table class="members sq-att">' + head + '<tbody>' + body + '</tbody></table></div>';
+  }
+  function sqStatsHtml() {
+    var Q = sqState(), ev = Q.events, rows = Q.rows;
+    var bar = '<div class="sq-bar">' + sqSwitch(['grid', 'sq_grid'], ['stats', 'sq_analysis'], 'stats', 'aview') + '</div>';
+    if (!ev.length) return bar + '<p class="muted">' + esc(t('sq_no_events')) + '</p>';
+    var ids = {}; rows.forEach(function (m) { ids[m.id] = 1; });
+    var cnt = function (e) { return (e.attendees || []).filter(function (x) { return ids[x]; }).length; };
+    var pct = function (a, b) { return b ? Math.round(100 * a / b) : 0; };
+    var meter = function (p) { return '<span class="sq-meter"><span style="width:' + p + '%"></span></span> ' + p + '%'; };
+    var total = 0; ev.forEach(function (e) { total += cnt(e); });
+    var avg = ev.length ? total / ev.length : 0;
+    var kpi = '<div class="sq-kpis"><div><b>' + ev.length + '</b><span>' + esc(t('sq_n_ev')) + '</span></div><div><b>' + rows.length + '</b><span>' + esc(t('sq_n_mem')) + '</span></div>' +
+      '<div><b>' + avg.toFixed(1).replace('.', ',') + '</b><span>' + esc(t('sq_avg')) + '</span></div><div><b>' + pct(avg, rows.length) + '%</b><span>' + esc(t('sq_share')) + '</span></div></div>';
+    var per = rows.map(function (m) {
+      var mine = ev.filter(function (e) { return (e.attendees || []).indexOf(m.id) > -1; }), cs = {}, last = 0;
+      mine.forEach(function (e) { if (e.country) cs[norm(e.country)] = 1; if (e.year > last) last = e.year; });
+      return { m: m, n: mine.length, c: Object.keys(cs).length, last: last };
+    }).sort(function (a, b) { return b.n - a.n || sqName(a.m).localeCompare(sqName(b.m), S.lang); });
+    var t1 = '<h3>' + esc(t('sq_by_member')) + '</h3><div class="table-wrap"><table class="sq-stats"><thead><tr><th scope="col">' + esc(t('sq_soldier')) + '</th><th scope="col">' + esc(t('sq_attended')) + '</th><th scope="col">' + esc(t('sq_share')) + '</th><th scope="col">' + esc(t('sq_countries')) + '</th><th scope="col">' + esc(t('sq_last')) + '</th></tr></thead><tbody>' +
+      per.map(function (x) {
+        return '<tr><th scope="row"><strong>' + esc(sqName(x.m)) + '</strong>' + (sqv(x.m, 'nom_guerre') && sqFull(x.m) ? ' <span class="muted">' + esc(sqFull(x.m)) + '</span>' : '') + '</th><td class="sq-num">' + x.n + ' / ' + ev.length + '</td><td>' + meter(pct(x.n, ev.length)) + '</td><td class="sq-num">' + x.c + '</td><td class="sq-num">' + (x.last || '—') + '</td></tr>';
+      }).join('') + '</tbody></table></div>';
+    function grouped(list, keyf, label) {
+      var g = {}, order = [];
+      list.forEach(function (e) { var k = keyf(e) || '—'; if (!g[k]) { g[k] = { n: 0, a: 0 }; order.push(k); } g[k].n++; g[k].a += cnt(e); });
+      return '<section class="sq-group"><h3>' + esc(label) + '</h3><div class="table-wrap"><table class="sq-stats"><thead><tr><th scope="col">' + esc(label) + '</th><th scope="col">' + esc(t('sq_n_ev')) + '</th><th scope="col">' + esc(t('sq_avg')) + '</th><th scope="col">' + esc(t('sq_share')) + '</th></tr></thead><tbody>' +
+        order.map(function (k) { var a = g[k].a / g[k].n; return '<tr><th scope="row">' + esc(k) + '</th><td class="sq-num">' + g[k].n + '</td><td class="sq-num">' + a.toFixed(1).replace('.', ',') + '</td><td>' + meter(pct(a, rows.length)) + '</td></tr>'; }).join('') + '</tbody></table></div></section>';
+    }
+    var newest = ev.slice().sort(function (a, b) { return (b.year || 0) - (a.year || 0); });
+    var byCountry = ev.slice().sort(function (a, b) { return (a.country || '').localeCompare(b.country || '', S.lang); });
+    return bar + kpi + t1 + '<div class="sq-two">' + grouped(newest, function (e) { return e.year ? String(e.year) : ''; }, t('sq_by_year')) +
+      grouped(byCountry, function (e) { return (e.country || '').trim(); }, t('sq_by_country')) + '</div>';
+  }
+  function sqRow(el) { var tr = el.closest && el.closest('[data-sid]'), Q = sqState(); return tr && Q.rows.filter(function (m) { return m.id === tr.getAttribute('data-sid'); })[0]; }
+  function sqEv(el) { var tr = el.closest && el.closest('[data-eid]'), Q = sqState(); return tr && Q.events.filter(function (e) { return e.id === tr.getAttribute('data-eid'); })[0]; }
+  function sqSaveSet() {
+    var Q = sqState();
+    return track(t('saving'), sb.from('squad_rosters').upsert({ squad: Q.squad, settings: Q.set }, { onConflict: 'squad' }).then(q)).then(drawSquad).catch(fail);
+  }
+  document.addEventListener('click', function (e) {
+    var el = e.target.closest && e.target.closest('[data-sq]'); if (!el || !S.sq) return;
+    var Q = S.sq, act = el.getAttribute('data-sq'), k = el.getAttribute('data-k');
+    if (act === 'view') { Q.view = el.getAttribute('data-v'); drawSquad(); return; }
+    if (act === 'aview') { Q.aview = el.getAttribute('data-v'); drawSquad(); return; }
+    if (act === 'sec') { Q.sec = el.getAttribute('data-v'); drawSquad(); return; }
+    if (act === 'add-row') {
+      var top = 0; Q.rows.forEach(function (m) { top = Math.max(top, m.sort || 0); });
+      track(t('saving'), sb.from('squad_members').insert({ squad: Q.squad, sort: top + 1 }).select().single().then(q)).then(function (m) {
+        m._p = null; Q.rows.push(m); drawSquad();
+        var inp = document.querySelector('#sq tr[data-sid="' + m.id + '"] input'); if (inp) inp.focus();
+      }).catch(fail);
+      return;
+    }
+    if (act === 'del-row') {
+      var m = sqRow(el); if (!m || !window.confirm(t('sq_del_row_q'))) return;
+      track(t('deleting'), sb.from('squad_members').delete().eq('id', m.id).then(q)).then(function () {
+        Q.rows = Q.rows.filter(function (x) { return x !== m; }); drawSquad();
+      }).catch(fail);
+      return;
+    }
+    if (act === 'add-col') {
+      var name = (window.prompt(t('sq_col_name')) || '').trim(); if (!name) return;
+      Q.set.extra = (Q.set.extra || []).concat([{ id: 'c' + Date.now().toString(36), label: name.slice(0, 60) }]);
+      sqSaveSet(); return;
+    }
+    if (act === 'del-col') {
+      if (!window.confirm(t('sq_del_col_q'))) return;
+      Q.set.extra = (Q.set.extra || []).filter(function (c) { return c.id !== k; });
+      sqSaveSet(); return;
+    }
+    if (act === 'hide-col') { Q.set.hide = (Q.set.hide || []).concat([k]); sqSaveSet(); return; }
+    if (act === 'show-col') { Q.set.hide = (Q.set.hide || []).filter(function (x) { return x !== k; }); sqSaveSet(); return; }
+    if (act === 'del-ev') {
+      var ev = sqEv(el); if (!ev || !window.confirm(t('sq_del_ev_q'))) return;
+      track(t('deleting'), sb.from('squad_events').delete().eq('id', ev.id).then(q)).then(function () {
+        Q.events = Q.events.filter(function (x) { return x !== ev; }); drawSquad();
+      }).catch(fail);
+    }
+  });
+  document.addEventListener('change', function (e) {
+    var el = e.target; if (!S.sq || !el.closest || !el.closest('#sq, .sq-head')) return;
+    var Q = S.sq;
+    if (el.id === 'sq-squad') { Q.squad = el.value; Q.loaded = ''; loadSquad(true); return; }
+    var sk = el.getAttribute('data-sk'), kk = el.getAttribute('data-kk'), ek = el.getAttribute('data-ek'), att = el.getAttribute('data-att'), m, upd = {};
+    if (sk) {
+      m = sqRow(el); if (!m) return;
+      if (sk === 'jm' || sk === 'jy') {
+        var tr = el.closest('tr'), jm = tr.querySelector('[data-sk=jm]').value, jy = tr.querySelector('[data-sk=jy]').value;
+        if ((jm && !jy) || (jy && !jm)) return; // wait until both are chosen
+        upd.joined_9e = jm ? jy + '-' + jm + '-01' : null;
+      } else if (SQ_BASE.indexOf(sk) > -1) upd[sk] = el.value.trim() || null;
+      else { var ex = {}; Object.keys(m.extra || {}).forEach(function (x) { ex[x] = m.extra[x]; }); ex[sk] = el.value.trim(); upd.extra = ex; }
+      track(t('saving'), sb.from('squad_members').update(upd).eq('id', m.id).then(q)).then(function () { Object.keys(upd).forEach(function (x) { m[x] = upd[x]; }); }).catch(fail);
+      return;
+    }
+    if (kk) {
+      m = sqRow(el); if (!m) return;
+      var kit = {}; Object.keys(m.kit || {}).forEach(function (x) { kit[x] = m.kit[x]; });
+      if (el.value) kit[kk] = el.value; else delete kit[kk];
+      el.className = 'kit k-' + (el.value || 'none');
+      track(t('saving'), sb.from('squad_members').update({ kit: kit }).eq('id', m.id).then(q)).then(function () {
+        m.kit = kit;
+        var sc = el.closest('tr').querySelector('.sq-score'), n = 0, tot = sqKitGroups().reduce(function (a, g) { g.cols.forEach(function (c) { if (kit[c.key] === 'ok') n++; }); return a + g.cols.length; }, 0);
+        if (sc) sc.textContent = n + '/' + tot;
+      }).catch(fail);
+      return;
+    }
+    if (ek || att) {
+      var ev = sqEv(el); if (!ev) return;
+      if (ek) { var v = el.value.trim(); if (ek === 'name' && !v) { el.value = ev.name; return; } upd[ek] = ek === 'year' ? (parseInt(v, 10) || null) : (v || null); }
+      else {
+        var a = (ev.attendees || []).filter(function (x) { return x !== att; });
+        if (el.checked) a.push(att);
+        upd.attendees = a;
+      }
+      track(t('saving'), sb.from('squad_events').update(upd).eq('id', ev.id).then(q)).then(function () {
+        Object.keys(upd).forEach(function (x) { ev[x] = upd[x]; });
+        if (att) { var c = el.closest('tr').querySelector('.sq-num'); if (c) c.textContent = Q.rows.filter(function (m2) { return ev.attendees.indexOf(m2.id) > -1; }).length; }
+      }).catch(fail);
+    }
+  });
+  document.addEventListener('submit', function (e) {
+    if (e.target.id !== 'f-sq-ev' || !S.sq) return;
+    e.preventDefault();
+    var f = e.target.elements, Q = S.sq, name = f.name.value.trim(); if (!name) return;
+    var row = { squad: Q.squad, name: name, year: parseInt(f.year.value, 10) || null, country: f.country.value.trim() || null };
+    track(t('saving'), sb.from('squad_events').insert(row).select().single().then(q)).then(function (ev) {
+      Q.events.push(ev);
+      Q.events.sort(function (a, b) { return (a.year || 0) - (b.year || 0); });
+      drawSquad();
+    }).catch(fail);
+  });
   window.__app = { S: S, render: render }; // for debugging and tests
   start();
 })();

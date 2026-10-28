@@ -521,3 +521,74 @@ table.members input,table.members select{font-size:.9rem;padding:.2rem .3rem;min
 
 .rr-ex{display:block;color:var(--muted);font-size:.92rem;margin:.1rem 0 .5rem;max-width:48rem}
 .rr-real li.obj{border-left:3px solid var(--bleu);padding-left:.5rem}
+
+/* my squad */
+.sq-menu > a .n{font-size:.95em}
+.sq-head{display:flex;flex-wrap:wrap;gap:.6rem 1.2rem;align-items:baseline;justify-content:space-between}
+.sq-pick{display:inline-flex;gap:.5rem;align-items:center;font-family:var(--label);letter-spacing:.04em;font-size:.95rem}
+.sq-pick select{font:inherit;color:var(--ink);background:var(--sheet);border:1px solid var(--line);border-radius:3px;padding:.4rem .6rem;min-width:12rem}
+.sq-note{margin:.2rem 0 .8rem;font-size:.9rem}
+.sq-tabs a{font-family:var(--label);letter-spacing:.05em;font-size:1.02rem;color:var(--muted);text-decoration:none;border-bottom:3px solid transparent;padding:.65rem 1rem;white-space:nowrap}
+.sq-tabs a:hover{color:var(--ink)}
+.sq-tabs a[aria-current="page"]{color:var(--bleu);border-bottom-color:var(--bleu);font-weight:700}
+.sq-bar{display:flex;flex-wrap:wrap;gap:.6rem;align-items:center;margin:0 0 .8rem}
+.sq-switch{display:inline-flex;border:1px solid var(--bleu);border-radius:4px;overflow:hidden}
+.sq-switch .seg{font-family:var(--label);letter-spacing:.04em;font-size:.98rem;padding:.5rem 1rem;border:0;background:var(--sheet);color:var(--bleu);cursor:pointer}
+.sq-switch .seg + .seg{border-left:1px solid var(--bleu)}
+.sq-switch .seg.on{background:var(--bleu);color:var(--on-bleu);font-weight:700}
+.sq-chips{display:inline-flex;flex-wrap:wrap;gap:.35rem}
+.sq-chip{font-family:var(--label);letter-spacing:.04em;font-size:.9rem;padding:.4rem .8rem;border:1px solid var(--line);border-radius:999px;background:var(--sheet);color:var(--ink);cursor:pointer}
+.sq-chip.on{border-color:var(--bleu);background:var(--bleu);color:var(--on-bleu)}
+.sq-legend{display:inline-flex;gap:.4rem;margin:0 0 0 auto;font-size:.85rem}
+.sq-legend span{padding:.15rem .55rem;border-radius:3px;border:1px solid}
+.sq-hint{font-size:.88rem;margin:-.3rem 0 .6rem}
+.sq-th{display:inline-flex;gap:.3rem;align-items:center;white-space:nowrap}
+.sq-th .mini{opacity:.45}
+.sq-th:hover .mini,.sq-th .mini:focus-visible{opacity:1}
+table.sq-table tr.sq-webrow td{background:color-mix(in srgb,var(--bleu) 5%,var(--sheet))}
+.sq-badge{font-family:var(--label);font-size:.72rem;letter-spacing:.04em;padding:.1rem .45rem;border:1px solid var(--bleu);color:var(--bleu);border-radius:999px;white-space:nowrap;cursor:help}
+.sq-act{text-align:center;width:1%}
+.sq-num{text-align:center;font-variant-numeric:tabular-nums;white-space:nowrap}
+/* sticky first column for the wide grids */
+.sq-kit,.sq-att{border-collapse:separate;border-spacing:0}
+.sq-kit th,.sq-kit td{border-bottom:1px solid var(--line);border-right:1px solid color-mix(in srgb,var(--line) 50%,transparent);padding:.25rem .3rem;font-size:.85rem}
+.sq-kit thead th{background:var(--sheet);font-family:var(--label);letter-spacing:.03em;font-weight:500;vertical-align:bottom}
+.sq-kit thead th.grp{text-align:center;border-bottom:2px solid var(--bleu);font-weight:700;white-space:nowrap}
+.sq-kit thead th.grp a{color:var(--ink);text-decoration:none}
+.sq-kit thead th.sub{font-size:.76rem;color:var(--muted);max-width:7rem;line-height:1.2}
+.sq-kit .g0{border-left:2px solid var(--line)}
+.sq-stick{position:sticky;left:0;z-index:2;background:var(--sheet);text-align:left;min-width:10rem;box-shadow:2px 0 0 var(--line)}
+thead .sq-stick{z-index:3}
+.sq-stick strong{display:block}
+.sq-stick span,.sq-mem span{display:block;font-size:.78rem;color:var(--muted);font-weight:400}
+.sq-score{text-align:center;font-variant-numeric:tabular-nums;white-space:nowrap;font-weight:700}
+select.kit{font:inherit;font-size:.8rem;border:1px solid var(--line);border-radius:3px;padding:.15rem .2rem;min-width:5.6rem;cursor:pointer;color:var(--ink);background:var(--sheet)}
+.k-ok{background:color-mix(in srgb,#2e8b57 22%,var(--sheet))!important;border-color:#2e8b57!important;color:var(--ink)}
+.k-missing{background:color-mix(in srgb,#d9a521 30%,var(--sheet))!important;border-color:#b8860b!important;color:var(--ink)}
+.k-wrong{background:color-mix(in srgb,#c0392b 22%,var(--sheet))!important;border-color:#c0392b!important;color:var(--ink)}
+select.kit.k-none{color:var(--muted)}
+.sq-att th.sq-mem{min-width:6.5rem;text-align:center;font-weight:500}
+.sq-att .sq-stick input{min-width:12rem}
+.sq-att input.sq-year{min-width:5rem;width:5.5rem}
+.sq-chk{text-align:center}
+table.sq-att .sq-chk input{width:1.35rem;height:1.35rem;min-width:0;cursor:pointer;accent-color:var(--bleu)}
+.sq-evform{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center;margin:0 0 .9rem;padding:.7rem .8rem;border:1px solid var(--line);background:var(--sheet);border-radius:4px}
+.sq-evform input{font:inherit;color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:3px;padding:.4rem .6rem}
+.sq-evform input[name=name]{flex:1 1 14rem}
+.sq-evform input[name=year]{width:6rem}
+.sq-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(9rem,1fr));gap:.6rem;margin:0 0 1.2rem}
+.sq-kpis div{border:1px solid var(--line);background:var(--sheet);border-radius:4px;padding:.7rem .9rem}
+.sq-kpis b{display:block;font-size:1.6rem;color:var(--bleu);font-variant-numeric:tabular-nums}
+.sq-kpis span{font-size:.85rem;color:var(--muted)}
+table.sq-stats{width:100%;border-collapse:collapse;font-size:.92rem}
+table.sq-stats th,table.sq-stats td{padding:.35rem .6rem;border-bottom:1px solid var(--line);text-align:left}
+table.sq-stats thead th{font-family:var(--label);letter-spacing:.03em;font-weight:500;color:var(--muted)}
+.sq-meter{display:inline-block;vertical-align:middle;width:8rem;height:.55rem;background:var(--quote-bg);border-radius:999px;overflow:hidden}
+.sq-meter span{display:block;height:100%;background:var(--bleu)}
+.sq-two{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,24rem),1fr));gap:0 1.5rem}
+.sq-soon{border:1px dashed var(--line);background:var(--sheet);padding:1.2rem 1.4rem;border-radius:4px;max-width:44rem}
+.sq-kit thead th.sub a{color:inherit;text-decoration:none}
+form.sq-evform input[name=year]{flex:0 0 6.5rem;width:6.5rem}
+form.sq-evform input[name=country]{flex:0 1 13rem}
+table.sq-att input[data-ek=country]{max-width:12rem}
+table.sq-att input[data-ek=year]{max-width:6rem}
