@@ -311,7 +311,7 @@
     }
     document.getElementById('menu-body').innerHTML =
       '<ol class="extra top-link"><li><a href="#" data-sec="home"><span class="n">⌂</span><span>' + esc(t('home')) + '</span></a></li>' +
-      (isAdmin() ? '<li class="has-kids sq-menu"><a href="#esquadra" data-sec="esquadra-top"><span class="n">⚑</span><span>' + esc(t('sq_my')) + '</span></a><ol class="sub">' +
+      (isMember() ? '<li class="has-kids sq-menu"><a href="#esquadra" data-sec="esquadra-top"><span class="n">⚑</span><span>' + esc(t('sq_my')) + '</span></a><ol class="sub">' +
         [['esquadra', 'members'], ['esquadra-assistencia', 'sq_attend'], ['esquadra-esdeveniments', 'sq_events']].map(function (x) {
           return '<li><a href="#' + x[0] + '" data-sec="' + x[0] + '"><span>' + esc(t(x[1])) + '</span></a></li>';
         }).join('') + '</ol></li>' : '') + '</ol>' +
@@ -2649,7 +2649,7 @@
       }, 0);
     });
   }
-  /* ------------------------------------------------------------------ my squad (administrators only for now) */
+  /* ------------------------------------------------------------------ my squad (every approved member) */
   // a list per squad: people with a web account are added automatically, others are entered by hand
   var SQ_BASE = ['first_name', 'last_name', 'nom_guerre', 'rank', 'birth_date', 'joined_9e', 'email'];
   var SQ_ROUTES = { esquadra: 'members', 'esquadra-assistencia': 'attend', 'esquadra-esdeveniments': 'events' };
@@ -2684,7 +2684,7 @@
   }
   function squadView(id) {
     var title = t('sq_my');
-    if (!isAdmin()) return '<section class="view narrow"><h2 class="page-title" tabindex="-1">' + esc(title) + '</h2>' + lockedHtml() + '</section>';
+    if (!isMember()) return '<section class="view narrow"><h2 class="page-title" tabindex="-1">' + esc(title) + '</h2>' + lockedHtml() + '</section>';
     var Q = sqState(), names = S.squads.map(function (s) { return s.name; });
     Q.squads.forEach(function (n) { if (names.indexOf(n) < 0) names.push(n); });
     var tabs = [['esquadra', 'members'], ['esquadra-assistencia', 'sq_attend'], ['esquadra-esdeveniments', 'sq_events']];
@@ -2692,7 +2692,6 @@
       '<div class="sq-head"><h2 class="page-title" tabindex="-1">' + esc(title) + '</h2>' +
       '<details class="sq-pick sq-sel"><summary>' + esc(t('esquadra')) + ': <strong>' + esc(Q.squads.join(' + ') || t('choose')) + '</strong></summary><div class="acct-pop sq-pop"><p class="muted">' + esc(t('sq_sel_hint')) + '</p>' +
       names.map(function (n) { return '<label><input type="checkbox" data-sqsel="1" value="' + esc(n) + '"' + (Q.squads.indexOf(n) > -1 ? ' checked' : '') + '> ' + esc(n) + '</label>'; }).join('') + '</div></details></div>' +
-      '<p class="muted sq-note">' + esc(t('sq_admin_only')) + '</p>' +
       '<nav class="tabs sq-tabs" aria-label="' + esc(title) + '">' + tabs.map(function (x) {
         return '<a href="#' + x[0] + '"' + (x[0] === id ? ' aria-current="page"' : '') + '>' + esc(t(x[1])) + '</a>';
       }).join('') + '</nav>' +
@@ -2712,7 +2711,7 @@
       sb.from('squad_rosters').select('*').eq('squad', sq).maybeSingle(),
       sb.from('squad_members').select('*').order('sort').order('created_at'),
       sb.from('squad_events').select('*').in('squad', sqs).order('year', { ascending: true, nullsFirst: true }).order('created_at'),
-      sb.from('profiles').select('id,first_name,last_name,nom_guerre,rank,birth_date,joined_9e,email,esquadra,status').eq('status', 'approved')
+      sb.rpc('squad_directory')
     ]).then(function (r) {
       var set = q(r[0]), all = q(r[1]) || [], evs = q(r[2]) || [], prof = q(r[3]) || [];
       var byP = {}, linked = {}, jobs = [], top = 0;
