@@ -212,6 +212,7 @@
   .mrow{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:5px 0;}
   .mrow .lbl{display:flex;flex-direction:column;min-width:0;flex:1 1 170px;}
   .mrow.stack{flex-direction:column;align-items:stretch;gap:4px;}
+  .mrow.pair{display:block;} .mrow.pair .acts{display:flex;gap:6px;} .mrow.pair .acts .act{flex:1 1 0;justify-content:center;}
   .mrow.stack .acts{justify-content:flex-start;}
   .mrow.stack .lbl{flex:none;}
   .mrow .lbl b{font-family:var(--body);font-weight:700;font-size:16px;color:var(--ink);font-style:italic;}
@@ -1295,6 +1296,28 @@ const SFX = (() => {
     const base = 2400 + Math.random() * 1400, n = 2 + Math.floor(Math.random() * 3);
     for (let i = 0; i < n; i++) tone(t + i * 0.11, base, base * (1.15 + Math.random() * .2), 0.07, 0.025, 'sine');
   }
+  // So ambient de la càrrega: capes de petits sorolls superposats (baqueta, pany, culata, paper, corretges…) mentre els homes carreguen
+  let ldT = null, ldGet = null;
+  const metal = (t, f, g) => { tone(t, f, f * 0.96, 0.05, g, 'triangle'); tone(t, f * 2.7, f * 2.5, 0.03, g * 0.35, 'sine'); noise(t, 0.02, { type: 'highpass', f: 5200, gain: g * 0.5, attack: 0.001 }); };
+  const LOADFX = [
+    [3, t => { const n = 3 + Math.floor(Math.random() * 3), f = 2300 + Math.random() * 900, d = 0.11 + Math.random() * 0.05; for (let i = 0; i < n; i++) metal(t + i * d, f * (1 + (i % 2) * 0.06), 0.035); }],        // baqueta: clinc clinc clinc
+    [2, t => { noise(t, 0.14, { type: 'bandpass', f: 1200 + Math.random() * 1800, q: 0.9, gain: 0.05, attack: 0.01 }); noise(t + 0.09, 0.1, { type: 'bandpass', f: 2400, q: 1.2, gain: 0.03, attack: 0.01 }); }],   // paper del cartutx
+    [2, t => { tone(t, 170 + Math.random() * 40, 85, 0.07, 0.07); noise(t, 0.05, { type: 'lowpass', f: 700, gain: 0.05 }); }],                                                            // culata contra el terra o la bota
+    [2, t => { metal(t, 3400, 0.03); metal(t + 0.07, 2600, 0.04); }],                                                                                                                     // pany: clic-clac
+    [3, t => { const n = 3 + Math.floor(Math.random() * 3); for (let i = 0; i < n; i++) noise(t + Math.random() * 0.25, 0.04 + Math.random() * 0.04, { f: 1500 + Math.random() * 2200, q: 1.3, gain: 0.03 + Math.random() * 0.03, attack: 0.002 }); }],   // roba i correatges
+    [1, t => { for (let i = 0; i < 3; i++) metal(t + i * 0.05, 4000 + Math.random() * 1200, 0.018); }],                                                                                      // baioneta i gots de metall
+    [1, t => { noise(t, 0.18, { type: 'bandpass', f: 400 + Math.random() * 200, q: 0.8, gain: 0.05, attack: 0.02 }); }]                                                                       // fregament de fusta (baqueta pel canó)
+  ];
+  function ldTick() {
+    if (!ldGet || screen !== 'game') { ldGet = null; ldT = null; return; }
+    const k = ldGet();
+    if (k > 0 && !paused && ready() && S.move) {
+      const tot = LOADFX.reduce((a, x) => a + x[0], 0); let r = Math.random() * tot, fx = LOADFX[0];
+      for (const x of LOADFX) { r -= x[0]; if (r <= 0) { fx = x; break; } }
+      fx[1](ac.currentTime + Math.random() * 0.05);
+    }
+    ldT = setTimeout(ldTick, (140 + Math.random() * 380) / Math.max(0.3, k || 0.3));
+  }
   function ambientStart() {
     if (!ready() || amb) return;
     const src = ac.createBufferSource(); src.buffer = noiseBuf; src.loop = true;
@@ -1328,6 +1351,8 @@ const SFX = (() => {
     },
     chime() { if (!ready()) return; const t = ac.currentTime; tone(t, 660, 660, 0.35, 0.09); tone(t + 0.12, 990, 990, 0.45, 0.08); },
     ding() { if (!ready()) return; const t = ac.currentTime; [523, 659, 784, 1046].forEach((f, i) => { tone(t + i * 0.13, f, f, 0.7, 0.1); tone(t + i * 0.13, f * 2, f * 2, 0.4, 0.03); }); },
+    loadStart(get) { ldGet = get; if (!ldT) ldTick(); },
+    loadStop() { ldGet = null; clearTimeout(ldT); ldT = null; },
     rustle() {                                       // moviment sec: roba, correatges i equip, sense cos greu
       if (!ready() || !S.move) return; const t = ac.currentTime, n = 6 + Math.floor(Math.random() * 3);
       for (let i = 0; i < n; i++) noise(t + Math.random() * 0.22, 0.03 + Math.random() * 0.035, { f: 1100 + Math.random() * 1700, q: 1.3, gain: 0.07 + Math.random() * 0.07, attack: 0.002 });
@@ -1769,6 +1794,8 @@ function feu() {
   }
 }
 function updateMusket(dt) {
+  if (co.arm === 'charge' && !co.ldSnd) { co.ldSnd = true; SFX.loadStart(() => co.arm === 'charge' ? 0.4 + 0.6 * co.members.filter(m => m.ld < 1).length / co.members.length : 0); }
+  else if (co.arm !== 'charge' && co.ldSnd) { co.ldSnd = false; SFX.loadStop(); }
   if (co.arm === 'charge') {
     let done = 0;
     for (const m of co.members) {
@@ -2772,19 +2799,19 @@ const ORDERS = [
   { id: 'CD-06', des: 1, shot: true, fam: 'form', k: 'form', sec: 'Línia aturada', fr: 'Contremarche', full: 'Contremarche!', gl: 'mitja volta de tota la unitat', icon: 'counter', cmds: ['counter'],
     avail: aturatLinia, run: () => contremarche() },
   // Mosquet (maneig i foc)
-  { id: 'MD-01', des: 0, fam: 'arm', k: 'musket', lvl: 'musket', fr: 'Portez', full: 'Portez – vos armes!', gl: 'arma a l\'espatlla: cal per moure\'s', icon: 'musket', cmds: ['portez'],
+  { id: 'MD-01', des: 0, fam: 'arm', k: 'musket', lvl: 'musket', fr: 'Portez vos armes', pair: true, full: 'Portez – vos armes!', gl: 'arma a l\'espatlla: cal per moure\'s', icon: 'musket', cmds: ['portez'],
     avail: () => armOrder(() => co.arm === 'portez' ? 'ja la tenen a l\'espatlla' : co.arm === 'joue' && co.loaded ? 'primer Redressez' : true), run: () => setArm('portez', 'Portez vos armes!') },
-  { id: 'MD-02', des: 0, fam: 'arm', k: 'musket', lvl: 'musket', fr: 'Reposez', full: 'Reposez-vous – sur vos armes!', gl: 'arma a terra: es cansen menys', icon: 'rest', cmds: ['reposez'],
+  { id: 'MD-02', des: 0, fam: 'arm', k: 'musket', lvl: 'musket', fr: 'Reposez vos armes', pair: true, full: 'Reposez-vous – sur vos armes!', gl: 'arma a terra: es cansen menys', icon: 'rest', cmds: ['reposez'],
     avail: () => armOrder(() => co.arm === 'repose' ? 'ja la tenen a terra' : co.arm !== 'portez' ? 'cal tenir-la a l\'espatlla' : true), run: () => setArm('repose', 'Reposez-vous sur vos armes!') },
-  { id: 'MD-10', des: 0, fam: 'arm', k: 'musket', lvl: 'musket', fr: 'Croisez la baïonnette', full: 'Croisez – la baïonnette!', gl: 'baioneta en càrrega, mirant endavant', icon: 'bayonet', cmds: ['croisez'],
-    avail: () => armOrder(() => co.arm === 'croise' ? 'ja la tenen creuada' : co.arm !== 'portez' ? 'cal tenir-la a l\'espatlla' : true), run: () => setArm('croise', 'Croisez la baïonnette!') },
   { id: 'LS-01', des: 0, fam: 'arm', k: 'musket', lvl: 'musket', fr: 'Chargez', full: 'Chargez – vos armes!', gl: 'carregar (uns 18 s, més si estan cansats)', icon: 'load', cmds: ['chargez'],
     avail: () => armOrder(() => co.loaded ? 'ja estan carregats' : co.arm !== 'portez' && co.arm !== 'joue' ? 'cal tenir-la a l\'espatlla' : true), run: () => startLoad() },
+  { id: 'MD-10', des: 0, fam: 'arm', k: 'musket', lvl: 'musket', fr: 'Croisez la baïonnette', full: 'Croisez – la baïonnette!', gl: 'baioneta en càrrega, mirant endavant', icon: 'bayonet', cmds: ['croisez'],
+    avail: () => armOrder(() => co.arm === 'croise' ? 'ja la tenen creuada' : co.arm !== 'portez' ? 'cal tenir-la a l\'espatlla' : true), run: () => setArm('croise', 'Croisez la baïonnette!') },
   { id: 'FI-01', des: 0, fam: 'arm', float: true, lvl: 'musket', fr: 'Apprêtez', full: 'Apprêtez – vos armes!', gl: 'preparar per disparar (cal estar carregats)', icon: 'aim', cmds: ['appretez'],
     avail: () => armOrder(() => co.arm !== 'portez' ? 'cal tenir-la a l\'espatlla' : !co.loaded ? 'primer cal carregar (Chargez)' : true), run: () => setArm('apprete', 'Apprêtez vos armes!') },
   { id: 'FI-02', des: 0, fam: 'arm', float: true, lvl: 'musket', fr: 'Joue', full: 'Joue!', gl: 'apuntar (des d\'Apprêtez)', icon: 'aim', cmds: ['joue'],
     avail: () => armOrder(() => co.arm !== 'apprete' ? 'primer Apprêtez' : true), run: () => setArm('joue', 'Joue!') },
-  { id: 'FI-03', des: 0, fam: 'arm', lvl: 'musket', fr: 'Redressez', full: 'Redressez – vos armes!', gl: 'de Joue tornen a Apprêtez sense disparar', icon: 'back', cmds: ['redressez'],
+  { id: 'FI-03', des: 0, fam: 'arm', float: true, lvl: 'musket', fr: 'Redressez', full: 'Redressez – vos armes!', gl: 'de Joue tornen a Apprêtez sense disparar', icon: 'back', cmds: ['redressez'],
     avail: () => armOrder(() => co.arm !== 'joue' || !co.loaded ? 'només apuntant amb l\'arma carregada' : true), run: () => setArm('apprete', 'Redressez vos armes!') },
   { id: 'FI-04', des: 0.15, shot: true, fam: 'arm', float: true, lvl: 'musket', fr: 'Feu', full: 'Feu!', gl: 'disparar', icon: 'aim', cmds: ['feu'],
     avail: () => armOrder(() => co.arm !== 'joue' ? 'primer Joue' : !co.loaded ? 'no estan carregats' : true), run: () => feu() }
@@ -2920,8 +2947,13 @@ function buildOrderPanel() {
       else { openMenu(f.id); famPinned = f.id; }
     });
     panel.fams[f.id] = { wrap, btn, menu, badge: btn.querySelector('.badge') };
-    for (const o of ORDERS.filter(x => x.fam === f.id && !x.float)) {
-      const r = document.createElement('div'); r.className = 'mrow';
+    const list = ORDERS.filter(x => x.fam === f.id && !x.float); let pairRow = null;
+    for (const o of list) {
+      if (o.pair && pairRow) {                           // segon botó gran d'una parella (Portez | Reposez)
+        const b = document.createElement('button'); b.className = 'act wide'; b.innerHTML = ICONS[o.icon] + '<b>' + o.fr + '</b>'; b.onclick = () => fire(o);
+        pairRow.acts.appendChild(b); panel.rows.push({ o, r: document.createElement('div'), items: [{ b, arg: undefined, cmds: o.cmds, title: orderTitle(o) }], fam: f.id }); continue;
+      }
+      const r = document.createElement('div'); r.className = 'mrow' + (o.pair ? ' pair' : '');
       const items = [];
       const mk = (html, arg, cmds, cls) => {
         const b = document.createElement('button'); b.className = 'act ' + cls; b.innerHTML = html;
@@ -2933,14 +2965,15 @@ function buildOrderPanel() {
         const acts = r.querySelector('.acts');
         acts.appendChild(mk(ICONS[o.icons[0]] + '<span>gauche</span>', -1, o.cmdsS['-1'], 'side'));
         acts.appendChild(mk('<span>droite</span>' + ICONS[o.icons[1]], 1, o.cmdsS['1'], 'side'));
-      } else { r.classList.add('one'); r.appendChild(mk(ICONS[o.icon] + '<b>' + o.fr + '</b>', undefined, o.cmds, 'wide')); }
+      } else if (o.pair) { r.innerHTML = '<div class="acts"></div>'; r.acts = r.querySelector('.acts'); r.acts.appendChild(mk(ICONS[o.icon] + '<b>' + o.fr + '</b>', undefined, o.cmds, 'wide')); pairRow = r; }
+      else { r.classList.add('one'); r.appendChild(mk(ICONS[o.icon] + '<b>' + o.fr + '</b>', undefined, o.cmds, 'wide')); }
       menu.appendChild(r);
       panel.rows.push({ o, r, items, fam: f.id });
     }
   }
   if (!document.getElementById('fireBox')) {                 // control de foc fora de la barra: Apprêtez → Joue → Feu!
     const box = document.createElement('div'); box.id = 'fireBox'; box.innerHTML = '<span class="fst"><i></i>Carregats</span>';
-    for (const [id, html, cls] of [['FI-01', ICONS.aim + '<span>Apprêtez</span>', 'fstep'], ['FI-02', ICONS.aim + '<span>Joue</span>', 'fstep'], ['FI-04', '<b>Feu!</b><small>espai</small>', 'feu']]) {
+    for (const [id, html, cls] of [['FI-01', ICONS.aim + '<span>Apprêtez</span>', 'fstep'], ['FI-02', ICONS.aim + '<span>Joue</span>', 'fstep'], ['FI-03', ICONS.back + '<span>Redressez</span>', 'fstep'], ['FI-04', '<b>Feu!</b><small>espai</small>', 'feu']]) {
       const o = ORDER_BY_ID[id], b = document.createElement('button'); b.className = cls; b.dataset.id = id; b.innerHTML = html;
       b.onclick = () => fire(o); box.appendChild(b);
     }
@@ -2995,7 +3028,8 @@ function renderUnitControls() {
     document.getElementById('fireBox').style.display = armMode() && co.loaded && co.state === 'parat' ? '' : 'none';   // només surt amb les armes carregades
     for (const b of panel.fire) {
       const o = ORDER_BY_ID[b.dataset.id], a = o.avail();
-      b.disabled = a !== true || !!pendingCmd || lock; b.classList.toggle('go', a === true);
+      if (o.id === 'FI-03') b.style.display = co.arm === 'joue' ? '' : 'none';           // Redressez només surt quan estan apuntant
+      b.disabled = a !== true || !!pendingCmd || lock; b.classList.toggle('go', a === true && o.id !== 'FI-03');
       b.title = orderTitle(o) + (a === true ? (o.id === 'FI-04' ? ' (tecla espai)' : '') : ' — ' + a);
     }
   }
@@ -3364,7 +3398,7 @@ let autoStepT = 0;
 const VOICE = { on: false, rec: null, running: false, tested: false, seg: {}, interim: '', state: '', failT: 0, lastFail: null,
   learn: { phr: {}, ex: {} }, shared: { phr: {}, ex: {} }, opt: { mode: 'cont', vol: true, log: false, tele: true, engine: '' }, log: [], recentExec: null, ptt: false, db: false, loading: false };
 // Connexió amb Supabase (la mateixa de la web: si el joc s'obre dins la web, agafa window.APP_CONFIG) i fonts del motor local Vosk
-const GAME_VERSION = '1.4.6';
+const GAME_VERSION = '1.4.7';
 const CFG = Object.assign({
   SUPABASE_URL: 'https://ltopullwhasagnkuqaek.supabase.co',
   SUPABASE_ANON_KEY: 'sb_publishable_DhHFUh-UrbBrI0l476Vcnw_tSn-Gmkr',
