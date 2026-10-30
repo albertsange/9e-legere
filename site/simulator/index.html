@@ -251,6 +251,11 @@
     padding:6px 6px 6px 16px;background:var(--sheet);border:1px solid var(--line);border-radius:999px;box-shadow:0 6px 18px rgba(0,0,0,.18);}
   #controls #fireBox button{font-family:inherit;cursor:pointer;}
   #controls.menuOpen #fireBox{display:none !important;}
+  #unitTip{position:fixed;z-index:80;display:none;align-items:center;gap:10px;pointer-events:none;transform:translateX(-50%);width:max-content;max-width:340px;padding:8px 12px 8px 8px;
+    background:var(--sheet);border:2px solid var(--bleu);border-radius:10px;box-shadow:0 6px 18px rgba(0,0,0,.28);}
+  #unitTip img{width:46px;height:46px;border-radius:6px;flex:none;box-shadow:0 0 0 1px var(--line);}
+  #unitTip .nm{display:block;font-size:14.5px;line-height:1.2;color:var(--ink);}
+  #unitTip .st{margin-top:3px;font-size:13px;color:var(--muted);} #unitTip .st b{color:var(--ink);}
   #fireBox .fst{display:flex;align-items:center;gap:7px;padding-right:12px;margin-right:2px;border-right:1px solid var(--line);color:#2e7d32;font-weight:700;font-size:14px;letter-spacing:.03em;height:30px;}
   #fireBox .fst i{width:9px;height:9px;border-radius:50%;background:#2e7d32;}
   #controls #fireBox .fstep{height:40px;min-width:0;padding:0 14px;border-radius:999px;border:none;background:transparent;color:var(--bleu);
@@ -1108,7 +1113,9 @@ const TUNE = {
               cansats: 0.6,                   // sense energia, carreguen un 60 % més lent
               escalf: 0.45,                   // la descàrrega s'escampa en aquests segons (trrrrt)
               vent: [0.35, -0.12],            // deriva del fum (m/s)
-              fum: 6 }                        // segons que dura el fum
+              fum: 6,                         // segons que dura el fum
+              abast: 50,                      // metres: a més distància, els trets no fan efecte
+              punteria: [0.55, 0.15] }        // probabilitat d'encert per tret a boca de canó i a l'abast màxim
 };
 const CONV_ORDER = { stand: 'WH-01', move: 'WH-02', turn: 'WH-03', ligne: 'WH-04', cm: 'CD-06' };   // maniobra en curs → ordre que la descriu
 function orderPct() { return Math.round(100 * Math.max(0, 1 - disorderRms() / TUNE.ordre.rmsZero)); }
@@ -1486,6 +1493,7 @@ function reset() {
   centreCam();
   if (level && level.free) co.atencio = true;
   co.arm = 'portez'; co.loaded = false; FX.length = 0;
+  ENEMY.length = 0; for (const d of (level && level.enemies) || []) ENEMY.push(buildEnemy(d)); HOVER = null;
   objReset();
   tutOnReset();
 }
@@ -1643,6 +1651,78 @@ function updateCo(dt) {
   }
 }
 
+// ---------- Unitats enemigues i targeta d'unitat (en passar el ratolí per sobre) ----------
+const FLAGS = { aut: 'data:image/webp;base64,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', '9e': 'data:image/webp;base64,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' };
+const ENEMY = [];                              // unitats enemigues estàtiques del nivell: { name, flag, cx, cy, h, men: [{x,y,alive,t}] }
+function buildEnemy(d) {
+  const men = [], c = Math.cos(d.h), sn = Math.sin(d.h);
+  for (let rank = 0; rank < 2; rank++) for (let file = 0; file < FILES; file++) {
+    const a = -rank * RANK_GAP, l = (FILES / 2 - 0.5 - file) * FRONT;
+    men.push({ x: d.cx + c * a - sn * l, y: d.cy + sn * a + c * l, alive: true, t: 0 });
+  }
+  return Object.assign({}, d, { men });
+}
+const enAlive = e => e.men.filter(m => m.alive).length;
+const OWN_UNIT = { name: '9e Régiment d\'Infanterie Légère «L\'Incomparable»', flag: '9e', col: '#1f3a78' };
+function unitRect(pts, h, pad) {                // rectangle orientat que envolta una unitat (coordenades de món)
+  const c = Math.cos(h), s = Math.sin(h); let f0 = 1e9, f1 = -1e9, s0 = 1e9, s1 = -1e9;
+  for (const p of pts) { const f = p.x * c + p.y * s, q = -p.x * s + p.y * c; f0 = Math.min(f0, f); f1 = Math.max(f1, f); s0 = Math.min(s0, q); s1 = Math.max(s1, q); }
+  f0 -= pad; f1 += pad; s0 -= pad; s1 += pad;
+  return [[f0, s0], [f1, s0], [f1, s1], [f0, s1]].map(([f, q]) => ({ x: f * c - q * s, y: f * s + q * c }));
+}
+let HOVER = null;                               // { own: true } o { en: índex }
+const hoverUnits = () => [{ own: true, pts: co.members, h: co.members[0].h, info: OWN_UNIT, n: co.members.length, col: '#1f3a78' }]
+  .concat(ENEMY.map((e, i) => ({ en: i, pts: e.men.filter(m => m.alive), h: e.h, info: e, n: enAlive(e), col: '#c79a2b' })));
+function hoverAt(sx, sy) {
+  const w = toWorldPx(sx, sy), px = w.x / M, py = w.y / M, r = Math.max(0.9, 14 / M);
+  for (const u of hoverUnits().reverse()) if (u.pts.some(m => Math.hypot(m.x - px, m.y - py) < r)) return u;
+  return null;
+}
+canvas.addEventListener('pointermove', e => {
+  if (e.pointerType !== 'mouse' || e.buttons || !level || screen !== 'game') { if (e.buttons) HOVER = null; return; }
+  const rc = canvas.getBoundingClientRect(), u = hoverAt(e.clientX - rc.left, e.clientY - rc.top);
+  HOVER = u ? (u.own ? { own: true } : { en: u.en }) : null;
+});
+canvas.addEventListener('pointerleave', () => { HOVER = null; });
+const tipEl = document.createElement('div'); tipEl.id = 'unitTip'; tipEl.innerHTML = '<img alt=""><div><b class="nm"></b><div class="st"></div></div>'; document.body.appendChild(tipEl);
+function updateTip() {
+  const u = HOVER && screen === 'game' && !paused ? hoverUnits().find(x => HOVER.own ? x.own : x.en === HOVER.en) : null;
+  if (!u || !u.n) { tipEl.style.display = 'none'; return; }
+  const k = u.info.name + '|' + u.n + '|' + (u.own ? 1 : 0);
+  if (tipEl._k !== k) {
+    tipEl._k = k; tipEl.querySelector('img').src = FLAGS[u.info.flag]; tipEl.querySelector('.nm').textContent = u.info.name;
+    tipEl.querySelector('.st').innerHTML = (u.own ? 'La teva unitat' : 'Unitat enemiga') + ' · <span>Força</span> <b>' + u.n + '</b> <span>homes</span>';
+    tipEl.style.borderColor = u.col; tipEl.classList.toggle('en', !u.own);
+  }
+  const cs = unitRect(u.pts, u.h, 0.5).map(p => toScreen(p.x * M, p.y * M)), rc = canvas.getBoundingClientRect();
+  const minY = Math.min(...cs.map(p => p.y)), maxY = Math.max(...cs.map(p => p.y)), cx = cs.reduce((a, p) => a + p.x, 0) / cs.length;
+  tipEl.style.display = 'flex';
+  const w = tipEl.offsetWidth, h = tipEl.offsetHeight, up = minY - 12 - h > 4;
+  tipEl.style.left = Math.max(w / 2 + 6, Math.min(canvas.width - w / 2 - 6, cx)) + rc.left + 'px';
+  tipEl.style.top = (up ? minY - 12 - h : maxY + 12) + rc.top + 'px';
+}
+function drawHover() {                          // contorn de ressaltat de la unitat sota el ratolí
+  if (!HOVER) return;
+  const u = hoverUnits().find(x => HOVER.own ? x.own : x.en === HOVER.en); if (!u || !u.n) return;
+  const r = unitRect(u.pts, u.h, 0.55);
+  ctx.save(); ctx.lineJoin = 'round'; ctx.beginPath(); r.forEach((p, i) => i ? ctx.lineTo(p.x * M, p.y * M) : ctx.moveTo(p.x * M, p.y * M)); ctx.closePath();
+  ctx.fillStyle = u.col + '22'; ctx.fill(); ctx.strokeStyle = u.col; ctx.lineWidth = Math.max(2, 0.12 * M); ctx.stroke(); ctx.restore();
+}
+function drawEnemies() {
+  const rS = Math.max(1.8, 0.2 * M);
+  for (const e of ENEMY) for (const m of e.men) {
+    const px = m.x * M, py = m.y * M;
+    if (m.alive) {
+      ctx.fillStyle = '#f7f5ee'; ctx.strokeStyle = '#6c6a63'; ctx.lineWidth = Math.max(1, 0.05 * M);
+      ctx.beginPath(); ctx.arc(px, py, rS, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      ctx.strokeStyle = '#8a877e'; ctx.lineWidth = Math.max(1, 0.06 * M); ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(px + Math.cos(e.h) * 0.32 * M, py + Math.sin(e.h) * 0.32 * M); ctx.stroke();
+    } else {                                                                                  // caigut: una taca fosca i un punt vermell
+      ctx.fillStyle = 'rgba(90,86,78,.45)'; ctx.beginPath(); ctx.ellipse(px, py, rS * 1.15, rS * 0.7, m.a || 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#b3261e'; ctx.beginPath(); ctx.arc(px, py, rS * 0.4, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+}
+
 // ---------- Maneig del mosquet i foc (MD-01, MD-02, MD-10, LS-01, FI-01…04): de moment només al mode lliure ----------
 // co.arm: 'portez' (espatlla) · 'repose' (a terra) · 'croise' (baioneta) · 'charge' (carregant) · 'apprete' · 'joue'.  co.loaded: arma carregada.
 const armMode = () => !!(level && level.musket);
@@ -1672,6 +1752,21 @@ function feu() {
     SFX.shot(d);
   }
   SFX.rumble(0.08, tMax + 1.2);
+  if (ENEMY.length) {                                                       // efecte sobre la unitat enemiga davant nostre
+    const c = unitCentre(), h = co.members[0].h; let best = null;
+    for (const e of ENEMY) { const d = Math.hypot(e.cx - c.x, e.cy - c.y), off = Math.abs(wrapA(Math.atan2(e.cy - c.y, e.cx - c.x) - h)); if (enAlive(e) && (!best || d < best.d)) best = { e, d, off }; }
+    if (best) {
+      const inRange = best.d <= T.abast, facing = best.off < 0.45, ok = inRange && facing; let hits = 0;
+      if (ok) {
+        const pr = T.punteria[0] + (T.punteria[1] - T.punteria[0]) * best.d / T.abast;
+        for (let i = 0; i < co.members.length; i++) { const al = best.e.men.filter(m => m.alive); if (al.length && Math.random() < pr) { const v = al[Math.floor(Math.random() * al.length)]; v.alive = false; v.a = Math.random() * 3; hits++; } }
+      }
+      co.volley = { t: performance.now(), ok, hits, d: best.d };
+      if (!inRange) reac('assenyala', 'Massa lluny, chasseur: a <b>' + Math.round(best.d) + ' m</b> les bales no arriben. Cal estar a menys de <b>' + T.abast + ' m</b>.', 5000);
+      else if (!facing) reac('assenyala', 'No miren cap als austríacs: <b>gira la unitat</b> cap a ells abans de disparar.', 5000);
+      else setTimeout(() => reac('aprova', hits ? 'Impacte! Els austríacs han perdut <b>' + hits + '</b> homes.' : 'Han passat per sobre dels caps… ha estat una mala descàrrega.', 4200), 900);
+    }
+  }
 }
 function updateMusket(dt) {
   if (co.arm === 'charge') {
@@ -2555,6 +2650,7 @@ function drawMini() {
   c.beginPath();
   [[0, 0], [canvas.width, 0], [canvas.width, canvas.height], [0, canvas.height]].forEach(([qx, qy], i) => { const w = toWorldPx(qx, qy); i ? c.lineTo(w.x / M * s, w.y / M * s) : c.moveTo(w.x / M * s, w.y / M * s); });
   c.closePath(); c.stroke();
+  for (const e of ENEMY) if (enAlive(e)) { c.fillStyle = '#f7f5ee'; c.strokeStyle = '#6c6a63'; c.lineWidth = 1.3; c.beginPath(); c.arc(e.cx * s, e.cy * s, 3.6, 0, 7); c.fill(); c.stroke(); }
   c.fillStyle = '#1f3a78'; c.beginPath(); c.arc(u.x * s, u.y * s, 3.6, 0, 7); c.fill();
   c.strokeStyle = '#1f3a78'; c.lineWidth = 1.8; c.beginPath(); c.moveTo(u.x * s, u.y * s); c.lineTo(u.x * s + Math.cos(h) * 10, u.y * s + Math.sin(h) * 10); c.stroke();
 }
@@ -2676,13 +2772,13 @@ const ORDERS = [
   { id: 'CD-06', des: 1, shot: true, fam: 'form', k: 'form', sec: 'Línia aturada', fr: 'Contremarche', full: 'Contremarche!', gl: 'mitja volta de tota la unitat', icon: 'counter', cmds: ['counter'],
     avail: aturatLinia, run: () => contremarche() },
   // Mosquet (maneig i foc)
-  { id: 'MD-01', des: 0, fam: 'arm', lvl: 'musket', fr: 'Portez', full: 'Portez – vos armes!', gl: 'arma a l\'espatlla: cal per moure\'s', icon: 'musket', cmds: ['portez'],
+  { id: 'MD-01', des: 0, fam: 'arm', k: 'musket', lvl: 'musket', fr: 'Portez', full: 'Portez – vos armes!', gl: 'arma a l\'espatlla: cal per moure\'s', icon: 'musket', cmds: ['portez'],
     avail: () => armOrder(() => co.arm === 'portez' ? 'ja la tenen a l\'espatlla' : co.arm === 'joue' && co.loaded ? 'primer Redressez' : true), run: () => setArm('portez', 'Portez vos armes!') },
-  { id: 'MD-02', des: 0, fam: 'arm', lvl: 'musket', fr: 'Reposez', full: 'Reposez-vous – sur vos armes!', gl: 'arma a terra: es cansen menys', icon: 'rest', cmds: ['reposez'],
+  { id: 'MD-02', des: 0, fam: 'arm', k: 'musket', lvl: 'musket', fr: 'Reposez', full: 'Reposez-vous – sur vos armes!', gl: 'arma a terra: es cansen menys', icon: 'rest', cmds: ['reposez'],
     avail: () => armOrder(() => co.arm === 'repose' ? 'ja la tenen a terra' : co.arm !== 'portez' ? 'cal tenir-la a l\'espatlla' : true), run: () => setArm('repose', 'Reposez-vous sur vos armes!') },
-  { id: 'MD-10', des: 0, fam: 'arm', lvl: 'musket', fr: 'Croisez la baïonnette', full: 'Croisez – la baïonnette!', gl: 'baioneta en càrrega, mirant endavant', icon: 'bayonet', cmds: ['croisez'],
+  { id: 'MD-10', des: 0, fam: 'arm', k: 'musket', lvl: 'musket', fr: 'Croisez la baïonnette', full: 'Croisez – la baïonnette!', gl: 'baioneta en càrrega, mirant endavant', icon: 'bayonet', cmds: ['croisez'],
     avail: () => armOrder(() => co.arm === 'croise' ? 'ja la tenen creuada' : co.arm !== 'portez' ? 'cal tenir-la a l\'espatlla' : true), run: () => setArm('croise', 'Croisez la baïonnette!') },
-  { id: 'LS-01', des: 0, fam: 'arm', lvl: 'musket', fr: 'Chargez', full: 'Chargez – vos armes!', gl: 'carregar (uns 18 s, més si estan cansats)', icon: 'load', cmds: ['chargez'],
+  { id: 'LS-01', des: 0, fam: 'arm', k: 'musket', lvl: 'musket', fr: 'Chargez', full: 'Chargez – vos armes!', gl: 'carregar (uns 18 s, més si estan cansats)', icon: 'load', cmds: ['chargez'],
     avail: () => armOrder(() => co.loaded ? 'ja estan carregats' : co.arm !== 'portez' && co.arm !== 'joue' ? 'cal tenir-la a l\'espatlla' : true), run: () => startLoad() },
   { id: 'FI-01', des: 0, fam: 'arm', float: true, lvl: 'musket', fr: 'Apprêtez', full: 'Apprêtez – vos armes!', gl: 'preparar per disparar (cal estar carregats)', icon: 'aim', cmds: ['appretez'],
     avail: () => armOrder(() => co.arm !== 'portez' ? 'cal tenir-la a l\'espatlla' : !co.loaded ? 'primer cal carregar (Chargez)' : true), run: () => setArm('apprete', 'Apprêtez vos armes!') },
@@ -3175,12 +3271,15 @@ function checkLevel() {
     if (m.x > o.x0 - 0.15 && m.x < o.x1 + 0.15 && m.y > o.y0 - 0.15 && m.y < o.y1 + 0.15) {
       SFX.hit(); reset(); showMsg(o.msg, 2500); reac('decebut', 'Ho tornem a provar, chasseur.', 2800); return;
     }
+  if (level.win) { if (!level.win()) return; }
+  else {
   if (!level.zone || co.state !== 'parat' || formationName() !== 'línia') return;
   const c = unitCentre(), z = level.zone;
   if (c.x < z.x0 || c.x > z.x1 || c.y < z.y0 || c.y > z.y1) return;
   if (Math.abs(wrapA(co.members[0].h - level.goalHeading)) > 0.35) return;
   if (level.finishOk && !level.finishOk()) return;
   if (disorderRms() > 0.03 || co.hdT !== 0) return;      // cal que la línia estigui alineada i amb el cap al front
+  }
   paused = true; SFX.ding();
   if (typeof curLevel === 'number') progDone(LEVELS[curLevel].n);
   OBJ.complete = true; objUpdate();
@@ -3221,6 +3320,7 @@ function drawCo() {
     const c = co.conv; ctx.strokeStyle = T.ecarlate; ctx.lineWidth = 1.5; ctx.setLineDash([3, 3]);
     ctx.beginPath(); ctx.arc(c.px * M, c.py * M, Math.max(5, 0.5 * M), 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]);
   }
+  drawHover(); drawEnemies();
   // Soldats: rodones; la ratlla blanca indica cap on miren
   const rS = Math.max(1.8, 0.2 * M);
   for (const m of co.members) {
@@ -3247,6 +3347,7 @@ function draw() {
   drawCo();
   ctx.restore();
   drawBubbles();
+  updateTip();
 }
 
 
@@ -3263,7 +3364,7 @@ let autoStepT = 0;
 const VOICE = { on: false, rec: null, running: false, tested: false, seg: {}, interim: '', state: '', failT: 0, lastFail: null,
   learn: { phr: {}, ex: {} }, shared: { phr: {}, ex: {} }, opt: { mode: 'cont', vol: true, log: false, tele: true, engine: '' }, log: [], recentExec: null, ptt: false, db: false, loading: false };
 // Connexió amb Supabase (la mateixa de la web: si el joc s'obre dins la web, agafa window.APP_CONFIG) i fonts del motor local Vosk
-const GAME_VERSION = '1.4.5';
+const GAME_VERSION = '1.4.6';
 const CFG = Object.assign({
   SUPABASE_URL: 'https://ltopullwhasagnkuqaek.supabase.co',
   SUPABASE_ANON_KEY: 'sb_publishable_DhHFUh-UrbBrI0l476Vcnw_tSn-Gmkr',
@@ -4308,12 +4409,76 @@ function buildLevel5() {
   };
 }
 
+function buildLevel6() {
+  const A = MapKit.A, sc = [];
+  const W = 110, H = 50, EX = 88, EY = 26, R = TUNE.mosquet.abast;
+  sc.push(
+    A.field([[0, 0], [W, 0], [W, H], [0, H]], { kind: 'meadow' }),
+    A.road([[0, 26], [40, 26], [60, 24], [W, 24]], { kind: 'track' }),
+    A.wood([[4, 2], [40, 2], [44, 10], [6, 11]], { kind: 'mixed', seed: 61 }), A.wood([[48, 40], [104, 40], [104, 48], [50, 48]], { kind: 'broad', seed: 62 }),
+    A.wood([[60, 2], [104, 2], [104, 9], [62, 10]], { kind: 'mixed', seed: 63 }),
+    A.label('Els austríacs', EX, 17, { kind: 'town', scale: 0.55 }), A.label('Camp de tir', 40, 21, { kind: 'place', scale: 0.55 })
+  );
+  const dist = () => { const c = unitCentre(); return Math.hypot(EX - c.x, EY - c.y); };
+  const facing = () => { const c = unitCentre(); return Math.abs(wrapA(Math.atan2(EY - c.y, EX - c.x) - co.members[0].h)) < 0.45; };
+  const approach = () => co.state === 'parat' && dist() <= R - 3 && facing() && co.arm === 'portez' && formationName() === 'línia';
+  const fireHint = () => {
+    const d = Math.round(dist());
+    if (co.chaos) return '…';
+    if (!co.loaded) return co.arm === 'charge' ? 'Carregant… espera que els rellotges es posin en <b>verd</b>.' : 'Estan descarregats: <b>Mosquet → Chargez</b> (uns 18 s).';
+    if (co.state !== 'parat') return 'Atura\'t amb <b>Halte</b> abans de disparar.';
+    if (d > R) return 'Massa lluny (' + d + ' m): apropa\'t a menys de ' + R + ' m (<b>En avant</b>).';
+    if (!facing()) return 'Gira cap als austríacs (<b>Girs</b> o <b>Tournez</b>).';
+    return co.arm === 'portez' ? 'A ' + d + ' m: <b>Apprêtez</b>, <b>Joue</b> i <b>Feu!</b> (barra de dalt de les ordres).' : co.arm === 'apprete' ? '<b>Joue!</b> per apuntar.' : co.arm === 'joue' ? '<b>Feu!</b> (botó vermell o tecla espai).' : '…';
+  };
+  const ALL = ['gir', 'mov', 'pace', 'parfile', 'bataille', 'align', 'obl', 'conv', 'tournez', 'ligne', 'form', 'repos'];
+  const steps = [
+    { title: 'La guerra comença', pose: 'serios', hl: [], unlock: ALL, tag: 'Benvinguda', intro: true, btn: 'Endavant',
+      text: ['<b>Chasseur</b>, s\'han acabat els exercicis: <b>la guerra comença</b>. A l\'est, a uns <b>75 metres</b>, hi ha una unitat <b>austríaca</b> (els veuràs de blanc) i volem que la companyia pugui <b>disparar ja</b>.',
+        'Passa el ratolí per sobre d\'una unitat i et dirà <b>qui és</b>, <b>quants homes</b> té i quina <b>bandera</b> porta. Els austríacs no es mouran: nosaltres sí.'],
+      done: () => TUT.intro },
+    { title: 'Carregar', pose: 'assenyala', tag: 'Mosquet', hl: [], unlock: ['musket'], btn: 'Entesos', ack: true,
+      text: ['Un mosquet descarregat només serveix de pal. Obre <b>Mosquet → Chargez</b>: cada soldat carrega al seu ritme (uns <b>18 segons</b>, més si estan cansats) i el seu <b>rellotge</b> es posa en <b>verd</b> quan acaba.',
+        'Quan tots hagin acabat veuràs la barra <b>Carregats</b> sobre el tauler, amb les ordres de foc. Per moure\'s, els homes han de tenir l\'arma a l\'espatlla (<b>Portez</b>); tornen a aquesta posició sols en acabar de carregar.'],
+      done() { return !!this.acked; } },
+    { title: 'Carrega', pose: 'assenyala', unlock: [], mini: 'Obre <b>Mosquet</b> i dóna <b>Chargez</b>. Espera que tots els rellotges es posin en verd.',
+      get hl() { return co.loaded ? [] : ['chargez']; }, cue: () => co.loaded || co.arm === 'charge' ? '' : 'Mosquet → Chargez!', done: () => co.loaded },
+    { title: 'Apropa\'t', pose: 'assenyala', tag: 'Distància', hl: [], unlock: [], btn: 'Som-hi', ack: true,
+      text: ['Els mosquets d\'aquest temps només són eficaços fins a uns <b>' + R + ' metres</b>: més lluny, malgastaràs la pólvora. I com més a prop, millor punteria.',
+        '<b>Avança</b> en línia cap als austríacs (<b>En avant</b>) fins a menys de <b>' + R + ' m</b>, fes <b>Halte</b> i queda\'t de cara a ells.'],
+      done() { return !!this.acked; } },
+    { title: 'Avança', pose: 'assenyala', unlock: [], get hl() { return co.state === 'marxa' ? (dist() <= R - 3 ? ['halte'] : []) : co.state === 'parat' && !approach() ? ['avant'] : []; },
+      mini: () => co.state === 'marxa' ? (dist() <= R - 3 ? 'A ' + Math.round(dist()) + ' m: <b>Halte!</b>' : 'Distància als austríacs: <b>' + Math.round(dist()) + ' m</b>. Continua fins a menys de ' + R + ' m.') : approach() ? 'A punt!' : 'Fes <b>En avant</b> cap a l\'est. Els austríacs són a <b>' + Math.round(dist()) + ' m</b>.',
+      done: () => approach() },
+    { title: 'Foc', pose: 'serios', tag: 'Foc!', hl: [], unlock: [], btn: 'Entesos', ack: true,
+      text: ['La seqüència de foc: <b>Apprêtez</b> (preparar l\'arma), <b>Joue</b> (apuntar) i <b>Feu!</b> (disparar). Les tens a la barra <b>Carregats</b>, i <b>Feu!</b> també amb la tecla <b>espai</b>.',
+        'No tots els fusells surten alhora: sentiràs un <b>traqueteig</b>. Després de disparar els homes queden descarregats; si vols tornar a tirar, <b>Chargez</b> un altre cop.'],
+      done() { return !!this.acked; } },
+    { title: 'Dispara', pose: 'assenyala', unlock: [], get hl() { return !co.loaded ? ['chargez'] : co.state !== 'parat' ? ['halte'] : co.arm === 'portez' && dist() <= R && facing() ? ['appretez'] : co.arm === 'apprete' ? ['joue'] : co.arm === 'joue' ? ['feu'] : []; },
+      mini: fireHint, resetStep: () => 3, done: () => false }
+  ];
+  return {
+    w: W, h: H, start: { x: 14, y: 26 }, obstacles: [], scene: MapKit.scene(sc), zone: null, musket: true, driftScale: 0.5, goalHeading: 0,
+    enemies: [{ name: 'Regiment austríac', flag: 'aut', cx: EX, cy: EY, h: Math.PI }],
+    tutorial: { steps, figs: [], startAtencio: true, resetStep: () => 3 },
+    win: () => !!(co.volley && co.volley.ok && performance.now() - co.volley.t > 3200),
+    objectives: [
+      { t: 'Carregar els mosquets', ok: () => co.loaded || (co.volley && co.volley.ok) || OBJ.done[0] },
+      { t: 'Apropar-se a menys de ' + R + ' m i aturar-se de cara als austríacs', ok: () => OBJ.done[0] && (approach() || (co.volley && co.volley.ok)) || OBJ.done[1] },
+      { t: 'Disparar contra els austríacs', ok: () => OBJ.done[1] && !!(co.volley && co.volley.ok) }
+    ],
+    goalText: 'Carrega, apropa\'t a menys de ' + R + ' m dels austríacs i dispara.',
+    endText: 'Primera descàrrega feta, chasseur: has carregat, t\'has apropat a distància de tir i has fet foc sobre els austríacs. La guerra no ha fet més que començar.'
+  };
+}
+
 const LEVELS = [{ n: 1, title: 'Sortir de la plaça', desc: 'Tutorial: surt d\'una plaça tancada, passa un corredor de tendes i torna a formar.', build: buildLevel1 },
   { n: 2, title: 'La porta i la cantonada', desc: 'Oblics, Tournez i Par peloton: passa una porta en diagonal, gira una cantonada sense trencar la línia i fes front des d\'aturat.', build: buildLevel2 }];
 LEVELS.push({ n: 3, title: 'Exercici de síntesi', desc: 'Practica el que has après: porta en oblic, camí estret en columna i formació final alineada, sense ajuda.', build: buildLevel3 });
 LEVELS.push({ n: 4, title: 'La clariana', desc: 'Par peloton en ligne i contremarche: baixa per un camí estret en columna, forma la línia en marxa i gira tota la unitat.', build: buildLevel4 });
 LEVELS.push({ n: 5, title: 'Cansament i desordre', desc: 'Coneix el sergent-major Louis i el chasseur Lefon: recorre tres bases parant a descansar i a alinear la unitat.', build: buildLevel5 });
-for (let i = 6; i <= 12; i++) LEVELS.push({ n: i, title: 'Properament', desc: 'Aquest nivell encara no està disponible.', locked: true });
+LEVELS.push({ n: 6, title: 'La guerra comença', desc: 'Carrega el mosquet, avança cap a una unitat austríaca i dispara-li.', build: buildLevel6 });
+for (let i = 7; i <= 12; i++) LEVELS.push({ n: i, title: 'Properament', desc: 'Aquest nivell encara no està disponible.', locked: true });
 
 const FREE = { build: buildFree };
 function showScreen(name) {
