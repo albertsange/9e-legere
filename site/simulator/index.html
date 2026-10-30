@@ -1351,17 +1351,17 @@ const SFX = (() => {
     },
     chime() { if (!ready()) return; const t = ac.currentTime; tone(t, 660, 660, 0.35, 0.09); tone(t + 0.12, 990, 990, 0.45, 0.08); },
     ding() { if (!ready()) return; const t = ac.currentTime; [523, 659, 784, 1046].forEach((f, i) => { tone(t + i * 0.13, f, f, 0.7, 0.1); tone(t + i * 0.13, f * 2, f * 2, 0.4, 0.03); }); },
-    cry(n = 7, g = 0.06) {                           // crit de la tropa en calar la baioneta: «uh!»
+    cry(n = 10, g = 0.075) {                         // crit de la tropa en calar la baioneta: un «UH-RAH!» enèrgic i agut, que puja d'entrada
       if (!ready()) return; const t0 = ac.currentTime;
       for (let i = 0; i < n; i++) {
-        const t = t0 + Math.random() * 0.18, f0 = 95 + Math.random() * 45, o = ac.createOscillator(); o.type = 'sawtooth';
-        o.frequency.setValueAtTime(f0, t); o.frequency.exponentialRampToValueAtTime(f0 * 1.3, t + 0.14); o.frequency.exponentialRampToValueAtTime(f0 * 0.85, t + 0.5);
-        const f1 = ac.createBiquadFilter(); f1.type = 'bandpass'; f1.frequency.value = 330 + Math.random() * 90; f1.Q.value = 3;
-        const f2 = ac.createBiquadFilter(); f2.type = 'bandpass'; f2.frequency.value = 780 + Math.random() * 120; f2.Q.value = 4;
-        const gn = ac.createGain(); gn.gain.setValueAtTime(0.0001, t); gn.gain.linearRampToValueAtTime(g * (0.7 + Math.random() * 0.5), t + 0.05); gn.gain.exponentialRampToValueAtTime(0.0001, t + 0.55);
-        o.connect(f1); o.connect(f2); f1.connect(gn); f2.connect(gn); gn.connect(master); o.start(t); o.stop(t + 0.6);
+        const t = t0 + Math.random() * 0.14, f0 = 150 + Math.random() * 70, o = ac.createOscillator(); o.type = 'sawtooth';
+        o.frequency.setValueAtTime(f0 * 0.8, t); o.frequency.exponentialRampToValueAtTime(f0 * 1.75, t + 0.09); o.frequency.setValueAtTime(f0 * 1.75, t + 0.2); o.frequency.exponentialRampToValueAtTime(f0 * 1.25, t + 0.5);
+        const f1 = ac.createBiquadFilter(); f1.type = 'bandpass'; f1.frequency.setValueAtTime(420, t); f1.frequency.linearRampToValueAtTime(700 + Math.random() * 100, t + 0.12); f1.Q.value = 2.5;
+        const f2 = ac.createBiquadFilter(); f2.type = 'bandpass'; f2.frequency.setValueAtTime(1000, t); f2.frequency.linearRampToValueAtTime(1300 + Math.random() * 200, t + 0.12); f2.Q.value = 3;
+        const gn = ac.createGain(); gn.gain.setValueAtTime(0.0001, t); gn.gain.linearRampToValueAtTime(g * (0.7 + Math.random() * 0.5), t + 0.025); gn.gain.setValueAtTime(g * 0.8, t + 0.25); gn.gain.exponentialRampToValueAtTime(0.0001, t + 0.5);
+        o.connect(f1); o.connect(f2); f1.connect(gn); f2.connect(gn); gn.connect(master); o.start(t); o.stop(t + 0.55);
       }
-      noise(t0, 0.4, { type: 'bandpass', f: 600, q: 0.6, gain: g * 0.5, attack: 0.04 });
+      noise(t0, 0.3, { type: 'bandpass', f: 1800, q: 0.7, gain: g * 0.6, attack: 0.02 });       // soroll d'aire de la veu
     },
     loadStart(get) { ldGet = get; if (!ldT) ldTick(); },
     loadStop() { ldGet = null; clearTimeout(ldT); ldT = null; },
@@ -1819,7 +1819,7 @@ function updateBayonet() {                      // càrrega a la baioneta: amb l
     if (Math.random() < 0.5) { v.a = Math.random() * 3; dead++; }
     else { const a = Math.atan2(v.y - c.y, v.x - c.x) + (Math.random() - 0.5) * 0.9, sp = 3.2 + Math.random() * 2; v.fl = { vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, t: -Math.random() * 0.4 }; fled++; }
   }
-  co.stab = { t: performance.now(), n: dead + fled, dead, fled }; SFX.hit(); SFX.cry(5, 0.07);
+  co.stab = { t: performance.now(), n: dead + fled, dead, fled }; SFX.hit(); SFX.cry(8, 0.08);
   reac('aprova', 'A la baioneta! <b>' + dead + '</b> austríacs han caigut i <b>' + fled + '</b> fugen corrents.', 4500);
 }
 function updateMusket(dt) {
@@ -3429,7 +3429,7 @@ let autoStepT = 0;
 const VOICE = { on: false, rec: null, running: false, tested: false, seg: {}, interim: '', state: '', failT: 0, lastFail: null,
   learn: { phr: {}, ex: {} }, shared: { phr: {}, ex: {} }, opt: { mode: 'cont', vol: true, log: false, tele: true, engine: '' }, log: [], recentExec: null, ptt: false, db: false, loading: false };
 // Connexió amb Supabase (la mateixa de la web: si el joc s'obre dins la web, agafa window.APP_CONFIG) i fonts del motor local Vosk
-const GAME_VERSION = '1.4.9';
+const GAME_VERSION = '1.4.10';
 const CFG = Object.assign({
   SUPABASE_URL: 'https://ltopullwhasagnkuqaek.supabase.co',
   SUPABASE_ANON_KEY: 'sb_publishable_DhHFUh-UrbBrI0l476Vcnw_tSn-Gmkr',
