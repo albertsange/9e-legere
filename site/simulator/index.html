@@ -1115,6 +1115,7 @@ const TUNE = {
               escalf: 0.45,                   // la descàrrega s'escampa en aquests segons (trrrrt)
               vent: [0.35, -0.12],            // deriva del fum (m/s)
               fum: 6,                         // segons que dura el fum
+              obertura: 0.1745,               // semiobertura de la franja de foc (±10°)
               abast: 50,                      // metres: a més distància, els trets no fan efecte
               punteria: [0.55, 0.15] }        // probabilitat d'encert per tret a boca de canó i a l'abast màxim
 };
@@ -1780,6 +1781,30 @@ function startLoad() {
   say('Chargez vos armes!'); co.arm = 'charge'; lastKey = '';
   for (const m of co.members) { m.ld = 0; m.ldDur = T.carrega * (1 - T.varia / 2 + Math.random() * T.varia) * slow; m.okT = 0; }
 }
+function fireStrip() {                           // franja de foc: origen al front de la línia, direcció pròpia (per defecte, el rumb de la unitat)
+  const h = co.members[0].h, a = co.fireDir == null ? h : co.fireDir, c = unitCentre(), px = -Math.sin(h), py = Math.cos(h);
+  let lo = 0, hi = 0;
+  for (const m of co.members) { const q = (m.x - c.x) * px + (m.y - c.y) * py; lo = Math.min(lo, q); hi = Math.max(hi, q); }
+  const fw = Math.cos(h), fs = Math.sin(h), fr = Math.max(...co.members.map(m => (m.x - c.x) * fw + (m.y - c.y) * fs));
+  const mid = (lo + hi) / 2;
+  return { a, ox: c.x + fw * fr + px * mid, oy: c.y + fs * fr + py * mid, hw: (hi - lo) / 2 + 0.6, tg: Math.tan(TUNE.mosquet.obertura), R: TUNE.mosquet.abast };
+}
+function inStrip(S, x, y) {                      // retorna la distància al llarg del tret si el punt és dins la franja, o -1
+  const dx = x - S.ox, dy = y - S.oy, c = Math.cos(S.a), s = Math.sin(S.a), u = dx * c + dy * s, v = -dx * s + dy * c;
+  return (u >= 0 && u <= S.R && Math.abs(v) <= S.hw + u * S.tg) ? u : -1;
+}
+function drawFireStrip() {
+  const S = fireStrip(), w1 = S.hw + S.R * S.tg;
+  ctx.save(); ctx.translate(S.ox * M, S.oy * M); ctx.rotate(S.a);
+  const g = ctx.createLinearGradient(0, 0, S.R * M, 0);
+  g.addColorStop(0, 'rgba(214,60,40,.30)'); g.addColorStop(1, 'rgba(214,60,40,.06)');
+  ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(0, -S.hw * M); ctx.lineTo(S.R * M, -w1 * M); ctx.lineTo(S.R * M, w1 * M); ctx.lineTo(0, S.hw * M); ctx.closePath(); ctx.fill();
+  ctx.strokeStyle = 'rgba(214,60,40,.55)'; ctx.lineWidth = Math.max(1, 0.08 * M); ctx.setLineDash([0.8 * M, 0.5 * M]);
+  ctx.beginPath(); ctx.moveTo(0, -S.hw * M); ctx.lineTo(S.R * M, -w1 * M); ctx.moveTo(0, S.hw * M); ctx.lineTo(S.R * M, w1 * M); ctx.stroke(); ctx.setLineDash([]);
+  ctx.fillStyle = 'rgba(214,60,40,.8)'; ctx.font = Math.max(9, 0.9 * M) + 'px sans-serif'; ctx.textAlign = 'center';
+  for (const r of [25, S.R]) { const w = S.hw + r * S.tg; ctx.lineWidth = Math.max(1, 0.1 * M); ctx.strokeStyle = 'rgba(214,60,40,.7)'; ctx.beginPath(); ctx.moveTo(r * M, -w * M); ctx.lineTo(r * M, w * M); ctx.stroke(); ctx.fillText(r + ' m', r * M - 1.6 * M, -w * M - 0.4 * M); }
+  ctx.restore();
+}
 function feu() {
   say('Feu!'); co.loaded = false; lastKey = '';
   const T = TUNE.mosquet; let tMax = 0;
@@ -1792,17 +1817,17 @@ function feu() {
   }
   SFX.rumble(0.08, tMax + 1.2);
   if (ENEMY.length) {                                                       // efecte sobre la unitat enemiga davant nostre
-    const c = unitCentre(), h = co.members[0].h; let best = null;
-    for (const e of ENEMY) { const d = Math.hypot(e.cx - c.x, e.cy - c.y), off = Math.abs(wrapA(Math.atan2(e.cy - c.y, e.cx - c.x) - h)); if (enAlive(e) && (!best || d < best.d)) best = { e, d, off }; }
-    if (best) {
-      const inRange = best.d <= T.abast, facing = best.off < 0.6, ok = inRange && facing; let hits = 0;
-      if (ok) {
-        const pr = T.punteria[0] + (T.punteria[1] - T.punteria[0]) * best.d / T.abast;
-        for (let i = 0; i < co.members.length; i++) { const al = best.e.men.filter(m => m.alive); if (al.length && Math.random() < pr) { const v = al[Math.floor(Math.random() * al.length)]; v.alive = false; v.a = Math.random() * 3; hits++; } }
+    const S = fireStrip(), c = unitCentre(); let near = Infinity, inside = [];
+    for (const e of ENEMY) for (const v of e.men) { if (!v.alive) continue; near = Math.min(near, Math.hypot(v.x - c.x, v.y - c.y)); const u = inStrip(S, v.x, v.y); if (u >= 0) inside.push({ v, u }); }
+    if (near < Infinity) {
+      const ok = inside.length > 0; let hits = 0;
+      if (ok) for (let i = 0; i < co.members.length; i++) {
+        const t = inside[Math.floor(Math.random() * inside.length)];
+        if (t.v.alive && Math.random() < T.punteria[0] + (T.punteria[1] - T.punteria[0]) * t.u / T.abast) { t.v.alive = false; t.v.a = Math.random() * 3; hits++; }
       }
-      co.volley = { t: performance.now(), ok, hits, d: best.d };
-      if (!inRange) reac('assenyala', 'Massa lluny, chasseur: a <b>' + Math.round(best.d) + ' m</b> les bales no arriben. Cal estar a menys de <b>' + T.abast + ' m</b>.', 5000);
-      else if (!facing) reac('assenyala', 'No miren cap als austríacs: <b>gira la unitat</b> cap a ells abans de disparar.', 5000);
+      co.volley = { t: performance.now(), ok, hits, d: near };
+      if (!ok && near > T.abast) reac('assenyala', 'Massa lluny, chasseur: a <b>' + Math.round(near) + ' m</b> les bales no arriben. Cal estar a menys de <b>' + T.abast + ' m</b>.', 5000);
+      else if (!ok) reac('assenyala', 'No miren cap als austríacs: <b>gira la unitat</b> cap a ells abans de disparar.', 5000);
       else setTimeout(() => reac('aprova', hits ? 'Impacte! Els austríacs han perdut <b>' + hits + '</b> homes.' : 'Han passat per sobre dels caps… ha estat una mala descàrrega.', 4200), 900);
     }
   }
@@ -3396,6 +3421,7 @@ function drawCo() {
     ctx.strokeStyle = T.tick; ctx.lineWidth = Math.max(1, 0.06 * M);
     ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(px + Math.cos(a) * 0.45 * M, py + Math.sin(a) * 0.45 * M); ctx.stroke();
   }
+  if (armMode() && co.arm === 'joue') drawFireStrip();
   if (FX.length) drawFx();
 }
 
@@ -3429,7 +3455,7 @@ let autoStepT = 0;
 const VOICE = { on: false, rec: null, running: false, tested: false, seg: {}, interim: '', state: '', failT: 0, lastFail: null,
   learn: { phr: {}, ex: {} }, shared: { phr: {}, ex: {} }, opt: { mode: 'cont', vol: true, log: false, tele: true, engine: '' }, log: [], recentExec: null, ptt: false, db: false, loading: false };
 // Connexió amb Supabase (la mateixa de la web: si el joc s'obre dins la web, agafa window.APP_CONFIG) i fonts del motor local Vosk
-const GAME_VERSION = '1.4.10';
+const GAME_VERSION = '1.4.11';
 const CFG = Object.assign({
   SUPABASE_URL: 'https://ltopullwhasagnkuqaek.supabase.co',
   SUPABASE_ANON_KEY: 'sb_publishable_DhHFUh-UrbBrI0l476Vcnw_tSn-Gmkr',
@@ -4486,7 +4512,7 @@ function buildLevel6() {
   );
   const near = () => { const c = unitCentre(); return Math.hypot(EX - c.x, EY - c.y); };
   const dist = near;
-  const facing = () => { const c = unitCentre(); return Math.abs(wrapA(Math.atan2(EY - c.y, EX - c.x) - co.members[0].h)) < 0.6; };
+  const facing = () => inStrip(fireStrip(), EX, EY) >= 0;          // el centre dels austríacs és dins la franja de foc
   const approach = () => co.state === 'parat' && dist() <= R - 3 && facing() && co.arm === 'portez' && formationName() === 'línia';
   const left = () => ENEMY.length ? enAlive(ENEMY[0]) : 0;
   const fired = () => !!(co.volley && co.volley.ok);
