@@ -696,8 +696,36 @@ const MapKit = (() => {
   // ---- BOSCOS I ARBRES ----------------------------------------------------
   // Bosc: contorn de punts + arbres escampats (jittered grid). kind: 'broad' | 'con' | 'mixed'
   // gaps: [{x,y,r}] clarianes/obertures sense arbres (p. ex. un pas en fila índia)
+  // Contorn orgànic: cada costat es parteix en trams, es desplaça cap a dins (sobretot) i cap a fora amb un soroll suau, i es suavitza (Catmull-Rom tancat).
+  function organicOutline(poly, R) {
+    const [bx0, by0, bx1, by1] = bbox(poly), amp = Math.min(2.8, 0.14 * Math.min(bx1 - bx0, by1 - by0) + 0.5);
+    const ph = [R() * TAU, R() * TAU, R() * TAU], pts = []; let per = 0;
+    for (let i = 0; i < poly.length; i++) {
+      const a = poly[i], b = poly[(i + 1) % poly.length], len = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1, nseg = Math.max(2, Math.round(len / 3.6));
+      let nx = (b[1] - a[1]) / len, ny = -(b[0] - a[0]) / len;
+      if (inPoly((a[0] + b[0]) / 2 + nx * 0.3, (a[1] + b[1]) / 2 + ny * 0.3, poly)) { nx = -nx; ny = -ny; }          // normal cap a fora
+      for (let k = 0; k < nseg; k++) {
+        const t = k / nseg, d = per + t * len;
+        const n = 0.5 * Math.sin(d * 0.37 + ph[0]) + 0.35 * Math.sin(d * 0.91 + ph[1]) + 0.25 * Math.sin(d * 1.7 + ph[2]) + (R() - 0.5) * 0.5;
+        const off = amp * (n * 0.9 - 0.35);                                                                        // sobretot cap a dins
+        pts.push([a[0] + (b[0] - a[0]) * t + nx * off, a[1] + (b[1] - a[1]) * t + ny * off]);
+      }
+      per += len;
+    }
+    const out = [], n = pts.length;
+    for (let i = 0; i < n; i++) {
+      const p0 = pts[(i + n - 1) % n], p1 = pts[i], p2 = pts[(i + 1) % n], p3 = pts[(i + 2) % n];
+      for (let k = 0; k < 3; k++) {
+        const t = k / 3, t2 = t * t, t3 = t2 * t;
+        out.push([0, 1].map(j => 0.5 * ((2 * p1[j]) + (-p0[j] + p2[j]) * t + (2 * p0[j] - 5 * p1[j] + 4 * p2[j] - p3[j]) * t2 + (-p0[j] + 3 * p1[j] - 3 * p2[j] + p3[j]) * t3)));
+      }
+    }
+    return out;
+  }
   A.wood = (poly, { kind = 'broad', spacing = 4.2, seed = 7, gaps = [] } = {}) => {
-    const R = rng(seed), [x0, y0, x1, y1] = bbox(poly), ts = [];
+    const R = rng(seed), ts = [];
+    poly = organicOutline(poly, R);
+    const [x0, y0, x1, y1] = bbox(poly);
     for (let y = y0; y < y1; y += spacing) for (let x = x0; x < x1; x += spacing) {
       const px = x + R() * spacing, py = y + R() * spacing;
       if (!inPoly(px, py, poly)) continue;
@@ -1037,7 +1065,8 @@ const PAN_MARGIN = 80;         // píxels que es poden sortir del mapa en arross
 const TUNE = {
   ordre:    { rmsZero: 0.2,                   // desviació mitjana (m) que equival a 0 % d'ordre
               verd: 85, groc: 60,             // colors de la barra (%)
-              avis: 25, rearma: 50 },         // el Louis surt per sota d'«avis» i torna a poder sortir per sobre de «rearma»
+              avis: 25, rearma: 50,         // el Louis surt per sota d'«avis» i torna a poder sortir per sobre de «rearma»
+              caos: 3, calma: 85 },           // ordre ≤ «caos» %: només Halte, Garde à vous i Alignement fins a tornar a «calma» %
   desordre: { pas: 0.06,                      // soroll per pas en marxa (× des de l'ordre de marxa × pas)
               roda: 0.07,                     // soroll per pas en conversions (× des × distància al pivot)
               cop: 0.06,                      // sacsejada d'una ordre instantània o d'arribada (× des)
@@ -1473,16 +1502,17 @@ function updateStamina(dt) {
   co.cansament = Math.max(0, Math.min(Math.max(cap, co.cansament), co.cansament + r * dt * ((level && level.fatigueScale) || 1)));
   if (level && level.exhaust && co.cansament <= 0 && (co.state === 'marxa' || co.state === 'conv') && !(co.conv && co.conv.kind === 'cm')) {   // exhaustos: la unitat s'atura
     co.conv = null; stopCo('Exhaustos: la unitat s\'ha aturat'); lastKey = '';
-    reac('lefon', '<b>Lefon:</b> No puc més, chasseur… Deixa\'ns descansar!', 5000);
+    reac('lefon', '<b>Lefon:</b> No puc més, chasseur… <b>Deixa\'ns descansar</b>!', 5000);
   }
   if (adv && screen === 'game' && !paused) {                                         // el Lefon rondina quan estan cansats
-    if (co.cansament < E.rondina && !co.warnedTired) { co.warnedTired = true; reac('lefon', '<b>Lefon:</b> <i>(rondina)</i> Les cames no em responen, chasseur… Necessitem un descans: <b>Posició → En place, repos</b>.', 6000); }
+    if (co.cansament < E.rondina && !co.warnedTired) { co.warnedTired = true; reac('lefon', '<b>Lefon:</b> <i>(rondina)</i> Les cames <b>no em responen</b>, chasseur… Necessitem <b>descansar</b>: Posició → <b>En place, repos</b>.', 6000); }
     else if (co.cansament > E.rearma) co.warnedTired = false;
   }
 }
 function updateCo(dt) {
   tickPending(dt);
   updateStamina(dt);
+  updateChaos();
   // Gir del cap (alineament, CD-03)
   for (const m of co.members) {
     const d = (m.ht || 0) - (m.hd || 0), st = 1.5 * dt;
@@ -2493,6 +2523,22 @@ const ORDERS = [
 //          Ordres instantànies (shot) i arribades (Tournez, Contremarche): mida de la sacsejada.
 //  «en»  = quant cansa (multiplicador de TUNE.energia.marxa o .maniobra; 1 si no hi és).
 const ORDER_BY_ID = Object.fromEntries(ORDERS.map(o => [o.id, o]));
+// Caos (ordre ≈ 0 %): només es poden fer Halte, Garde à vous i Alignement (+ Fixe!) fins que la unitat torna a estar alineada.
+const CHAOS_OK = new Set(['FD-02', 'CD-03', 'CD-03b']), CHAOS_WHY = 'el Louis no et deixa moure fins que alineïs';
+for (const o of ORDERS) if (!CHAOS_OK.has(o.id)) { const a = o.avail; o.avail = function (arg) { return co && co.chaos ? CHAOS_WHY : a.call(this, arg); }; }
+function updateChaos() {
+  if (!(level && level.warnDisorder) || screen !== 'game' || paused) return;
+  const pct = orderPct(), T = TUNE.ordre;
+  if (!co.chaos && pct <= T.caos) {
+    co.chaos = true; pendingCmd = null;
+    if ((co.state === 'marxa' || co.state === 'conv') && !(co.conv && co.conv.kind === 'cm')) { co.conv = null; stopCo(); }
+    lastKey = ''; SFX.chime && SFX.chime();
+    reac('louis', '<b>Louis:</b> <b>Prou!</b> Això és un <b>desordre total</b>, chasseur! No et mouràs fins que la unitat estigui <b>alineada</b>: Halte, Garde à vous i <b>Alignement</b>.', -1);
+  } else if (co.chaos && pct >= T.calma) {
+    co.chaos = false; lastKey = '';
+    reac('louis', '<b>Louis:</b> Així m\'agrada: <b>ordre</b>. Ja pots continuar.', 2800);
+  }
+}
 const paceMul = p => (ORDER_BY_ID['MA-04'].desOpt[p]) || 1;
 // Caminar en columna (front estret) desordena i cansa menys que en línia
 function marchDes() {                // desordre per pas de la marxa actual (ordre de marxa × pas × formació)
@@ -2509,10 +2555,11 @@ const HALTE = { k: 'mov', full: 'Peloton – halte!', cmds: ['halte', 'convHalte
   avail: () => co.state === 'conv' ? (co.conv.kind === 'cm' || co.conv.kind === 'turn' ? 'la unitat executa una maniobra' : true) : co.state !== 'marxa' ? 'la unitat ja està aturada' : (co.pf || co.flank) ? 'espera que acabi el par file' : co.haltReq ? 's\'aturarà al pas següent' : true,
   run: () => co.state === 'conv' ? convHalte() : halte() };
 
-let openFam = null, closeT = 0;
+let openFam = null, closeT = 0, famPinned = null;      // famPinned: menú obert amb un clic (no es tanca en sortir el ratolí)
 const panel = { fams: {}, rows: [], halte: null, thr: null };
 function openMenu(id) {
   clearTimeout(closeT);
+  if (id === null || id !== famPinned) famPinned = null;
   openFam = id;
   for (const f of FAMILIES) {
     const el = panel.fams[f.id]; if (!el) continue;
@@ -2587,8 +2634,11 @@ function buildOrderPanel() {
     menu.innerHTML = '<div class="mtitle">' + f.name + '</div>';
     wrap.appendChild(menu); wrap.appendChild(btn); row.appendChild(wrap);
     wrap.addEventListener('mouseenter', () => openMenu(f.id));
-    wrap.addEventListener('mouseleave', () => { clearTimeout(closeT); closeT = setTimeout(() => { if (openFam === f.id) openMenu(null); }, 450); });
-    btn.addEventListener('click', () => openMenu(openFam === f.id ? null : f.id));
+    wrap.addEventListener('mouseleave', () => { clearTimeout(closeT); closeT = setTimeout(() => { if (openFam === f.id && famPinned !== f.id) openMenu(null); }, 450); });
+    btn.addEventListener('click', () => {            // el ratolí ja obre el menú en passar-hi per sobre: un clic el deixa fix; un segon clic el tanca
+      if (openFam === f.id) { if (famPinned === f.id) openMenu(null); else famPinned = f.id; }
+      else { openMenu(f.id); famPinned = f.id; }
+    });
     panel.fams[f.id] = { wrap, btn, menu, badge: btn.querySelector('.badge') };
     for (const o of ORDERS.filter(x => x.fam === f.id)) {
       const r = document.createElement('div'); r.className = 'mrow';
@@ -2685,7 +2735,7 @@ function updateInfo() {
   $('ucOrdLbl').textContent = mess && level && level.warnDisorder ? 'Desordre!' : 'Ordre';
   $('ucOrdLbl').style.color = mess && level && level.warnDisorder ? 'var(--ecarlate)' : '';
   if (level && level.warnDisorder && screen === 'game' && !paused) {          // avís del capità: la tropa és un desordre
-    if (mess && !co.warnedDis) { co.warnedDis = true; reac('louis', '<b>Louis:</b> Quin desordre és aquest, chasseur! Atura la unitat i <b>alinea</b>: Formacions → Alignement.', 6000); SFX.chime && SFX.chime(); }
+    if (mess && !co.warnedDis && !co.chaos) { co.warnedDis = true; reac('louis', '<b>Louis:</b> Quin <b>desordre</b> és aquest, chasseur! Atura la unitat i <b>alinea</b>: Formacions → <b>Alignement</b>.', 6000); SFX.chime && SFX.chime(); }
     else if (pct > T.ordre.rearma) co.warnedDis = false;
   }
   // Glif: la unitat vista des de dalt, girada perquè el front quedi amunt
@@ -2998,7 +3048,7 @@ let autoStepT = 0;
 const VOICE = { on: false, rec: null, running: false, tested: false, seg: {}, interim: '', state: '', failT: 0, lastFail: null,
   learn: { phr: {}, ex: {} }, shared: { phr: {}, ex: {} }, opt: { mode: 'cont', vol: true, log: false, tele: true, engine: '' }, log: [], recentExec: null, ptt: false, db: false, loading: false };
 // Connexió amb Supabase (la mateixa de la web: si el joc s'obre dins la web, agafa window.APP_CONFIG) i fonts del motor local Vosk
-const GAME_VERSION = '1.4.0';
+const GAME_VERSION = '1.4.1';
 const CFG = Object.assign({
   SUPABASE_URL: 'https://ltopullwhasagnkuqaek.supabase.co',
   SUPABASE_ANON_KEY: 'sb_publishable_DhHFUh-UrbBrI0l476Vcnw_tSn-Gmkr',
@@ -3968,21 +4018,22 @@ function buildLevel4() {
 
 function buildLevel5() {
   const A = MapKit.A, sc = [];
-  const W = 110, H = 56;
-  const ZA = { x0: 40, y0: 28, x1: 52, y1: 47 }, ZB = { x0: 40, y0: 2, x1: 54, y1: 17 }, ZC = { x0: 88, y0: 2, x1: 104, y1: 17 };
+  const W = 80, H = 46;
+  const ZA = { x0: 29, y0: 20, x1: 41, y1: 38 }, ZB = { x0: 28, y0: 4, x1: 41, y1: 19 }, ZC = { x0: 62, y0: 4, x1: 76, y1: 19 };
   sc.push(
     A.field([[0, 0], [W, 0], [W, H], [0, H]], { kind: 'meadow' }),
-    A.road([[2, 40], [46, 40], [46, 10], [W - 4, 10]], { kind: 'track' }),
-    A.wood([[10, 2], [34, 2], [34, 26], [10, 26]], { kind: 'mixed', seed: 31 }), A.wood([[58, 20], [100, 20], [100, 33], [58, 33]], { kind: 'broad', seed: 32 }),
-    A.wood([[8, 47], [100, 47], [100, 55], [8, 55]], { kind: 'mixed', seed: 33 }),
-    A.label('Base A', 46, 44, { kind: 'town', scale: 0.55 }), A.label('Base B', 47, 6, { kind: 'town', scale: 0.55 }), A.label('Base C', 96, 6, { kind: 'town', scale: 0.55 }),
-    A.mark(46, 40, 'A'), A.mark(46, 10, 'B'), A.mark(96, 10, 'C'), A.benchmark(8, 30, '305·1')
+    A.road([[2, 34], [34, 34], [34, 12], [W - 4, 12]], { kind: 'track' }),
+    A.wood([[4, 2], [22, 2], [24, 20], [5, 22]], { kind: 'mixed', seed: 31 }), A.wood([[44, 22], [74, 22], [74, 33], [44, 33]], { kind: 'broad', seed: 32 }),
+    A.wood([[6, 40], [74, 40], [74, 45], [6, 45]], { kind: 'mixed', seed: 33 }),
+    A.label('Base A', 34, 38.5, { kind: 'town', scale: 0.55 }), A.label('Base B', 35, 8, { kind: 'town', scale: 0.55 }), A.label('Base C', 70, 8, { kind: 'town', scale: 0.55 }),
+    A.mark(34, 34, 'A'), A.mark(34, 12, 'B'), A.mark(70, 12, 'C'), A.benchmark(8, 28, '305·1')
   );
   const inR = z => { const c = unitCentre(); return c.x >= z.x0 && c.x <= z.x1 && c.y >= z.y0 && c.y <= z.y1; };
   const ordPct = orderPct;
   const ready = z => co.state === 'parat' && formationName() === 'línia' && inR(z) && co.cansament >= 90 && ordPct() >= 85 && co.hdT === 0;
   const hint = (z, nom, extra) => () => {
     const e = Math.round(co.cansament), o = ordPct();
+    if (co.chaos) return '<b>Louis:</b> no et mous fins que la unitat estigui <b>alineada</b>: <b>Halte</b>, <b>Garde à vous</b> i <b>Alignement</b>.';
     if (co.state === 'conv' || co.state === 'gir' || co.state === 'auto') return '…';
     if (co.state === 'marxa') return e < 25 ? '<b>Energia baixa (' + e + ' %)!</b> Fes <b>Halte</b> i descansa.' : o < 40 ? '<b>Ordre baix (' + o + ' %)!</b> Atura\'t i alinea.' : extra + ' Energia ' + e + ' %, ordre ' + o + ' %.';
     if (!inR(z)) return extra;
@@ -3991,32 +4042,45 @@ function buildLevel5() {
     if (o < 85) return 'Ordre ' + o + ' %: <b>Formacions → Alignement</b> i <b>Fixe!</b>';
     return 'Base ' + nom + ' a punt!';
   };
+  const hintHl = z => {                                  // quin botó assenyalar segons la situació
+    const e = co.cansament, o = ordPct();
+    if (co.chaos) return co.state === 'marxa' ? ['halte'] : !co.atencio ? ['garde'] : co.hdT !== 0 ? ['fixe'] : ['align'];
+    if (co.state === 'marxa') return e < 25 || o < 40 ? ['halte'] : [];
+    if (co.state !== 'parat') return [];
+    if (!inR(z)) return ['avant'];
+    if (e < 90) return co.atencio ? ['repos'] : [];
+    if (!co.atencio) return ['garde'];
+    if (co.hdT !== 0) return ['fixe'];
+    return o < 85 ? ['align'] : [];
+  };
   const steps = [
     { title: 'El cansament i el desordre', pose: 'serios', hl: [], unlock: ['gir', 'mov', 'pace', 'parfile', 'bataille', 'align', 'obl', 'conv', 'tournez', 'ligne', 'form', 'repos'], tag: 'Benvinguda', intro: true, btn: 'Endavant',
       text: ['<b>Chasseur</b>, una unitat no només camina: <b>es cansa</b> i <b>es desordena</b>. Un bon comandant sap quan parar-la per deixar-la descansar i per tornar-la a alinear.',
-        'Per explicar-t\'ho et presento dos homes de la companyia: el <b>sergent-major Louis</b>, que vetlla per l\'ordre, i el <b>chasseur Lefon</b>, que et dirà quan la tropa no pot més.'],
+        'Per explicar-t\'ho et presento dos homes de la companyia: el <b>sergent-major Louis</b>, que vetlla per l\'<b>ordre</b>, i el <b>chasseur Lefon</b>, que et dirà quan la tropa no pot més i està <b>cansada</b>.'],
       done: () => TUT.intro },
     { title: 'El sergent-major Louis', pose: 'louis', tag: 'Ordre', hl: [], unlock: [], btn: 'Entesos', ack: true,
-      text: ['Sóc el <b>sergent-major Louis</b> i m\'encarrego que la formació mantingui l\'ordre. No t\'ho penso repetir més d\'una vegada: <b>no suporto el desordre</b>. Si la tropa es desordena em veuràs aparèixer a la pantalla, i com no hi posis una mica d\'ordre, t\'ordenaré a òsties.',
+      text: ['Sóc el <b>sergent-major Louis</b> i m\'encarrego que la formació mantingui l\'ordre. No t\'ho penso repetir més d\'una vegada: <b>no suporto el desordre</b>. Si la tropa es desordena em veuràs <b>aparèixer a la pantalla</b>, i com no hi posis una mica d\'ordre, <b>t\'ordenaré a òsties</b>.',
         'La barra <b>Ordre</b> de la unitat diu com d\'alineada és la línia: <b>verda</b>, bé; <b>groga</b>, s\'està desordenant; <b>vermella</b>, desordre. Caminar desordena, però <b>no tot per igual</b>:<br>• Desordenen <b>poc</b>: estar aturat, la marxa en <b>columna</b> i el pas <b>ordinaire</b>.<br>• Desordenen <b>més</b>: el pas <b>accéléré</b> i <b>de charge</b>, la marxa <b>oblíqua</b>, el <b>Par file</b>, les <b>conversions</b> i el <b>Tournez</b>.<br>Per corregir-ho: atura\'t, <b>Garde à vous</b> i, a <b>Formacions</b>, <b>Alignement</b> i <b>Fixe!</b>'],
       done() { return !!this.acked; } },
     { title: 'Prova el desordre', pose: 'louis', unlock: [], mini: 'Fes <b>En avant</b> i, caminant, un <b>Tournez à gauche</b> (<b>Conversions</b>). Mira com baixa la barra <b>Ordre</b>.',
+      get hl() { return co.state === 'parat' ? ['avant'] : co.state === 'marxa' && !co.conv ? ['wh03L'] : []; },
+      cue: () => co.state === 'parat' ? 'Primer, En avant!' : co.state === 'marxa' && !co.conv ? 'Ara! Tournez à gauche!' : '',
       done: () => co.state === 'marxa' && !co.conv && Math.abs(wrapA(co.members[0].h)) > 1.2 },
     { title: 'El chasseur Lefon', pose: 'lefon', tag: 'Energia', hl: [], unlock: [], btn: 'Entesos', ack: true,
-      text: ['<i>(rondina)</i> Sí, sóc el Lefon, què vols, pesat? Porto tres hores caminant, i les cames em diuen que això es fa llarg. Jo rondino sempre, específicament quan la tropa està cansada: fes-me cas.',
+      text: ['<i>(rondina)</i> Sí, sóc el <b>Lefon</b>, què vols, pesat? Porto <b>tres hores caminant</b>, i les cames em diuen que això es fa llarg. Jo <b>rondino</b> sempre, específicament quan la tropa està <b>cansada</b>: fes-me cas.',
         'Fixa\'t: amb aquests moviments també ens hem <b>cansat</b>. La barra <b>Energia</b> es buida <b>caminant</b>, més com més ràpid és el pas (en columna, menys). Quan estem aturats se\'ns recupera una mica (fins al <b>50 %</b>), però si ens deixes quiets massa estona ens tornem a cansar. Per omplir-la de debò: <b>Posició → En place, repos!</b><br>Sota el <b>25 %</b> em sentiràs rondinar; a <b>zero</b>, la unitat s\'atura <b>exhausta</b> i no marxarà fins que descansi.'],
       done() { return !!this.acked; } },
     { title: 'El recorregut', pose: 'assenyala', tag: 'Exercici', hl: [], unlock: [], btn: 'Som-hi', ack: true,
       text: ['Hi ha <b>tres bases</b>: A, B i C. A cada base cal arribar <b>aturats, en línia, descansats</b> (energia ≥ 90 %) i <b>alineats</b> (ordre en verd). A la C, a més, de cara a l\'est.',
         'Entre base i base hi ha prou distància perquè t\'hagis de parar a descansar i alinear: planifica-ho. Fes servir els <b>Tournez</b> per girar sense trencar la línia i vigila els arbres.'],
       done() { return !!this.acked; } },
-    { title: 'Base A', pose: 'assenyala', unlock: [], mini: hint(ZA, 'A', 'Orienta\'t cap a l\'est (<b>Tournez à droite</b>) i camina fins a la <b>base A</b>.'), done: () => OBJ.done[0] },
-    { title: 'Base B', pose: 'assenyala', unlock: [], mini: hint(ZB, 'B', 'Cap al nord, a la <b>base B</b>: <b>En avant</b> i <b>Tournez à gauche</b> a l\'alçada de la base A.'), done: () => OBJ.done[1] },
-    { title: 'Base C', pose: 'assenyala', unlock: [], mini: hint(ZC, 'C', 'Cap a l\'est, a la <b>base C</b>: <b>Tournez à droite</b> i camina. Atura\'t de cara a l\'est.'), done: () => false }
+    { title: 'Base A', pose: 'assenyala', unlock: [], get hl() { return hintHl(ZA); }, mini: hint(ZA, 'A', 'Orienta\'t cap a l\'est (<b>Tournez à droite</b>) i camina fins a la <b>base A</b>.'), done: () => OBJ.done[0] },
+    { title: 'Base B', pose: 'assenyala', unlock: [], get hl() { return hintHl(ZB); }, mini: hint(ZB, 'B', 'Cap al nord, a la <b>base B</b>: <b>En avant</b> i <b>Tournez à gauche</b> a l\'alçada de la base A.'), done: () => OBJ.done[1] },
+    { title: 'Base C', pose: 'assenyala', unlock: [], get hl() { return hintHl(ZC); }, mini: hint(ZC, 'C', 'Cap a l\'est, a la <b>base C</b>: <b>Tournez à droite</b> i camina. Atura\'t de cara a l\'est.'), done: () => false }
   ];
   return {
-    w: W, h: H, start: { x: 6, y: 40 }, obstacles: [], scene: MapKit.scene(sc), zone: ZC, driftScale: 1.1, goalHeading: 0,
-    advanced: true, warnDisorder: true, fatigueScale: 2.5, exhaust: true, finishOk: () => co.cansament >= 90,
+    w: W, h: H, start: { x: 6, y: 34 }, obstacles: [], scene: MapKit.scene(sc), zone: ZC, driftScale: 1.1, goalHeading: 0,
+    advanced: true, warnDisorder: true, fatigueScale: 3, exhaust: true, finishOk: () => co.cansament >= 90,
     tutorial: { steps, figs: [], startAtencio: true, resetStep: () => 5 },
     objectives: [
       { t: 'Base A: aturats, en línia, descansats i alineats', ok: () => ready(ZA) },
