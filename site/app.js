@@ -319,6 +319,7 @@
       '<ol class="extra"><li><a href="#regulacions" data-sec="regulacions"><span class="n">§</span><span>' + esc(L((S.site.regs || {}).title) || t('regs_page')) + '</span></a></li>' +
       '<li><a href="#decisions" data-sec="decisions"><span class="n">·</span><span>' + esc(L((S.site.decisions || {}).title) || t('decisions')) + '</span></a></li>' +
       '<li><a href="#fonts" data-sec="fonts"><span class="n">·</span><span>' + esc(L((S.site.fonts || {}).title) || t('sources')) + '</span></a></li>' +
+      '<li><a href="#simulator" data-sec="simulator"><span class="n">▶</span><span>' + esc(L((S.site.simulator || {}).title) || t('sim_title')) + '</span></a></li>' +
       (isAdmin() ? '<li><a href="#nova" data-sec="nova"><span class="n">+</span><span>' + esc(t('new_page')) + '</span></a></li>' : '') + '</ol>';
 
     var acct = document.getElementById('acct'), dark = isDark();
@@ -349,9 +350,9 @@
   /* ------------------------------------------------------------------ routing */
   function routeId() { return (decodeURIComponent((location.hash || '').replace(/^#/, '')) || 'home').split('~')[0]; }
   function routeAnchor() { var h = decodeURIComponent((location.hash || '').replace(/^#/, '')); return h.indexOf('~') > -1 ? h.slice(h.indexOf('~') + 1) : ''; }
-  var SPECIAL = { home: 1, decisions: 1, fonts: 1, regulacions: 1, registre: 1, compte: 1, gestio: 1, nova: 1, contrasenya: 1 };
+  var SPECIAL = { home: 1, decisions: 1, fonts: 1, regulacions: 1, simulator: 1, registre: 1, compte: 1, gestio: 1, nova: 1, contrasenya: 1 };
 
-  function draftKeyFor(id) { var blk = { home: 1, decisions: 1, fonts: 1, regulacions: 1 }; if (SPECIAL[id] && !blk[id]) return null; return S.byId[id] || blk[id] ? id : null; }
+  function draftKeyFor(id) { var blk = { home: 1, decisions: 1, fonts: 1, simulator: 1, regulacions: 1 }; if (SPECIAL[id] && !blk[id]) return null; return S.byId[id] || blk[id] ? id : null; }
   function makeDraft(id) {
     S.draftKey = id; S.dirty = false; S.prefilled = [];
     if (S.byId[id]) {
@@ -367,7 +368,7 @@
       S.draft = { site: clone(S.site) };
       var s = S.draft.site;
       s.home = s.home || {}; ['eyebrow', 'h1', 'lead1', 'lead2', 'lead3', 'crit', 'platecap'].forEach(function (k) { s.home[k] = s.home[k] || { ca: '' }; });
-      ['decisions', 'fonts'].forEach(function (k) { s[k] = s[k] || {}; s[k].title = s[k].title || { ca: '' }; s[k].html = s[k].html || { ca: '' }; });
+      ['decisions', 'fonts', 'simulator'].forEach(function (k) { s[k] = s[k] || {}; s[k].title = s[k].title || { ca: '' }; s[k].html = s[k].html || { ca: '' }; });
       s.regs = s.regs || {}; ['title', 'intro_r', 'intro_i'].forEach(function (k) { s.regs[k] = s.regs[k] || { ca: '' }; });
     }
     prefillLang();
@@ -467,6 +468,7 @@
     if (id === 'home') html = homeView();
     else if (id === 'decisions' || id === 'fonts') html = blockView(id);
     else if (id === 'regulacions') html = regsAllView();
+    else if (id === 'simulator') html = simulatorView();
     else if (id === 'registre') { html = homeView(); setTimeout(function () { history.replaceState(null, '', location.pathname); openRegister(); }, 0); }
     else if (id === 'compte') html = accountView();
     else if (id === 'gestio') html = adminView();
@@ -634,6 +636,20 @@
       '<div class="table-wrap block-' + key + '">' + F('site.' + key + '.html.' + S.lang, body, 'div', 'block-html', { raw: 1 }) + '</div>' +
       (S.edit && key === 'decisions' ? '<button type="button" class="add-btn" data-act="addrow">+ ' + esc(t('add_row')) + '</button>' : '') +
       '</section>';
+  }
+
+  /* ------------------------------------------------------------------ 9e Simulator (game hosted in site/simulator/, notes editable like the other blocks) */
+  function simulatorView() {
+    var site = S.edit && S.draft && S.draft.site ? S.draft.site : S.site;
+    var b = site.simulator || {};
+    var title = S.edit ? (b.title || {})[S.lang] : (L(b.title) || t('sim_title'));
+    var body = S.edit ? (b.html || {})[S.lang] : L(b.html);
+    return '<section class="view" data-view="simulator"><p class="crumb"><a href="#">' + esc(t('home')) + '</a> <span aria-hidden="true">/</span> ' + esc(plain(L(b.title)) || t('sim_title')) + '</p>' +
+      '<div class="piece-head">' + F('site.simulator.title.' + S.lang, title, 'h2', 'page-title', { raw: 1, single: 1, attr: ' tabindex="-1"' }) + penBtn() + '</div>' +
+      '<p class="muted">' + esc(t('sim_intro')) + '</p>' +
+      '<div class="table-wrap"><iframe src="simulator/index.html" title="' + esc(t('sim_title')) + '" allow="microphone; fullscreen" style="width:100%;height:78vh;min-height:520px;border:1px solid var(--line,#ccc);border-radius:6px;background:#fff"></iframe></div>' +
+      '<p class="about-link"><a class="tlink" href="simulator/index.html" target="_blank" rel="noopener">' + esc(t('sim_open')) + '</a> <a class="tlink" href="simulator/HANDOFF.md" target="_blank" rel="noopener">' + esc(t('sim_handoff')) + '</a></p>' +
+      '<div class="table-wrap block-simulator">' + F('site.simulator.html.' + S.lang, body, 'div', 'block-html', { raw: 1 }) + '</div></section>';
   }
 
   /* ------------------------------------------------------------------ search inside the regulations and the inspections */
@@ -1727,7 +1743,7 @@
         if (orphans.length) return sb.storage.from(PRIVATE_BUCKET).remove(orphans).catch(function (e) { console.warn(e); });
       });
     } else {
-      var rows = ['home', 'decisions', 'fonts', 'regs'].map(function (k) { return { key: k, value: S.draft.site[k] }; });
+      var rows = ['home', 'decisions', 'fonts', 'simulator', 'regs'].map(function (k) { return { key: k, value: S.draft.site[k] }; });
       job = sb.from('site').upsert(rows).then(q);
     }
     return job.then(function () { return loadPublic(); }).then(loadPrivate).then(function () {
