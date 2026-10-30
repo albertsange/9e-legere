@@ -264,6 +264,12 @@
   #controls #fireBox .fstep svg{width:16px;height:16px;}
   #controls #fireBox .fstep.go{background:var(--bleu);color:#fff;}
   #controls #fireBox .fstep:disabled{opacity:.4;cursor:default;}
+  #fireBox .jm{position:absolute;bottom:calc(100% + 10px);left:120px;display:none;gap:6px;padding:6px;background:var(--sheet);border:1px solid var(--line);border-radius:14px;box-shadow:0 6px 22px rgba(0,0,0,.22);}
+  #fireBox .jm.open{display:flex;}
+  #controls #fireBox .jm button{display:flex;flex-direction:column;align-items:center;gap:3px;width:92px;height:auto;padding:8px 6px;border-radius:10px;border:1px solid var(--line);background:transparent;color:var(--bleu);font-size:12px;font-weight:700;}
+  #controls #fireBox .jm button:hover{background:var(--bleu);color:#fff;}
+  #controls #fireBox .jm svg{width:26px;height:26px;}
+  #controls #fireBox .jm small{font-weight:500;font-size:10px;opacity:.8;}
   #controls #fireBox .feu{width:52px;height:52px;padding:0;margin:-4px -2px -4px 2px;border-radius:50%;border:2px solid #fff;
     background:radial-gradient(circle at 40% 35%,#d8463b,#9e1f17);color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;box-shadow:0 2px 6px rgba(0,0,0,.25);}
   #controls #fireBox .feu.go{animation:feuPulse 1.1s ease-in-out infinite;}
@@ -1117,7 +1123,12 @@ const TUNE = {
               fum: 6,                         // segons que dura el fum
               obertura: 0.0436,               // semiobertura de la franja de foc (±2,5°)
               abast: 50,                      // metres: a més distància, els trets no fan efecte
-              punteria: [0.55, 0.15] }        // probabilitat d'encert per tret a boca de canó i a l'abast màxim
+              punteria: [0.55, 0.15],         // probabilitat d'encert per tret a boca de canó i a l'abast màxim
+              rengle1: 1.4, rengle2: 0.4,     // multiplicador de la probabilitat de caure: el primer rengle rep molt més que el segon
+              oblic: Math.PI / 4,             // angle del foc oblic (TF-02)
+              enOberta: 0.14,                 // semiobertura de la franja d'un regiment enemic (±8°)
+              enAvis: 2.5,                    // segons que triga un regiment a disparar-nos un cop som davant seu
+              enRecarrega: 20 }               // segons entre les seves descàrregues
 };
 const CONV_ORDER = { stand: 'WH-01', move: 'WH-02', turn: 'WH-03', ligne: 'WH-04', cm: 'CD-06' };   // maniobra en curs → ordre que la descriu
 function orderPct() { return Math.round(100 * Math.max(0, 1 - disorderRms() / TUNE.ordre.rmsZero)); }
@@ -1531,7 +1542,7 @@ function reset() {
   centreCam();
   if (level && level.free) co.atencio = true;
   co.arm = 'portez'; co.loaded = false; FX.length = 0;
-  ENEMY.length = 0; for (const d of (level && level.enemies) || []) ENEMY.push(buildEnemy(d)); HOVER = null;
+  CORPSES.length = 0; ENEMY.length = 0; for (const d of (level && level.enemies) || []) ENEMY.push(buildEnemy(d)); HOVER = null;
   objReset();
   tutOnReset();
 }
@@ -1696,9 +1707,9 @@ function buildEnemy(d) {
   const men = [], c = Math.cos(d.h), sn = Math.sin(d.h);
   for (let rank = 0; rank < 2; rank++) for (let file = 0; file < FILES; file++) {
     const a = -rank * RANK_GAP, l = (FILES / 2 - 0.5 - file) * FRONT;
-    men.push({ x: d.cx + c * a - sn * l, y: d.cy + sn * a + c * l, alive: true, t: 0 });
+    men.push({ x: d.cx + c * a - sn * l, y: d.cy + sn * a + c * l, alive: true, t: 0, rank });
   }
-  return Object.assign({}, d, { men });
+  return Object.assign({}, d, { men, reload: 4, aimT: 0, volleys: 0, routed: false });
 }
 const enAlive = e => e.men.filter(m => m.alive).length;
 const OWN_UNIT = { name: '9e Régiment d\'Infanterie Légère «L\'Incomparable»', flag: '9e', col: '#1f3a78' };
@@ -1756,9 +1767,6 @@ function drawEnemies() {
       ctx.fillStyle = '#f7f5ee'; ctx.strokeStyle = '#6c6a63'; ctx.lineWidth = Math.max(1, 0.05 * M);
       ctx.beginPath(); ctx.arc(px, py, rS, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
       ctx.strokeStyle = '#8a877e'; ctx.lineWidth = Math.max(1, 0.06 * M); ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(px + Math.cos(e.h) * 0.32 * M, py + Math.sin(e.h) * 0.32 * M); ctx.stroke(); ctx.globalAlpha = 1;
-    } else {                                                                                  // caigut: una taca fosca i un punt vermell
-      ctx.fillStyle = 'rgba(90,86,78,.45)'; ctx.beginPath(); ctx.ellipse(px, py, rS * 1.15, rS * 0.7, m.a || 0, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = '#b3261e'; ctx.beginPath(); ctx.arc(px, py, rS * 0.4, 0, Math.PI * 2); ctx.fill();
     }
   }
 }
@@ -1777,22 +1785,95 @@ function armOrder(fn) {                         // condicions comunes de les ord
 }
 function setArm(a, text) { say(text); co.arm = a; SFX.rustle(); lastKey = ''; }
 function startLoad() {
-  const T = TUNE.mosquet, slow = 1 + T.cansats * (1 - co.cansament / 100);
+  const T = TUNE.mosquet, slow = 1 + T.cansats * (1 - co.cansament / 100); co.fireDir = null;
   say('Chargez vos armes!'); co.arm = 'charge'; lastKey = '';
   for (const m of co.members) { m.ld = 0; m.ldDur = T.carrega * (1 - T.varia / 2 + Math.random() * T.varia) * slow; m.okT = 0; }
 }
-function fireStrip() {                           // franja de foc: origen al front de la línia, direcció pròpia (per defecte, el rumb de la unitat)
-  const h = co.members[0].h, a = co.fireDir == null ? h : co.fireDir, c = unitCentre(), px = -Math.sin(h), py = Math.cos(h);
-  let lo = 0, hi = 0;
-  for (const m of co.members) { const q = (m.x - c.x) * px + (m.y - c.y) * py; lo = Math.min(lo, q); hi = Math.max(hi, q); }
-  const fw = Math.cos(h), fs = Math.sin(h), fr = Math.max(...co.members.map(m => (m.x - c.x) * fw + (m.y - c.y) * fs));
+function makeStrip(men, h, a, open) {             // franja de foc d'un grup d'homes: origen al front de la línia, amplada de la línia, s'obre «open» rad a cada banda
+  const c = { x: 0, y: 0 }; for (const m of men) { c.x += m.x; c.y += m.y; } c.x /= men.length; c.y /= men.length;
+  const px = -Math.sin(h), py = Math.cos(h), fw = Math.cos(h), fs = Math.sin(h);
+  let lo = 0, hi = 0, fr = -1e9;
+  for (const m of men) { const q = (m.x - c.x) * px + (m.y - c.y) * py; lo = Math.min(lo, q); hi = Math.max(hi, q); fr = Math.max(fr, (m.x - c.x) * fw + (m.y - c.y) * fs); }
   const mid = (lo + hi) / 2;
-  return { a, ox: c.x + fw * fr + px * mid, oy: c.y + fs * fr + py * mid, hw: (hi - lo) / 2 + 0.6, tg: Math.tan(TUNE.mosquet.obertura), R: TUNE.mosquet.abast };
+  return { a, ox: c.x + fw * fr + px * mid, oy: c.y + fs * fr + py * mid, hw: (hi - lo) / 2 + 0.6, tg: Math.tan(open), R: TUNE.mosquet.abast };
 }
+function fireStrip() { const h = co.members[0].h; return makeStrip(co.members, h, co.fireDir == null ? h : co.fireDir, TUNE.mosquet.obertura); }
 function inStrip(S, x, y) {                      // retorna la distància al llarg del tret si el punt és dins la franja, o -1
   const dx = x - S.ox, dy = y - S.oy, c = Math.cos(S.a), s = Math.sin(S.a), u = dx * c + dy * s, v = -dx * s + dy * c;
   return (u >= 0 && u <= S.R && Math.abs(v) <= S.hw + u * S.tg) ? u : -1;
 }
+// Probabilitat que caigui UN home que és dins la franja a la distància u: més a prop, més probable; el primer rengle molt més que el segon;
+// escala amb el nombre de tiradors (n = fracció de la unitat que dispara). Cada home és independent: només s'aplica als que són dins la franja.
+function dieProb(u, rank, n) {
+  const T = TUNE.mosquet, acc = T.punteria[0] + (T.punteria[1] - T.punteria[0]) * Math.min(1, u / T.abast);
+  return Math.min(0.95, acc * (rank ? T.rengle2 : T.rengle1) * n);
+}
+function hitMen(S, men, n) {                      // retorna { inside, dead } de la llista d'homes {x,y,rank}
+  const inside = [], dead = [];
+  for (const m of men) { const u = inStrip(S, m.x, m.y); if (u < 0) continue; inside.push(m); if (Math.random() < dieProb(u, m.rank, n)) dead.push(m); }
+  return { inside, dead };
+}
+
+// ---------- Cadàvers: un cilindre arrodonit (com un Tic Tac) i un bassal de sang ----------
+const CORPSES = [];
+function addCorpse(x, y, a, own, rank) {
+  const n = 18, ph = [Math.random() * 6.28, Math.random() * 6.28, Math.random() * 6.28], r0 = 0.4 + Math.random() * 0.14, rad = [];
+  for (let i = 0; i < n; i++) { const th = i / n * Math.PI * 2; rad.push(r0 * (1 + 0.24 * Math.sin(2 * th + ph[0]) + 0.15 * Math.sin(3 * th + ph[1]) + 0.1 * Math.sin(5 * th + ph[2]) + (Math.random() - 0.5) * 0.14)); }
+  const drops = []; for (let i = 0; i < 4 + Math.floor(Math.random() * 3); i++) drops.push({ a: Math.random() * 6.28, d: r0 * (1.2 + Math.random() * 0.5), r: 0.04 + Math.random() * 0.05 });
+  CORPSES.push({ x, y, a, own, rank, t: 0, rad, drops, ox: Math.cos(a) * 0.12, oy: Math.sin(a) * 0.12 });
+}
+function drawCorpses() {
+  for (const c of CORPSES) {
+    const k = Math.min(1, 0.2 + 0.8 * Math.sqrt(c.t / 1.8)), n = c.rad.length;
+    ctx.save(); ctx.translate((c.x + c.ox) * M, (c.y + c.oy) * M);
+    const P = c.rad.map((r, i) => { const th = i / n * Math.PI * 2; return [Math.cos(th) * r * k * M, Math.sin(th) * r * k * M]; });
+    const path = () => { ctx.beginPath(); const mid = (p, q) => [(p[0] + q[0]) / 2, (p[1] + q[1]) / 2], m0 = mid(P[n - 1], P[0]); ctx.moveTo(m0[0], m0[1]); for (let i = 0; i < n; i++) { const q = P[i], m = mid(q, P[(i + 1) % n]); ctx.quadraticCurveTo(q[0], q[1], m[0], m[1]); } ctx.closePath(); };
+    const R = Math.max(...c.rad) * k * M, g = ctx.createRadialGradient(0, 0, 0, 0, 0, R);
+    g.addColorStop(0, 'rgba(92,6,8,.96)'); g.addColorStop(0.55, 'rgba(122,10,12,.93)'); g.addColorStop(1, 'rgba(142,18,18,.82)');
+    path(); ctx.fillStyle = g; ctx.fill(); ctx.strokeStyle = 'rgba(70,4,6,.55)'; ctx.lineWidth = Math.max(1, 0.05 * M); ctx.stroke();
+    ctx.fillStyle = 'rgba(255,205,205,.16)'; ctx.beginPath(); ctx.ellipse(-R * 0.28, -R * 0.3, R * 0.3, R * 0.14, -0.5, 0, Math.PI * 2); ctx.fill();      // brillantor de líquid
+    ctx.fillStyle = 'rgba(130,14,14,.85)'; for (const d of c.drops) { ctx.beginPath(); ctx.arc(Math.cos(d.a) * d.d * k * M, Math.sin(d.a) * d.d * k * M, Math.max(1, d.r * M), 0, Math.PI * 2); ctx.fill(); }
+    ctx.restore();
+    ctx.save(); ctx.translate(c.x * M, c.y * M); ctx.rotate(c.a);                                                     // el cos: un cilindre arrodonit, el cap cap a on mirava
+    const L = 0.8 * M, W = 0.34 * M, rr = Math.min(W * 0.46, 0.15 * M);
+    ctx.beginPath(); ctx.roundRect(-L / 2, -W / 2, L, W, rr);
+    ctx.fillStyle = c.own ? (c.rank ? T['u-rear'] : T['u-front']) : '#f7f5ee'; ctx.fill();
+    ctx.strokeStyle = c.own ? 'rgba(0,0,0,.45)' : '#6c6a63'; ctx.lineWidth = Math.max(1, 0.05 * M); ctx.stroke();
+    ctx.strokeStyle = 'rgba(255,255,255,.35)'; ctx.lineWidth = Math.max(1, 0.05 * M); ctx.beginPath(); ctx.moveTo(-L / 2 + rr, -W * 0.22); ctx.lineTo(L / 2 - rr, -W * 0.22); ctx.stroke();
+    ctx.restore();
+  }
+}
+function killEnemy(v, e) { v.alive = false; v.a = e.h; addCorpse(v.x, v.y, e.h + (Math.random() - 0.5) * 0.6, false, v.rank); }
+function routEnemy(e) {                          // els supervivents fugen corrents, lluny de la nostra unitat
+  const c = unitCentre(); let fled = 0;
+  for (const v of e.men) if (v.alive) { v.alive = false; const a = Math.atan2(v.y - c.y, v.x - c.x) + (Math.random() - 0.5) * 0.9, sp = 3.2 + Math.random() * 2; v.fl = { vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, t: -Math.random() * 0.6 }; fled++; }
+  e.routed = true; e.routedAt = performance.now(); return fled;
+}
+
+// ---------- Baixes pròpies: un altre home ocupa el buit (el punt de guia sempre queda a la dreta) ----------
+// Si cau un del primer rengle, puja el de darrere; si el buit és al segon rengle, l'omple el de la seva esquerra (i així en cadena).
+function fillHole(r, f, x, y) {
+  let src = null, nr = r, nf = f;
+  if (r === 0) { src = co.members.find(q => q.rank === 1 && q.file === f); if (src) { src.rank = 0; nr = 1; } }          // el de darrere puja
+  if (!src) { src = co.members.find(q => q.rank === r && q.file === f + 1); if (src) { src.file = f; nf = f + 1; } }       // el de l'esquerra s'hi desplaça
+  if (!src) return;
+  const ox = src.x + (src.gd ? src.gd.x : 0), oy = src.y + (src.gd ? src.gd.y : 0);      // el seu lloc antic (o on anava) queda buit
+  src.gd = { x: x - src.x, y: y - src.y };                                                // desplaçament que li queda per fer
+  fillHole(nr, nf, ox, oy);
+}
+function killOwn(m) {
+  const i = co.members.indexOf(m); if (i < 0) return;
+  addCorpse(m.x, m.y, m.h, true, m.rank);
+  co.members.splice(i, 1);
+  fillHole(m.rank, m.file, m.x, m.y);
+}
+function updateGlide(dt) {                       // els qui cobreixen un buit hi caminen (el desplaçament és relatiu: no depèn de si la unitat es mou)
+  for (const m of co.members) if (m.gd) {
+    const d = Math.hypot(m.gd.x, m.gd.y), st = 1.3 * dt;
+    if (d <= st) { m.x += m.gd.x; m.y += m.gd.y; m.gd = null; } else { const ax = m.gd.x / d * st, ay = m.gd.y / d * st; m.x += ax; m.y += ay; m.gd.x -= ax; m.gd.y -= ay; }
+  }
+}
+
 function drawFireStrip() {
   const S = fireStrip(), w1 = S.hw + S.R * S.tg;
   ctx.save(); ctx.translate(S.ox * M, S.oy * M); ctx.rotate(S.a);
@@ -1816,19 +1897,22 @@ function feu() {
     SFX.shot(d);
   }
   SFX.rumble(0.08, tMax + 1.2);
-  if (ENEMY.length) {                                                       // efecte sobre la unitat enemiga davant nostre
-    const S = fireStrip(), c = unitCentre(); let near = Infinity, inside = [];
-    for (const e of ENEMY) for (const v of e.men) { if (!v.alive) continue; near = Math.min(near, Math.hypot(v.x - c.x, v.y - c.y)); const u = inStrip(S, v.x, v.y); if (u >= 0) inside.push({ v, u }); }
+  const S = fireStrip(), nSh = co.members.length / 20; co.fireDir = null;
+  if (ENEMY.length) {                                                       // efecte sobre els homes enemics dins la franja
+    const c = unitCentre(); let near = Infinity, ok = false, hits = 0, exp = 0, tot = 0, exposed = [];
+    for (const e of ENEMY) {
+      const live = e.men.filter(v => v.alive); if (!live.length) continue;
+      for (const v of live) near = Math.min(near, Math.hypot(v.x - c.x, v.y - c.y));
+      const r = hitMen(S, live, nSh); for (const v of r.dead) { killEnemy(v, e); hits++; }
+      if (r.inside.length) { ok = true; e.volleys++; exp += r.inside.length; tot += live.length; }
+      exposed.push({ e, n: r.inside.length, of: live.length });
+    }
     if (near < Infinity) {
-      const ok = inside.length > 0; let hits = 0;
-      if (ok) for (let i = 0; i < co.members.length; i++) {
-        const t = inside[Math.floor(Math.random() * inside.length)];
-        if (t.v.alive && Math.random() < T.punteria[0] + (T.punteria[1] - T.punteria[0]) * t.u / T.abast) { t.v.alive = false; t.v.a = Math.random() * 3; hits++; }
-      }
       co.volley = { t: performance.now(), ok, hits, d: near };
-      if (!ok && near > T.abast) reac('assenyala', 'Massa lluny, chasseur: a <b>' + Math.round(near) + ' m</b> les bales no arriben. Cal estar a menys de <b>' + T.abast + ' m</b>.', 5000);
+      if (!ok && near > TUNE.mosquet.abast) reac('assenyala', 'Massa lluny, chasseur: a <b>' + Math.round(near) + ' m</b> les bales no arriben. Cal estar a menys de <b>' + TUNE.mosquet.abast + ' m</b>.', 5000);
       else if (!ok) reac('assenyala', 'No miren cap als austríacs: <b>gira la unitat</b> cap a ells abans de disparar.', 5000);
-      else setTimeout(() => reac('aprova', hits ? 'Impacte! Els austríacs han perdut <b>' + hits + '</b> homes.' : 'Han passat per sobre dels caps… ha estat una mala descàrrega.', 4200), 900);
+      else setTimeout(() => reac('aprova', (hits ? 'Impacte! Els austríacs han perdut <b>' + hits + '</b> homes.' : 'Han passat per sobre dels caps… ha estat una mala descàrrega.') + (exp < tot * 0.6 ? ' Només <b>' + exp + '</b> dels <b>' + tot + '</b> homes eren dins la franja.' : ''), 4600), 900);
+      if (level && level.onVolley) level.onVolley();
     }
   }
 }
@@ -1838,17 +1922,39 @@ function updateBayonet() {                      // càrrega a la baioneta: amb l
   for (const e of ENEMY) for (const v of e.men) if (v.alive && co.members.some(m => Math.hypot(m.x - v.x, m.y - v.y) < 1.0)) { touch = true; break; }
   if (!touch) return;
   if (!(co.volley && co.volley.ok)) { if (!co.stabWarn || performance.now() - co.stabWarn > 8000) { co.stabWarn = performance.now(); reac('louis', '<b>Louis:</b> Sense haver disparat primer? Així no, chasseur: <b>recula</b>, carrega i fes una <b>descàrrega</b> abans de la baioneta.', 5000); } return; }
-  let dead = 0, fled = 0, cx = 0, cy = 0; const c = unitCentre();
-  for (const e of ENEMY) for (const v of e.men) if (v.alive) {              // uns cauen i els altres fugen corrents cap enrere
-    v.alive = false;
-    if (Math.random() < 0.5) { v.a = Math.random() * 3; dead++; }
-    else { const a = Math.atan2(v.y - c.y, v.x - c.x) + (Math.random() - 0.5) * 0.9, sp = 3.2 + Math.random() * 2; v.fl = { vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, t: -Math.random() * 0.4 }; fled++; }
-  }
+  let dead = 0, fled = 0;
+  for (const e of ENEMY) { const live = e.men.filter(v => v.alive); for (const v of live) if (Math.random() < 0.5) { killEnemy(v, e); dead++; } fled += routEnemy(e); }
   co.stab = { t: performance.now(), n: dead + fled, dead, fled }; SFX.hit(); SFX.cry(8, 0.08);
   reac('aprova', 'A la baioneta! <b>' + dead + '</b> austríacs han caigut i <b>' + fled + '</b> fugen corrents.', 4500);
 }
+function enemyVolley(e, S, live) {
+  const T = TUNE.mosquet;
+  for (const v of live) { const d = Math.random() * T.escalf * (Math.random() < 0.12 ? 1.6 : 1); FX.push({ k: 'shot', x: v.x + Math.cos(e.h) * 1.25, y: v.y + Math.sin(e.h) * 1.25, a: e.h, t: -d }); SFX.shot(d); }
+  SFX.rumble(0.08, T.escalf + 1.2);
+  const r = hitMen(S, co.members, live.length / 20), n = r.dead.length;
+  for (const m of r.dead) killOwn(m);
+  e.reload = T.enRecarrega; e.aimT = 0; lastKey = '';
+  setTimeout(() => reac(n ? 'decebut' : 'aprova', '<b>Louis:</b> ' + (n ? 'Ens disparen! Hem perdut <b>' + n + '</b> homes. Els buits es cobreixen sols.' : 'Ens han disparat, però han errat!'), 4600), 700);
+  if (level && level.minMen && co.members.length < level.minMen && !co.lost) {
+    co.lost = true; setTimeout(() => { reset(); showMsg('La unitat ha quedat destrossada: partida reiniciada', 3200); }, 2600);
+  }
+}
+function updateEnemies(dt) {                     // els regiments enemics disparen a qui tinguin al davant
+  if (screen !== 'game' || paused || tutOpen() || co.lost) return;
+  for (const e of ENEMY) {
+    if (!e.shoots || e.routed) continue;
+    const live = e.men.filter(v => v.alive); if (!live.length) continue;
+    if (e.reload > 0) e.reload -= dt;
+    const S = makeStrip(live, e.h, e.h, TUNE.mosquet.enOberta);
+    if (!co.members.some(m => inStrip(S, m.x, m.y) >= 0)) { e.aimT = 0; continue; }
+    if (!e.warned) { e.warned = true; reac('louis', '<b>Louis:</b> Atenció, chasseur: som <b>davant d\'un regiment austríac</b> i ens estan apuntant! Surt de la seva línia i respon-los en <b>oblic</b>.', 6000); }
+    if (e.reload > 0) continue;
+    e.aimT += dt;
+    if (e.aimT >= TUNE.mosquet.enAvis) enemyVolley(e, S, live);
+  }
+}
 function updateMusket(dt) {
-  updateBayonet();
+  updateBayonet(); updateEnemies(dt); updateGlide(dt); for (const c of CORPSES) c.t += dt;
   for (const e of ENEMY) for (const v of e.men) if (v.fl && !v.gone) { v.fl.t += dt; if (v.fl.t > 0) { v.x += v.fl.vx * dt; v.y += v.fl.vy * dt; } if (v.fl.t > 4) v.gone = true; }
   if (co.arm === 'charge' && !co.ldSnd) { co.ldSnd = true; SFX.loadStart(() => co.arm === 'charge' ? 0.4 + 0.6 * co.members.filter(m => m.ld < 1).length / co.members.length : 0); }
   else if (co.arm !== 'charge' && co.ldSnd) { co.ldSnd = false; SFX.loadStop(); }
@@ -2866,9 +2972,9 @@ const ORDERS = [
   { id: 'FI-01', des: 0, fam: 'arm', float: true, lvl: 'musket', fr: 'Apprêtez', full: 'Apprêtez – vos armes!', gl: 'preparar per disparar (cal estar carregats)', icon: 'aim', cmds: ['appretez'],
     avail: () => armOrder(() => co.arm !== 'portez' ? 'cal tenir-la a l\'espatlla' : !co.loaded ? 'primer cal carregar (Chargez)' : true), run: () => setArm('apprete', 'Apprêtez vos armes!') },
   { id: 'FI-02', des: 0, fam: 'arm', float: true, lvl: 'musket', fr: 'Joue', full: 'Joue!', gl: 'apuntar (des d\'Apprêtez)', icon: 'aim', cmds: ['joue'],
-    avail: () => armOrder(() => co.arm !== 'apprete' ? 'primer Apprêtez' : true), run: () => setArm('joue', 'Joue!') },
+    avail: () => armOrder(() => co.arm !== 'apprete' ? 'primer Apprêtez' : true), run: sd => { co.fireDir = sd ? co.members[0].h + sd * TUNE.mosquet.oblic : null; setArm('joue', 'Joue!'); } },
   { id: 'FI-03', des: 0, fam: 'arm', float: true, lvl: 'musket', fr: 'Redressez', full: 'Redressez – vos armes!', gl: 'de Joue tornen a Apprêtez sense disparar', icon: 'back', cmds: ['redressez'],
-    avail: () => armOrder(() => co.arm !== 'joue' || !co.loaded ? 'només apuntant amb l\'arma carregada' : true), run: () => setArm('apprete', 'Redressez vos armes!') },
+    avail: () => armOrder(() => co.arm !== 'joue' || !co.loaded ? 'només apuntant amb l\'arma carregada' : true), run: () => { co.fireDir = null; setArm('apprete', 'Redressez vos armes!'); } },
   { id: 'FI-04', des: 0.15, shot: true, fam: 'arm', float: true, lvl: 'musket', fr: 'Feu', full: 'Feu!', gl: 'disparar', icon: 'aim', cmds: ['feu'],
     avail: () => armOrder(() => co.arm !== 'joue' ? 'primer Joue' : !co.loaded ? 'no estan carregats' : true), run: () => feu() }
 ];
@@ -2934,7 +3040,7 @@ function openMenu(id) {
   }
 }
 const PACE_FR = { ordinari: 'ordinaire', accelerat: 'accéléré', carrega: 'de charge' };
-const orderTitle = (o, arg) => o.full ? o.full.replace(/\{s\}/g, SIDE_FR[String(arg)] || '').replace('{o}', PACE_FR[arg] || arg || '') : o.fr;
+const orderTitle = (o, arg) => o.id === 'FI-02' && arg ? 'Oblique à ' + SIDE_FR[String(arg)] + ' – joue!' : o.full ? o.full.replace(/\{s\}/g, SIDE_FR[String(arg)] || '').replace('{o}', PACE_FR[arg] || arg || '') : o.fr;
 // Ordres en dues veus (reglament): primer la veu PREVENTIVA («Par le flanc droite») i, passat ORDER_DELAY, l'EXECUTIVA («droite!»), que és
 // quan la unitat executa. Les ordres d'una sola paraula (Fixe!, Contremarche!) i Halte s'executen al moment.
 const ORDER_DELAY = 1;
@@ -3028,20 +3134,25 @@ function buildOrderPanel() {
     }
   }
   if (!document.getElementById('fireBox')) {                 // control de foc fora de la barra: Apprêtez → Joue → Feu!
+    const jm = document.createElement('div'); jm.className = 'jm';
     const box = document.createElement('div'); box.id = 'fireBox'; box.innerHTML = '<span class="fst"><i></i>Carregats</span>';
     for (const [id, html, cls] of [['FI-01', ICONS.aim + '<span>Apprêtez</span>', 'fstep'], ['FI-02', ICONS.aim + '<span>Joue</span>', 'fstep'], ['FI-03', ICONS.back + '<span>Redressez</span>', 'fstep'], ['FI-04', '<b>Feu!</b><small>espai</small>', 'feu']]) {
       const o = ORDER_BY_ID[id], b = document.createElement('button'); b.className = cls; b.dataset.id = id; b.innerHTML = html;
-      b.onclick = () => fire(o); box.appendChild(b);
+      b.onclick = id === 'FI-02' ? () => { if (o.avail() === true && !tutLocked() && !pendingCmd) jm.classList.toggle('open'); } : () => fire(o); box.appendChild(b);
     }
+    jm.innerHTML = [[-1, ICONS.obLeft, 'Oblique à gauche', 'oblic esquerra'], [0, ICONS.forward, 'En avant', 'foc recte'], [1, ICONS.obRight, 'Oblique à droite', 'oblic dreta']]
+      .map(([v, ic, t, sm]) => '<button data-v="' + v + '">' + ic + '<span>' + t + '</span><small>' + sm + '</small></button>').join('');
+    jm.onclick = ev => { const bt = ev.target.closest('button'); if (!bt) return; jm.classList.remove('open'); const v = +bt.dataset.v; fire(ORDER_BY_ID['FI-02'], v || undefined); };
+    box.appendChild(jm);
     document.getElementById('controls').appendChild(box);
   }
-  panel.fire = [...document.querySelectorAll('#fireBox button')];
+  panel.fire = [...document.querySelectorAll('#fireBox > button')];
 }
 window.addEventListener('keydown', e => {                    // espai = Feu! (si no s'usa per parlar)
   if (e.code !== 'Space' || screen !== 'game' || e.repeat || (VOICE.on && VOICE.opt.mode === 'ptt') || tutOpen()) return;
   const fo = ORDER_BY_ID['FI-04']; if (armMode() && fo.avail() === true) { e.preventDefault(); fire(fo); }
 });
-document.addEventListener('pointerdown', e => { if (openFam && !e.target.closest('#famrow')) openMenu(null); });
+document.addEventListener('pointerdown', e => { if (!e.target.closest('#fireBox')) { const j = document.querySelector('#fireBox .jm'); if (j) j.classList.remove('open'); } if (openFam && !e.target.closest('#famrow')) openMenu(null); });
 window.addEventListener('keydown', e => { if (e.key === 'Escape' && openFam) openMenu(null); });
 
 function renderUnitControls() {
@@ -3082,6 +3193,7 @@ function renderUnitControls() {
   }
   if (panel.fire) {
     document.getElementById('fireBox').style.display = armMode() && co.loaded ? '' : 'none';   // només surt amb les armes carregades
+    if (co.arm !== 'apprete') document.querySelector('#fireBox .jm').classList.remove('open');
     for (const b of panel.fire) {
       const o = ORDER_BY_ID[b.dataset.id], a = o.avail();
       if (o.id === 'FI-03') b.style.display = co.arm === 'joue' ? '' : 'none';           // Redressez només surt quan estan apuntant
@@ -3100,7 +3212,7 @@ function renderUnitControls() {
 // ---------- Carta de la unitat (estat, a baix a l'esquerra) ----------
 function buildUnitCard() {
   const c = document.getElementById('ucard');
-  c.innerHTML = '<div class="section">Unitat · 20 homes</div><div class="ucbody"><canvas id="ucGlyph" width="76" height="76"></canvas>' +
+  c.innerHTML = '<div class="section" id="ucTitle">Unitat · 20 homes</div><div class="ucbody"><canvas id="ucGlyph" width="76" height="76"></canvas>' +
     '<dl><dt>Forma</dt><dd id="ucForm"></dd><dt>Posició</dt><dd id="ucPos"></dd><dt>Estat</dt><dd id="ucEst"></dd><dt id="ucPasL">Pas</dt><dd id="ucPas"></dd></dl></div>' +
     '<div class="ucord"><span id="ucOrdLbl">Ordre</span><div class="bar"><i id="ucBar"></i></div><b id="ucPct"></b></div>' +
     '<div class="ucord" id="ucEnRow" style="display:none"><span>Energia</span><div class="bar"><i id="ucEnBar"></i></div><b id="ucEnPct"></b></div>';
@@ -3108,6 +3220,7 @@ function buildUnitCard() {
 function updateInfo() {
   const $ = id => document.getElementById(id);
   if (!$('ucForm')) return;
+  if (co.members.length !== co._nShown) { co._nShown = co.members.length; $('ucTitle').textContent = 'Unitat · ' + co.members.length + ' homes'; }
   $('ucForm').textContent = formationName();
   $('ucPos').textContent = co.atencio ? 'atenció' : 'repòs';
   $('ucEst').textContent = estatText();
@@ -3410,7 +3523,7 @@ function drawCo() {
     const c = co.conv; ctx.strokeStyle = T.ecarlate; ctx.lineWidth = 1.5; ctx.setLineDash([3, 3]);
     ctx.beginPath(); ctx.arc(c.px * M, c.py * M, Math.max(5, 0.5 * M), 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]);
   }
-  drawHover(); drawEnemies();
+  drawCorpses(); drawHover(); drawEnemies();
   // Soldats: rodones; la ratlla blanca indica cap on miren
   const rS = Math.max(1.8, 0.2 * M);
   for (const m of co.members) {
@@ -3455,7 +3568,7 @@ let autoStepT = 0;
 const VOICE = { on: false, rec: null, running: false, tested: false, seg: {}, interim: '', state: '', failT: 0, lastFail: null,
   learn: { phr: {}, ex: {} }, shared: { phr: {}, ex: {} }, opt: { mode: 'cont', vol: true, log: false, tele: true, engine: '' }, log: [], recentExec: null, ptt: false, db: false, loading: false };
 // Connexió amb Supabase (la mateixa de la web: si el joc s'obre dins la web, agafa window.APP_CONFIG) i fonts del motor local Vosk
-const GAME_VERSION = '1.4.12';
+const GAME_VERSION = '1.4.13';
 const CFG = Object.assign({
   SUPABASE_URL: 'https://ltopullwhasagnkuqaek.supabase.co',
   SUPABASE_ANON_KEY: 'sb_publishable_DhHFUh-UrbBrI0l476Vcnw_tSn-Gmkr',
@@ -4584,13 +4697,83 @@ function buildLevel6() {
   };
 }
 
+function buildLevel7() {
+  const A = MapKit.A, sc = [];
+  const W = 120, H = 56, AX = 100, AY = 20, BY = 48, R = TUNE.mosquet.abast, OB = TUNE.mosquet.oblic;
+  sc.push(
+    A.field([[0, 0], [W, 0], [W, H], [0, H]], { kind: 'meadow' }),
+    A.road([[0, 34], [96, 34]], { kind: 'track' }),
+    A.wood([[4, 2], [40, 2], [44, 8], [6, 10]], { kind: 'mixed', seed: 71 }), A.wood([[10, 46], [48, 46], [52, 54], [12, 54]], { kind: 'broad', seed: 72 }),
+    A.label('Els austríacs', 108, 8, { kind: 'town', scale: 0.5 }), A.label('Camí de foc', 30, 38, { kind: 'place', scale: 0.55 })
+  );
+  const cen = i => ({ x: ENEMY[i].cx, y: ENEMY[i].cy });
+  const side = i => (i === 0 ? -1 : 1);                                      // el 1r regiment és a l'esquerra (nord) i el 2n a la dreta (sud)
+  const obStrip = i => { const h = co.members[0].h, S = fireStrip(); S.a = h + side(i) * OB; return S; };
+  const aimed = i => inStrip(obStrip(i), cen(i).x, cen(i).y) >= 0;           // el centre del regiment és dins la franja oblica
+  const rel = i => { const c = unitCentre(), t = cen(i); return Math.abs(wrapA(Math.atan2(t.y - c.y, t.x - c.x) - co.members[0].h)); };
+  const alive = () => co.members.length, shot = i => ENEMY[i] && ENEMY[i].volleys > 0;
+  const placeHint = i => {
+    const nm = i === 0 ? 'primer' : 'segon', d = Math.round(Math.hypot(cen(i).x - unitCentre().x, cen(i).y - unitCentre().y));
+    if (co.state === 'marxa') return aimed(i) ? 'Ja tens el ' + nm + ' regiment a l\'oblic (' + d + ' m): <b>Halte!</b>' : rel(i) < OB ? 'Encara no hi ets: continua <b>En avant</b> fins que el ' + nm + ' regiment quedi a 45° (' + d + ' m).' : 'Ja has passat de llarg: <b>En arrière</b> un parell de metres.';
+    if (co.state !== 'parat') return '…';
+    return aimed(i) ? 'El ' + nm + ' regiment queda a l\'oblic (' + d + ' m). <b>Apprêtez</b>, <b>Joue</b> (amb <b>oblique à ' + (i === 0 ? 'gauche' : 'droite') + '</b>) i <b>Feu!</b>' : rel(i) < OB ? '<b>En avant</b>: encara has d\'avançar per tenir el ' + nm + ' regiment a 45° (' + d + ' m).' : 'T\'has passat: <b>En arrière</b> per tenir el ' + nm + ' regiment a 45°.';
+  };
+  const fireHint = i => {
+    const nm = i === 0 ? 'primer' : 'segon';
+    if (co.chaos) return '…';
+    if (!co.loaded) return co.arm === 'charge' ? 'Carregant… espera que els rellotges es posin en <b>verd</b>.' : 'Estan descarregats: <b>Mosquet → Chargez</b>.';
+    if (co.state !== 'parat') return placeHint(i);
+    if (co.arm === 'portez') return placeHint(i);
+    if (co.arm === 'apprete') return 'Obre <b>Joue</b> i tria <b>oblique à ' + (i === 0 ? 'gauche' : 'droite') + '</b>: la franja vermella ha de tocar el ' + nm + ' regiment.';
+    if (co.arm === 'joue') return aimed(i) ? 'Franja sobre el ' + nm + ' regiment: <b>Feu!</b> (o espai).' : 'La franja no toca el ' + nm + ' regiment: <b>Redressez</b>, mou-te una mica i torna-ho a provar.';
+    return '…';
+  };
+  const ALL = ['gir', 'mov', 'pace', 'parfile', 'bataille', 'align', 'obl', 'conv', 'tournez', 'ligne', 'form', 'repos'];
+  const hlFire = i => !co.loaded ? ['chargez'] : co.state === 'marxa' ? (aimed(i) ? ['halte'] : []) : co.state !== 'parat' ? [] : co.arm === 'portez' ? (aimed(i) ? ['appretez'] : ['avant']) : co.arm === 'apprete' ? ['joue'] : co.arm === 'joue' && aimed(i) ? ['feu'] : co.arm === 'joue' ? [] : [];
+  const steps = [
+    { title: 'Foc recte i foc oblic', pose: 'serios', hl: [], unlock: ALL, tag: 'Benvinguda', intro: true, btn: 'Endavant',
+      text: ['<b>Chasseur</b>, ara tenim <b>dos regiments austríacs</b> a l\'est, un a cada banda del nostre camí. Mira\'ls: cadascun té una <b>línia de foc</b> al davant. Si t\'hi poses davant, <b>et disparen</b> i caurà gent; els buits els cobreixen sols els companys (puja el de darrere o es desplaça el de l\'esquerra, perquè el guia sempre queda a la dreta).',
+        'La solució és <b>no donar-los el front</b>: avança pel camí i dispara-los <b>en oblic</b>, des del costat. Si perds massa homes, perdrem la partida.'],
+      done: () => TUT.intro },
+    { title: 'Carregar', pose: 'assenyala', unlock: ['musket'], mini: 'Dóna <b>Mosquet → Chargez</b> i espera que tots els rellotges es posin en verd.',
+      get hl() { return co.loaded ? [] : ['chargez']; }, cue: () => co.loaded || co.arm === 'charge' ? '' : 'Mosquet → Chargez!', done: () => co.loaded },
+    { title: 'Joue: tres opcions', pose: 'assenyala', tag: 'Foc oblic', hl: [], unlock: [], btn: 'Entesos', ack: true,
+      text: ['Quan toquis <b>Joue</b> a la barra <b>Carregats</b> sortiran <b>tres opcions</b>: <b>En avant</b> (foc recte, sense cap ordre extra), <b>Oblique à gauche</b> i <b>Oblique à droite</b> (foc en diagonal, a 45°). Veuràs una <b>franja vermella</b> que mostra on aniran les bales: només cauran els que quedin <b>dins la franja</b>.',
+        'Com <b>més a prop</b>, més probabilitat; i el <b>primer rengle</b> en rep molt més que el segon. Si la franja només toca una part del regiment, només aquests homes es juguen la pell.'],
+      done() { return !!this.acked; } },
+    { title: 'Col·loca\'t pel 1r regiment', pose: 'assenyala', unlock: [], get hl() { return hlFire(0); }, mini: () => fireHint(0), resetStep: () => 3, done: () => shot(0) },
+    { title: 'Recarrega', pose: 'serios', tag: 'El segon regiment', hl: [], unlock: [], btn: 'Endavant', ack: true,
+      text: ['<b>Bona descàrrega!</b> Ara toca el <b>2n regiment</b>, a l\'altre costat del camí: recarrega, avança fins que el tinguis a <b>45° a la dreta</b> i dispara en <b>oblique à droite</b>.',
+        'Quan el segon regiment rebi la seva descàrrega, els dos <b>perdran el coratge</b> i fugiran.'],
+      done() { return !!this.acked; } },
+    { title: 'Col·loca\'t pel 2n regiment', pose: 'assenyala', unlock: [], get hl() { return hlFire(1); }, mini: () => fireHint(1), resetStep: () => 3, done: () => shot(1) },
+    { title: 'Fugen!', pose: 'aprova', unlock: [], hl: [], mini: 'Els austríacs fugen corrents!', done: () => false }
+  ];
+  return {
+    w: W, h: H, start: { x: 8, y: 34 }, obstacles: [], scene: MapKit.scene(sc), zone: null, musket: true, driftScale: 0.5, goalHeading: 0, minMen: 8,
+    enemies: [{ name: '1r Regiment austríac', flag: 'aut', cx: AX, cy: AY, h: Math.PI, shoots: true }, { name: '2n Regiment austríac', flag: 'aut', cx: AX, cy: BY, h: Math.PI, shoots: true }],
+    tutorial: { steps, figs: [], startAtencio: true, resetStep: () => 3 },
+    onVolley() { if (ENEMY.every(e => e.volleys > 0) && !ENEMY.some(e => e.routed)) setTimeout(() => { for (const e of ENEMY) routEnemy(e); SFX.cry(8, 0.08); reac('aprova', 'Els dos regiments han perdut el coratge i <b>fugen corrents</b>!', 4500); }, 1400); },
+    win: () => ENEMY.length > 0 && ENEMY.every(e => e.routed) && performance.now() - Math.max(...ENEMY.map(e => e.routedAt)) > 3200,
+    objectives: [
+      { t: 'Carregar els mosquets', ok: () => co.loaded || shot(0) || shot(1) || OBJ.done[0] },
+      { t: 'Descàrrega oblica contra el 1r regiment', ok: () => shot(0) },
+      { t: 'Descàrrega oblica contra el 2n regiment', ok: () => shot(1) },
+      { t: 'Aguantar amb almenys 8 homes', ok: () => alive() >= 8 && ENEMY.every(e => e.routed) }
+    ],
+    goalText: 'Dispara en oblic un cop a cada regiment austríac sense posar-te al seu davant; no baixis de 8 homes.',
+    endText: 'Molt bé, chasseur: has après a disparar en oblic i a no donar el front a l\'enemic. Els dos regiments austríacs han fugit.'
+  };
+}
+
 const LEVELS = [{ n: 1, title: 'Sortir de la plaça', desc: 'Tutorial: surt d\'una plaça tancada, passa un corredor de tendes i torna a formar.', build: buildLevel1 },
   { n: 2, title: 'La porta i la cantonada', desc: 'Oblics, Tournez i Par peloton: passa una porta en diagonal, gira una cantonada sense trencar la línia i fes front des d\'aturat.', build: buildLevel2 }];
 LEVELS.push({ n: 3, title: 'Exercici de síntesi', desc: 'Practica el que has après: porta en oblic, camí estret en columna i formació final alineada, sense ajuda.', build: buildLevel3 });
 LEVELS.push({ n: 4, title: 'La clariana', desc: 'Par peloton en ligne i contremarche: baixa per un camí estret en columna, forma la línia en marxa i gira tota la unitat.', build: buildLevel4 });
 LEVELS.push({ n: 5, title: 'Cansament i desordre', desc: 'Coneix el sergent-major Louis i el chasseur Lefon: recorre tres bases parant a descansar i a alinear la unitat.', build: buildLevel5 });
 LEVELS.push({ n: 6, title: 'La guerra comença', desc: 'Carrega el mosquet, avança cap a una unitat austríaca i dispara-li.', build: buildLevel6 });
-for (let i = 7; i <= 12; i++) LEVELS.push({ n: i, title: 'Properament', desc: 'Aquest nivell encara no està disponible.', locked: true });
+LEVELS.push({ n: 7, title: 'Foc recte i foc oblic', desc: 'Dos regiments austríacs et dispararan si els dones el front: dispara\'ls en oblic des del camí.', build: buildLevel7 });
+for (let i = 8; i <= 12; i++) LEVELS.push({ n: i, title: 'Properament', desc: 'Aquest nivell encara no està disponible.', locked: true });
 
 const FREE = { build: buildFree };
 function showScreen(name) {
