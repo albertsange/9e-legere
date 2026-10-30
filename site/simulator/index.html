@@ -1128,7 +1128,10 @@ const TUNE = {
               oblic: Math.PI / 4,             // angle del foc oblic (TF-02)
               enOberta: 0.14,                 // semiobertura de la franja d'un regiment enemic (±8°)
               enAvis: 2.5,                    // segons que triga un regiment a disparar-nos un cop som davant seu
-              enRecarrega: 20 }               // segons entre les seves descàrregues
+              enRecarrega: 20,                // segons entre les seves descàrregues
+              enPunteria: 0.45,               // la punteria dels austríacs, respecte a la nostra
+              enAlerta: 30,                   // a aquesta distància (si ens veuen) es giren cap a nosaltres
+              enGir: 0.17 }                   // velocitat de gir d'un regiment enemic (rad/s, ~10°/s)
 };
 const CONV_ORDER = { stand: 'WH-01', move: 'WH-02', turn: 'WH-03', ligne: 'WH-04', cm: 'CD-06' };   // maniobra en curs → ordre que la descriu
 function orderPct() { return Math.round(100 * Math.max(0, 1 - disorderRms() / TUNE.ordre.rmsZero)); }
@@ -1808,9 +1811,15 @@ function dieProb(u, rank, n) {
   const T = TUNE.mosquet, acc = T.punteria[0] + (T.punteria[1] - T.punteria[0]) * Math.min(1, u / T.abast);
   return Math.min(0.95, acc * (rank ? T.rengle2 : T.rengle1) * n);
 }
+function losBlocked(x0, y0, x1, y1) {            // els arbres (level.cover) tapen la visual i aturen les bales
+  const C = level && level.cover; if (!C) return false;
+  const dx = x1 - x0, dy = y1 - y0, L2 = dx * dx + dy * dy || 1;
+  for (const t of C) { const k = Math.max(0, Math.min(1, ((t.x - x0) * dx + (t.y - y0) * dy) / L2)), ex = x0 + dx * k - t.x, ey = y0 + dy * k - t.y; if (ex * ex + ey * ey < t.r * t.r * 0.64) return true; }
+  return false;
+}
 function hitMen(S, men, n) {                      // retorna { inside, dead } de la llista d'homes {x,y,rank}
   const inside = [], dead = [];
-  for (const m of men) { const u = inStrip(S, m.x, m.y); if (u < 0) continue; inside.push(m); if (Math.random() < dieProb(u, m.rank, n)) dead.push(m); }
+  for (const m of men) { const u = inStrip(S, m.x, m.y); if (u < 0 || losBlocked(S.ox, S.oy, m.x, m.y)) continue; inside.push(m); if (Math.random() < dieProb(u, m.rank, n)) dead.push(m); }
   return { inside, dead };
 }
 
@@ -1931,26 +1940,34 @@ function enemyVolley(e, S, live) {
   const T = TUNE.mosquet;
   for (const v of live) { const d = Math.random() * T.escalf * (Math.random() < 0.12 ? 1.6 : 1); FX.push({ k: 'shot', x: v.x + Math.cos(e.h) * 1.25, y: v.y + Math.sin(e.h) * 1.25, a: e.h, t: -d }); SFX.shot(d); }
   SFX.rumble(0.08, T.escalf + 1.2);
-  const r = hitMen(S, co.members, live.length / 20), n = r.dead.length;
+  const r = hitMen(S, co.members, live.length / 20 * T.enPunteria), n = r.dead.length;
   for (const m of r.dead) killOwn(m);
   e.reload = T.enRecarrega; e.aimT = 0; lastKey = '';
-  setTimeout(() => reac(n ? 'decebut' : 'aprova', '<b>Louis:</b> ' + (n ? 'Ens disparen! Hem perdut <b>' + n + '</b> homes. Els buits es cobreixen sols.' : 'Ens han disparat, però han errat!'), 4600), 700);
+  setTimeout(() => reac(n ? 'decebut' : 'aprova', '<b>Louis:</b> ' + (n ? 'Ens disparen! Hem perdut <b>' + n + '</b> homes.' : 'Ens han disparat, però han errat!'), 4600), 700);
   if (level && level.minMen && co.members.length < level.minMen && !co.lost) {
     co.lost = true; setTimeout(() => { reset(); showMsg('La unitat ha quedat destrossada: partida reiniciada', 3200); }, 2600);
   }
 }
-function updateEnemies(dt) {                     // els regiments enemics disparen a qui tinguin al davant
+function updateEnemies(dt) {                     // els regiments enemics es giren cap a nosaltres quan ens veuen i disparen a qui tinguin al davant
   if (screen !== 'game' || paused || tutOpen() || co.lost) return;
+  const T = TUNE.mosquet, c = unitCentre();
   for (const e of ENEMY) {
     if (!e.shoots || e.routed) continue;
     const live = e.men.filter(v => v.alive); if (!live.length) continue;
     if (e.reload > 0) e.reload -= dt;
-    const S = makeStrip(live, e.h, e.h, TUNE.mosquet.enOberta);
-    if (!co.members.some(m => inStrip(S, m.x, m.y) >= 0)) { e.aimT = 0; continue; }
-    if (!e.warned) { e.warned = true; reac('louis', '<b>Louis:</b> Atenció, chasseur: som <b>davant d\'un regiment austríac</b> i ens estan apuntant! Surt de la seva línia i respon-los en <b>oblic</b>.', 6000); }
+    const seen = !losBlocked(e.cx, e.cy, c.x, c.y);
+    if (!e.alert && (e.volleys > 0 || (seen && Math.hypot(c.x - e.cx, c.y - e.cy) <= T.enAlerta))) {
+      e.alert = true; reac('louis', '<b>Louis:</b> Ens han vist! El <b>' + e.name + '</b> gira cap a nosaltres.', 4500);
+    }
+    if (e.alert && seen) {                                                   // gira sobre el seu centre per encarar-nos
+      const d = wrapA(Math.atan2(c.y - e.cy, c.x - e.cx) - e.h), st = Math.max(-T.enGir * dt, Math.min(T.enGir * dt, d));
+      if (Math.abs(st) > 1e-5) { const cs = Math.cos(st), sn = Math.sin(st); for (const v of live) { const x = v.x - e.cx, y = v.y - e.cy; v.x = e.cx + x * cs - y * sn; v.y = e.cy + x * sn + y * cs; } e.h += st; }
+    }
+    const S = makeStrip(live, e.h, e.h, T.enOberta);
+    if (!co.members.some(m => inStrip(S, m.x, m.y) >= 0 && !losBlocked(S.ox, S.oy, m.x, m.y))) { e.aimT = 0; continue; }
     if (e.reload > 0) continue;
     e.aimT += dt;
-    if (e.aimT >= TUNE.mosquet.enAvis) enemyVolley(e, S, live);
+    if (e.aimT >= T.enAvis) enemyVolley(e, S, live);
   }
 }
 function updateMusket(dt) {
@@ -3568,7 +3585,7 @@ let autoStepT = 0;
 const VOICE = { on: false, rec: null, running: false, tested: false, seg: {}, interim: '', state: '', failT: 0, lastFail: null,
   learn: { phr: {}, ex: {} }, shared: { phr: {}, ex: {} }, opt: { mode: 'cont', vol: true, log: false, tele: true, engine: '' }, log: [], recentExec: null, ptt: false, db: false, loading: false };
 // Connexió amb Supabase (la mateixa de la web: si el joc s'obre dins la web, agafa window.APP_CONFIG) i fonts del motor local Vosk
-const GAME_VERSION = '1.4.14';
+const GAME_VERSION = '1.4.15';
 const CFG = Object.assign({
   SUPABASE_URL: 'https://ltopullwhasagnkuqaek.supabase.co',
   SUPABASE_ANON_KEY: 'sb_publishable_DhHFUh-UrbBrI0l476Vcnw_tSn-Gmkr',
@@ -4698,71 +4715,81 @@ function buildLevel6() {
 }
 
 function buildLevel7() {
-  const A = MapKit.A, sc = [];
-  const W = 120, H = 56, AX = 100, AY = 20, BY = 48, R = TUNE.mosquet.abast, OB = TUNE.mosquet.oblic;
+  const A = MapKit.A, sc = [], obs = [];
+  const W = 84, H = 56, R = TUNE.mosquet.abast, OB = TUNE.mosquet.oblic;
+  const RA = { x: 34, y: 24 }, RB = { x: 72, y: 40 };                       // 1r regiment (nord, en oblic) i 2n (al final del camí, de cara)
+  const bosquet = A.wood([[38, 25], [50, 24], [52, 33], [40, 36]], { kind: 'broad', spacing: 2.6, seed: 74 });
+  const bosc2 = A.wood([[2, 4], [20, 3], [22, 16], [4, 18]], { kind: 'mixed', spacing: 3.2, seed: 75 });
+  const bosc3 = A.wood([[50, 50], [80, 49], [82, 55], [52, 55]], { kind: 'broad', spacing: 3.4, seed: 76 });
+  const arbres = [[14, 37, 1.3], [11, 33, 1.1], [17, 31, 1.2], [56, 30, 1.2], [60, 34, 1.0], [10, 50, 1.2], [18, 52, 1.1]];   // arbres que tapen la vista del 1r regiment des de l'inici
   sc.push(
     A.field([[0, 0], [W, 0], [W, H], [0, H]], { kind: 'meadow' }),
-    A.road([[0, 34], [96, 34]], { kind: 'track' }),
-    A.wood([[4, 2], [40, 2], [44, 8], [6, 10]], { kind: 'mixed', seed: 71 }), A.wood([[10, 46], [48, 46], [52, 54], [12, 54]], { kind: 'broad', seed: 72 }),
-    A.label('Els austríacs', 108, 8, { kind: 'town', scale: 0.5 }), A.label('Camí de foc', 30, 38, { kind: 'place', scale: 0.55 })
+    A.road([[0, 44], [64, 44], [70, 42]], { kind: 'track' }),
+    bosquet, bosc2, bosc3, ...arbres.map(([x, y, r], i) => A.tree(x, y, { r, seed: 80 + i })),
+    A.fence([[36, 39], [62, 39]]),
+    A.label('Els austríacs', 64, 10, { kind: 'town', scale: 0.5 }), A.label('Le Bosquet', 45, 21, { kind: 'place', scale: 0.5 })
   );
+  obs.push({ x0: 36, y0: 38.6, x1: 62, y1: 39.4, msg: 'Has tocat la tanca: torna-ho a provar' });
+  const cover = [...bosquet.trees, ...bosc2.trees, ...bosc3.trees, ...arbres.map(([x, y, r]) => ({ x, y, r }))];
   const cen = i => ({ x: ENEMY[i].cx, y: ENEMY[i].cy });
-  const side = i => (i === 0 ? -1 : 1);                                      // el 1r regiment és a l'esquerra (nord) i el 2n a la dreta (sud)
-  const obStrip = i => { const h = co.members[0].h, S = fireStrip(); S.a = h + side(i) * OB; return S; };
-  const aimed = i => inStrip(obStrip(i), cen(i).x, cen(i).y) >= 0;           // el centre del regiment és dins la franja oblica
+  const mode = i => (i === 0 ? -1 : 0);                                     // al 1r, oblic a l'esquerra; al 2n, foc recte
+  const strip = i => { const h = co.members[0].h, S = fireStrip(); S.a = h + mode(i) * OB; return S; };
+  const aimed = i => { const S = strip(i), t = cen(i); return inStrip(S, t.x, t.y) >= 0 && !losBlocked(S.ox, S.oy, t.x, t.y); };
   const rel = i => { const c = unitCentre(), t = cen(i); return Math.abs(wrapA(Math.atan2(t.y - c.y, t.x - c.x) - co.members[0].h)); };
-  const alive = () => co.members.length, shot = i => ENEMY[i] && ENEMY[i].volleys > 0;
+  const dist = i => { const c = unitCentre(), t = cen(i); return Math.round(Math.hypot(t.x - c.x, t.y - c.y)); };
+  const shot = i => ENEMY[i] && ENEMY[i].volleys > 0;
   const placeHint = i => {
-    const nm = i === 0 ? 'primer' : 'segon', d = Math.round(Math.hypot(cen(i).x - unitCentre().x, cen(i).y - unitCentre().y));
-    if (co.state === 'marxa') return aimed(i) ? 'Ja tens el ' + nm + ' regiment a l\'oblic (' + d + ' m): <b>Halte!</b>' : rel(i) < OB ? 'Encara no hi ets: continua <b>En avant</b> fins que el ' + nm + ' regiment quedi a 45° (' + d + ' m).' : 'Ja has passat de llarg: <b>En arrière</b> un parell de metres.';
-    if (co.state !== 'parat') return '…';
-    return aimed(i) ? 'El ' + nm + ' regiment queda a l\'oblic (' + d + ' m). <b>Apprêtez</b>, <b>Joue</b> (amb <b>oblique à ' + (i === 0 ? 'gauche' : 'droite') + '</b>) i <b>Feu!</b>' : rel(i) < OB ? '<b>En avant</b>: encara has d\'avançar per tenir el ' + nm + ' regiment a 45° (' + d + ' m).' : 'T\'has passat: <b>En arrière</b> per tenir el ' + nm + ' regiment a 45°.';
+    const d = dist(i);
+    if (i === 0) {
+      if (aimed(0)) return co.state === 'marxa' ? 'Ja tens el primer regiment a l\'oblic (' + d + ' m): <b>Halte!</b>' : 'El primer regiment queda a l\'oblic (' + d + ' m). <b>Apprêtez</b>, <b>Joue</b> (amb <b>oblique à gauche</b>) i <b>Feu!</b>';
+      return rel(0) < OB ? 'Encara no hi ets: continua <b>En avant</b> fins que el primer regiment quedi a 45° (' + d + ' m).' : 'Ja has passat de llarg: <b>En arrière</b> un parell de metres.';
+    }
+    if (aimed(1) && d <= R) return co.state === 'marxa' ? 'El segon regiment és a tret i de cara (' + d + ' m): <b>Halte!</b>' : 'El segon regiment és de cara (' + d + ' m): <b>Apprêtez</b>, <b>Joue</b> (<b>En avant</b>) i <b>Feu!</b>';
+    return d > R ? 'Avança pel camí: el segon regiment és a ' + d + ' m, encara fora de tret.' : 'El segon regiment no és ben bé al davant: corregeix amb un <b>oblic</b> i atura\'t de cara a ell.';
   };
   const fireHint = i => {
-    const nm = i === 0 ? 'primer' : 'segon';
     if (co.chaos) return '…';
     if (!co.loaded) return co.arm === 'charge' ? 'Carregant… espera que els rellotges es posin en <b>verd</b>.' : 'Estan descarregats: <b>Mosquet → Chargez</b>.';
-    if (co.state !== 'parat') return placeHint(i);
-    if (co.arm === 'portez') return placeHint(i);
-    if (co.arm === 'apprete') return 'Obre <b>Joue</b> i tria <b>oblique à ' + (i === 0 ? 'gauche' : 'droite') + '</b>: la franja vermella ha de tocar el ' + nm + ' regiment.';
-    if (co.arm === 'joue') return aimed(i) ? 'Franja sobre el ' + nm + ' regiment: <b>Feu!</b> (o espai).' : 'La franja no toca el ' + nm + ' regiment: <b>Redressez</b>, mou-te una mica i torna-ho a provar.';
+    if (co.state !== 'parat' || co.arm === 'portez') return placeHint(i);
+    if (co.arm === 'apprete') return i === 0 ? 'Obre <b>Joue</b> i tria <b>oblique à gauche</b>: la franja vermella ha de tocar el primer regiment.' : 'Obre <b>Joue</b> i tria <b>En avant</b>: foc recte contra el segon regiment.';
+    if (co.arm === 'joue') return aimed(i) ? 'Franja sobre l\'enemic: <b>Feu!</b> (o espai).' : 'La franja no toca l\'enemic (o hi ha arbres pel mig): <b>Redressez</b>, mou-te una mica i torna-ho a provar.';
     return '…';
   };
   const ALL = ['gir', 'mov', 'pace', 'parfile', 'bataille', 'align', 'obl', 'conv', 'tournez', 'ligne', 'form', 'repos'];
-  const hlFire = i => !co.loaded ? ['chargez'] : co.state === 'marxa' ? (aimed(i) ? ['halte'] : []) : co.state !== 'parat' ? [] : co.arm === 'portez' ? (aimed(i) ? ['appretez'] : ['avant']) : co.arm === 'apprete' ? ['joue'] : co.arm === 'joue' && aimed(i) ? ['feu'] : co.arm === 'joue' ? [] : [];
+  const hlFire = i => !co.loaded ? ['chargez'] : co.state === 'marxa' ? (aimed(i) ? ['halte'] : []) : co.state !== 'parat' ? [] : co.arm === 'portez' ? (aimed(i) ? ['appretez'] : ['avant']) : co.arm === 'apprete' ? ['joue'] : co.arm === 'joue' && aimed(i) ? ['feu'] : [];
   const steps = [
-    { title: 'Foc recte i foc oblic', pose: 'serios', hl: [], unlock: ALL, tag: 'Benvinguda', intro: true, btn: 'Endavant',
-      text: ['<b>Chasseur</b>, ara tenim <b>dos regiments austríacs</b> a l\'est, un a cada banda del nostre camí. Mira\'ls: cadascun té una <b>línia de foc</b> al davant. Si t\'hi poses davant, <b>et disparen</b> i caurà gent; els buits els cobreixen sols els companys (puja el de darrere o es desplaça el de l\'esquerra, perquè el guia sempre queda a la dreta).',
-        'La solució és <b>no donar-los el front</b>: avança pel camí i dispara-los <b>en oblic</b>, des del costat. Si perds massa homes, perdrem la partida.'],
+    { title: 'Plom austríac', pose: 'serios', hl: [], unlock: ALL, tag: 'Benvinguda', intro: true, btn: 'Som-hi',
+      text: ['<b>Chasseur</b>, escolta bé. Dos regiments austríacs ens barren el pas: un vigila des del nord, a tocar del <b>bosquet</b>; l\'altre ens espera al <b>final del camí</b>. Tenen pólvora, tenen bales i moltes ganes de fer-nos-les empassar.',
+        'Si ens veuen, <b>es giraran cap a nosaltres</b> i ens dispararan. Un chasseur no s\'hi planta al davant com un ànec a la fira: <b>dispara primer</b>, de biaix si cal, i fa servir els <b>arbres</b> per cobrir-se, que les bales no travessen troncs. Carrega, i que no tremoli ningú.'],
       done: () => TUT.intro },
     { title: 'Carregar', pose: 'assenyala', unlock: ['musket'], mini: 'Dóna <b>Mosquet → Chargez</b> i espera que tots els rellotges es posin en verd.',
       get hl() { return co.loaded ? [] : ['chargez']; }, cue: () => co.loaded || co.arm === 'charge' ? '' : 'Mosquet → Chargez!', done: () => co.loaded },
     { title: 'Joue: tres opcions', pose: 'assenyala', tag: 'Foc oblic', hl: [], unlock: [], btn: 'Entesos', ack: true,
-      text: ['Quan toquis <b>Joue</b> a la barra <b>Carregats</b> sortiran <b>tres opcions</b>: <b>En avant</b> (foc recte, sense cap ordre extra), <b>Oblique à gauche</b> i <b>Oblique à droite</b> (foc en diagonal, a 45°). Veuràs una <b>franja vermella</b> que mostra on aniran les bales: només cauran els que quedin <b>dins la franja</b>.',
-        'Com <b>més a prop</b>, més probabilitat; i el <b>primer rengle</b> en rep molt més que el segon. Si la franja només toca una part del regiment, només aquests homes es juguen la pell.'],
+      text: ['En tocar <b>Joue</b> triaràs: <b>En avant</b> (foc recte), <b>Oblique à gauche</b> o <b>Oblique à droite</b> (a 45°). La <b>franja vermella</b> et mostra on aniran les bales.',
+        'El <b>primer regiment</b> és al nord: avança pel camí fins que quedi a <b>45° a l\'esquerra</b> i fes-li foc en <b>oblique à gauche</b>. Com més a prop, més en cauran; i el primer rengle en rep molt més que el segon.'],
       done() { return !!this.acked; } },
-    { title: 'Col·loca\'t pel 1r regiment', pose: 'assenyala', unlock: [], get hl() { return hlFire(0); }, mini: () => fireHint(0), resetStep: () => 3, done: () => shot(0) },
-    { title: 'Recarrega', pose: 'serios', tag: 'El segon regiment', hl: [], unlock: [], btn: 'Endavant', ack: true,
-      text: ['<b>Bona descàrrega!</b> Ara toca el <b>2n regiment</b>, a l\'altre costat del camí: recarrega, avança fins que el tinguis a <b>45° a la dreta</b> i dispara en <b>oblique à droite</b>.',
-        'Quan el segon regiment rebi la seva descàrrega, els dos <b>perdran el coratge</b> i fugiran.'],
+    { title: 'El 1r regiment', pose: 'assenyala', unlock: [], get hl() { return hlFire(0); }, mini: () => fireHint(0), resetStep: () => 3, done: () => shot(0) },
+    { title: 'El 2n regiment', pose: 'serios', tag: 'Foc recte', hl: [], unlock: [], btn: 'Endavant', ack: true,
+      text: ['<b>Bona descàrrega!</b> Ara s\'ho pensaran, però no badis: es giraran i et contestaran. <b>Recarrega</b> i fica\'t darrere el <b>bosquet</b>, que et taparà.',
+        'El <b>segon regiment</b> és al final del camí, <b>de cara</b>: avança, atura\'t a tret i fes-li <b>foc recte</b> (<b>Joue → En avant</b>). Quan el rebi, els dos <b>perdran el coratge</b>.'],
       done() { return !!this.acked; } },
-    { title: 'Col·loca\'t pel 2n regiment', pose: 'assenyala', unlock: [], get hl() { return hlFire(1); }, mini: () => fireHint(1), resetStep: () => 3, done: () => shot(1) },
+    { title: 'Foc recte', pose: 'assenyala', unlock: [], get hl() { return hlFire(1); }, mini: () => fireHint(1), resetStep: () => 3, done: () => shot(1) },
     { title: 'Fugen!', pose: 'aprova', unlock: [], hl: [], mini: 'Els austríacs fugen corrents!', done: () => false }
   ];
   return {
-    w: W, h: H, start: { x: 8, y: 34 }, obstacles: [], scene: MapKit.scene(sc), zone: null, musket: true, driftScale: 0.5, goalHeading: 0, minMen: 8,
-    enemies: [{ name: '1r Regiment austríac', flag: 'aut', cx: AX, cy: AY, h: Math.PI, shoots: true }, { name: '2n Regiment austríac', flag: 'aut', cx: AX, cy: BY, h: Math.PI, shoots: true }],
+    w: W, h: H, start: { x: 6, y: 44 }, obstacles: obs, scene: MapKit.scene(sc), zone: null, musket: true, driftScale: 0.5, goalHeading: 0, minMen: 8, cover,
+    enemies: [{ name: '1r Regiment austríac', flag: 'aut', cx: RA.x, cy: RA.y, h: Math.PI / 2, shoots: true }, { name: '2n Regiment austríac', flag: 'aut', cx: RB.x, cy: RB.y, h: Math.PI, shoots: true }],
     tutorial: { steps, figs: [], startAtencio: true, resetStep: () => 3 },
     onVolley() { if (ENEMY.every(e => e.volleys > 0) && !ENEMY.some(e => e.routed)) setTimeout(() => { for (const e of ENEMY) routEnemy(e); SFX.cry(8, 0.08); reac('aprova', 'Els dos regiments han perdut el coratge i <b>fugen corrents</b>!', 4500); }, 1400); },
     win: () => ENEMY.length > 0 && ENEMY.every(e => e.routed) && performance.now() - Math.max(...ENEMY.map(e => e.routedAt)) > 3200,
     objectives: [
       { t: 'Carregar els mosquets', ok: () => co.loaded || shot(0) || shot(1) || OBJ.done[0] },
-      { t: 'Descàrrega oblica contra el 1r regiment', ok: () => shot(0) },
-      { t: 'Descàrrega oblica contra el 2n regiment', ok: () => shot(1) },
-      { t: 'Aguantar amb almenys 8 homes', ok: () => alive() >= 8 && ENEMY.every(e => e.routed) }
+      { t: 'Foc oblic contra el 1r regiment', ok: () => shot(0) },
+      { t: 'Foc recte contra el 2n regiment', ok: () => shot(1) },
+      { t: 'Aguantar amb almenys 8 homes', ok: () => co.members.length >= 8 && ENEMY.every(e => e.routed) }
     ],
-    goalText: 'Dispara en oblic un cop a cada regiment austríac sense posar-te al seu davant; no baixis de 8 homes.',
-    endText: 'Molt bé, chasseur: has après a disparar en oblic i a no donar el front a l\'enemic. Els dos regiments austríacs han fugit.'
+    goalText: 'Dispara en oblic al 1r regiment i de cara al 2n; cobreix-te amb els arbres i no baixis de 8 homes.',
+    endText: 'Molt bé, chasseur: has disparat primer, en oblic i de cara, i has fet servir el bosquet. Els dos regiments austríacs han fugit.'
   };
 }
 
@@ -4772,7 +4799,7 @@ LEVELS.push({ n: 3, title: 'Exercici de síntesi', desc: 'Practica el que has ap
 LEVELS.push({ n: 4, title: 'La clariana', desc: 'Par peloton en ligne i contremarche: baixa per un camí estret en columna, forma la línia en marxa i gira tota la unitat.', build: buildLevel4 });
 LEVELS.push({ n: 5, title: 'Cansament i desordre', desc: 'Coneix el sergent-major Louis i el chasseur Lefon: recorre tres bases parant a descansar i a alinear la unitat.', build: buildLevel5 });
 LEVELS.push({ n: 6, title: 'La guerra comença', desc: 'Carrega el mosquet, avança cap a una unitat austríaca i dispara-li.', build: buildLevel6 });
-LEVELS.push({ n: 7, title: 'Foc recte i foc oblic', desc: 'Dos regiments austríacs et dispararan si els dones el front: dispara\'ls en oblic des del camí.', build: buildLevel7 });
+LEVELS.push({ n: 7, title: 'Foc recte i foc oblic', desc: 'Dos regiments austríacs es giraran i et dispararan: dispara primer, en oblic i de cara, i cobreix-te amb els arbres.', build: buildLevel7 });
 for (let i = 8; i <= 12; i++) LEVELS.push({ n: i, title: 'Properament', desc: 'Aquest nivell encara no està disponible.', locked: true });
 
 const FREE = { build: buildFree };
