@@ -1892,7 +1892,7 @@ function feu() {
   for (const m of co.members) {
     const d = Math.random() * T.escalf * (Math.random() < 0.12 ? 1.6 : 1);   // no tots alhora: alguns trets surten tard
     tMax = Math.max(tMax, d);
-    const a = m.h, len = 1.25;
+    const a = co.fireDir == null ? m.h : co.fireDir, len = 1.25;
     FX.push({ k: 'shot', x: m.x + Math.cos(a) * len, y: m.y + Math.sin(a) * len, a, t: -d });
     SFX.shot(d);
   }
@@ -1993,7 +1993,7 @@ function drawMusket(m, px, py, a, rS) {        // l'arma, vista des de dalt
     case 'repose': ctx.fillStyle = wood; ctx.beginPath(); ctx.arc(rx + c * 0.12 * M, ry + s * 0.12 * M, Math.max(1.4, 0.07 * M), 0, Math.PI * 2); ctx.fill(); break;   // a terra, al peu dret
     case 'charge': L(px + c * 0.15 * M + lx * 0.1 * M, py + s * 0.15 * M + ly * 0.1 * M, px + c * 0.45 * M + lx * 0.3 * M, py + s * 0.45 * M + ly * 0.3 * M, wood, w); break;
     case 'apprete': L(rx, ry, rx + (c * 0.55 + lx * 0.3) * M, ry + (s * 0.55 + ly * 0.3) * M, wood, w); break;
-    case 'joue': L(rx, ry, rx + c * 1.2 * M, ry + s * 1.2 * M, wood, w); break;
+    case 'joue': { const fa = co.fireDir == null ? a : co.fireDir; L(rx, ry, rx + Math.cos(fa) * 1.2 * M, ry + Math.sin(fa) * 1.2 * M, wood, w); break; }       // apunten cap a la direcció de foc (45° en oblic)
     case 'croise': { const ex = rx + c * 0.95 * M, ey = ry + s * 0.95 * M; L(rx, ry, ex, ey, wood, w); L(ex, ey, ex + c * 0.4 * M, ey + s * 0.4 * M, steel, Math.max(1, 0.05 * M)); break; }
   }
   if (co.arm === 'charge' || m.okT > 0) {                       // rellotge de càrrega (i ✓ verd quan acaben)
@@ -3568,7 +3568,7 @@ let autoStepT = 0;
 const VOICE = { on: false, rec: null, running: false, tested: false, seg: {}, interim: '', state: '', failT: 0, lastFail: null,
   learn: { phr: {}, ex: {} }, shared: { phr: {}, ex: {} }, opt: { mode: 'cont', vol: true, log: false, tele: true, engine: '' }, log: [], recentExec: null, ptt: false, db: false, loading: false };
 // Connexió amb Supabase (la mateixa de la web: si el joc s'obre dins la web, agafa window.APP_CONFIG) i fonts del motor local Vosk
-const GAME_VERSION = '1.4.13';
+const GAME_VERSION = '1.4.14';
 const CFG = Object.assign({
   SUPABASE_URL: 'https://ltopullwhasagnkuqaek.supabase.co',
   SUPABASE_ANON_KEY: 'sb_publishable_DhHFUh-UrbBrI0l476Vcnw_tSn-Gmkr',
