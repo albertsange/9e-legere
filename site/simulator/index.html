@@ -98,7 +98,45 @@
   #goal{z-index:20;position:fixed;top:12px;right:12px;max-width:300px;font-family:var(--label);letter-spacing:.03em;font-size:14px;background:var(--sheet);
     border:1px solid var(--line);border-left:3px solid var(--chasseur);border-radius:3px;padding:8px 12px;display:none;box-shadow:0 6px 18px -12px rgba(20,30,60,.5);}
   #goal b{display:block;color:var(--chasseur);text-transform:uppercase;letter-spacing:.08em;font-size:12px;}
-  #goal button{margin-top:8px;}
+  #goal{min-width:250px;max-width:330px;font-size:15px;border-left-width:5px;padding:10px 14px 12px;}
+  #goal .gh{display:flex;align-items:center;gap:8px;}
+  #goal .gh b{display:inline;font-size:13px;margin:0;}
+  #goalCnt{font-size:13px;color:var(--muted);flex:1;}
+  #goal .mbtn{display:inline-flex;align-items:center;gap:6px;margin:0;padding:3px 9px;font-family:var(--label);letter-spacing:.05em;font-size:13px;color:var(--bleu);background:var(--sheet);border:1px solid var(--bleu);border-radius:3px;cursor:pointer;}
+  #goal .mbtn:hover{background:var(--quote-bg);}
+  #goal .gbar{height:4px;background:var(--line);border-radius:2px;margin:7px 0 8px;overflow:hidden;}
+  #goal .gbar i{display:block;height:100%;width:0;background:var(--chasseur);transition:width .4s;}
+  #objList{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px;}
+  #objList li{display:flex;gap:9px;align-items:flex-start;line-height:1.25;color:var(--ink);}
+  #objList li i{flex:none;width:17px;height:17px;border:2px solid var(--bleu);border-radius:4px;margin-top:0;box-sizing:border-box;position:relative;background:var(--sheet);}
+  #objList li.cur{font-weight:700;} #objList li.cur i{border-color:var(--ecarlate);}
+  #objList li.ok{color:var(--muted);} #objList li.ok span{text-decoration:line-through;text-decoration-color:var(--chasseur);}
+  #objList li.ok i{background:var(--chasseur);border-color:var(--chasseur);}
+  #objList li.ok i::after{content:'';position:absolute;left:4px;top:0;width:4px;height:9px;border:solid #fff;border-width:0 2px 2px 0;transform:rotate(45deg);}
+  #objList li.flash i{animation:pulse 0.5s ease-in-out 3;}
+  #goalText{display:block;margin-top:2px;color:var(--muted);font-size:13px;}
+  #goalText:empty{display:none;}
+  #side{position:fixed;inset:0;z-index:96;display:none;}
+  #side.open{display:block;}
+  #side .bk{position:absolute;inset:0;background:rgba(20,30,60,.38);}
+  #side .pn{position:absolute;top:0;right:0;bottom:0;width:min(350px,92vw);background:var(--sheet);border-left:1px solid var(--line);border-top:4px solid var(--bleu);box-shadow:-12px 0 32px -14px rgba(20,30,60,.55);
+    padding:14px 18px 18px;display:flex;flex-direction:column;gap:8px;overflow:auto;font-family:var(--label);font-size:15px;animation:sideIn .18s ease-out;}
+  @keyframes sideIn{from{transform:translateX(34px);opacity:0;}}
+  #side .sh{display:flex;align-items:center;justify-content:space-between;}
+  #side h3{font-family:var(--display);font-weight:400;font-size:1.7rem;color:var(--bleu);margin:0;}
+  #side .x{border:0;background:transparent;font-size:20px;color:var(--muted);cursor:pointer;padding:2px 8px;}
+  #side .sb{display:flex;align-items:center;gap:12px;width:100%;text-align:left;padding:10px 12px;border:1px solid var(--line);background:var(--sheet);color:var(--bleu);border-radius:4px;cursor:pointer;font-family:var(--label);font-size:15px;letter-spacing:.03em;}
+  #side .sb span{width:18px;text-align:center;font-size:17px;}
+  #side .sb:hover:not(:disabled){background:var(--quote-bg);border-color:var(--bleu);}
+  #side .sb:disabled{opacity:.45;cursor:default;}
+  #side .sb.danger{color:var(--ecarlate);}
+  #side .sec{margin-top:8px;font-weight:700;color:var(--chasseur);text-transform:uppercase;letter-spacing:.08em;font-size:12px;border-bottom:1px solid var(--line);padding-bottom:3px;}
+  #side .pop{display:flex;position:static;border:0;box-shadow:none;padding:2px 0 0;background:transparent;max-height:none;}
+  #side .pop .vopts .vb button{padding:2px 8px;font-size:12.5px;background:var(--sheet);color:var(--bleu);border:1px solid var(--bleu);border-radius:3px;cursor:pointer;}
+  #side .pop .vopts .vb button:hover{background:var(--quote-bg) !important;}
+  #side .pop .vopts{border-top:0;margin-top:0;padding-top:0;}
+  #lvlNote{margin:.2rem 0 1rem;color:var(--muted);font-size:.95rem;}
+  .lvl .tag.done{color:#fff;background:var(--chasseur);}
   #msg{z-index:20;left:50%;right:auto;transform:translateX(-50%);top:62px;}
   #endmsg{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(20,30,60,.35);z-index:90;}
   #endmsg.show{display:flex;}
@@ -381,12 +419,21 @@
 </section>
 <section id="screenLevels" class="screen">
   <div class="lvl-head"><button class="btn-sec" id="btnBackTitle">‹ Enrere</button><h2>Nivells</h2></div>
+  <p id="lvlNote"></p>
   <div class="lvl-grid" id="lvlGrid"></div>
 </section>
-<div id="goal"><b>Objectiu</b><span id="goalText"></span><br><button class="btn-sec" id="btnMenu">‹ Nivells</button></div>
+<div id="goal"><div class="gh"><b id="goalH">Objectius</b><span id="goalCnt"></span><button class="mbtn" id="btnMenu" title="Menú (Esc)"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg><span>Menú</span></button></div>
+  <div class="gbar"><i></i></div><ul id="objList"></ul><span id="goalText"></span></div>
+<div id="side"><div class="bk"></div><div class="pn"><div class="sh"><h3>Menú</h3><button class="x" id="sideX" title="Tancar" aria-label="Tancar">✕</button></div>
+  <button class="sb" id="sideBack"><span>▶</span>Continuar</button>
+  <button class="sb" id="sideRetry"><span>↺</span>Repetir el pas</button>
+  <button class="sb" id="sideRestart"><span>⟲</span>Reiniciar el nivell</button>
+  <div class="sec">Ajustos</div><div id="sideSet"></div>
+  <div class="sec">Sortir</div>
+  <button class="sb danger" id="sideLevels"><span>‹</span><b id="sideLevelsT">Nivells</b></button></div></div>
 <div id="tut"><div class="card"><div class="av"><img alt="Capitaine Le Jay"><span>Capitaine Le Jay</span></div><div class="n"></div><h4></h4><p></p><div class="figs"></div><button id="tutOk">Entesos</button></div></div>
 <div id="endmsg"><div class="card"><img class="av2" alt="Capitaine Le Jay"><h3>Nivell completat</h3><p id="endText"></p>
-  <div class="row"><button class="btn-sec" id="btnAgain">Repetir</button><button class="btn-main" id="btnToLevels" style="font-size:1rem;padding:.5rem 1.6rem">Nivells</button></div></div></div>
+  <div class="row"><button class="btn-sec" id="btnAgain">Repetir</button><button class="btn-sec" id="btnToLevels">Nivells</button><button class="btn-main" id="btnNext" style="font-size:1rem;padding:.5rem 1.4rem">Nivell següent ›</button></div></div></div>
 <canvas id="c"></canvas>
 <div id="compass" data-cmd="compass" title="Brúixola: clica per posar el nord amunt; arrossega-la o usa les fletxes ← → del teclat per girar el mapa (↑ ↓ fan zoom)"><svg viewBox="-32 -32 64 64" aria-label="Brúixola"><circle r="27" fill="none" stroke="var(--line)" stroke-width="1"/><g id="needle"><path d="M0 -24 L6 0 L-6 0Z" fill="#b3261e"/><path d="M0 24 L6 0 L-6 0Z" fill="#6b6a63"/><text y="-12.5" text-anchor="middle" font-size="9" font-weight="700" fill="#fff" font-family="sans-serif" style="pointer-events:none">N</text></g><circle r="2.2" fill="var(--sheet)" stroke="var(--ink)" stroke-width=".6"/></svg></div>
 <div id="info"></div>
@@ -1022,6 +1069,7 @@ function setZoom(z, sx, sy) {
 // Càmera: segueix la unitat (follow) fins que l'usuari arrossega el mapa; «Centrar» torna a seguir-la
 let follow = true;
 let zoomTarget = 1, zoomAnchor = null;
+function inLevelZone() { const z = level && level.zone; if (!z) return false; const c = unitCentre(); return c.x >= z.x0 && c.x <= z.x1 && c.y >= z.y0 && c.y <= z.y1; }
 function unitCentre() {
   let sx = 0, sy = 0;
   for (const m of co.members) { sx += m.x; sy += m.y; }
@@ -1243,6 +1291,71 @@ function makeCo(cx, cy) {
 
 let co, lastKey = '', level = null, screen = 'title', paused = false;
 
+// ---------- Objectius del nivell: llista de punts de control (si es mor, tornen a començar) ----------
+const OBJ = { done: [], complete: false };
+function objReset() { OBJ.done = ((level && level.objectives) || []).map(() => false); OBJ.complete = false; objRender(); }
+function objUpdate() {
+  if (!level || !level.objectives) return;
+  let ch = false;
+  level.objectives.forEach((o, i) => { if (!OBJ.done[i] && o.ok()) { OBJ.done[i] = true; ch = true; OBJ.flash = i; SFX.chime(); } });
+  if (ch) objRender();
+}
+function objRender() {
+  const ul = document.getElementById('objList'); if (!ul) return;
+  const list = (level && level.objectives) || [], n = OBJ.done.filter(Boolean).length, cur = OBJ.done.indexOf(false);
+  const key = list.length + ':' + OBJ.done.map(x => x ? 1 : 0).join('') + ':' + OBJ.flash;
+  if (ul._k === key) return; ul._k = key;
+  ul.innerHTML = '';
+  list.forEach((o, i) => {
+    const li = document.createElement('li'); li.className = (OBJ.done[i] ? 'ok' : i === cur ? 'cur' : '') + (OBJ.flash === i && OBJ.done[i] ? ' flash' : '');
+    li.innerHTML = '<i></i><span></span>'; li.querySelector('span').textContent = o.t; ul.appendChild(li);
+  });
+  document.getElementById('goalCnt').textContent = list.length ? n + ' / ' + list.length : '';
+  document.querySelector('#goal .gbar').style.display = list.length ? '' : 'none';
+  document.querySelector('#goal .gbar i').style.width = list.length ? Math.round(100 * n / list.length) + '%' : '0';
+}
+
+// ---------- Memòria d'usuari: nivells superats ----------
+// Es guarda sempre en aquest navegador (localStorage) i, si hi ha sessió a la web (mateix origen), també al compte (taula game_progress, una fila per usuari).
+const PROG = { levels: {}, uid: null, synced: false };
+const PROG_KEY = '9eProgress';
+(function () { try { const j = JSON.parse(localStorage.getItem(PROG_KEY) || 'null'); if (j && j.levels) PROG.levels = j.levels; } catch (e) {} })();
+function progSaveLocal() { try { localStorage.setItem(PROG_KEY, JSON.stringify({ levels: PROG.levels })); } catch (e) {} }
+function progAuth() {
+  try {
+    const ref = new URL(CFG.SUPABASE_URL).hostname.split('.')[0], raw = localStorage.getItem('sb-' + ref + '-auth-token'); if (!raw) return null;
+    const j = JSON.parse(raw), se = j.currentSession || j;
+    if (!se || !se.access_token || !se.user || !se.user.id) return null;
+    if (se.expires_at && se.expires_at * 1000 < Date.now() + 5000) return null;
+    return { token: se.access_token, id: se.user.id };
+  } catch (e) { return null; }
+}
+async function progPush(a) {
+  await sbFetch('/rest/v1/game_progress?on_conflict=user_id', { method: 'POST', headers: { Authorization: 'Bearer ' + a.token, Prefer: 'resolution=merge-duplicates,return=minimal' },
+    body: JSON.stringify({ user_id: a.id, data: { levels: PROG.levels }, updated_at: new Date().toISOString() }) });
+}
+async function progSync() {
+  const a = progAuth(); PROG.uid = a ? a.id : null;
+  if (!a) { PROG.synced = false; renderLevelGrid(); return; }
+  try {
+    const r = await sbFetch('/rest/v1/game_progress?select=data&user_id=eq.' + a.id, { headers: { Authorization: 'Bearer ' + a.token } });
+    const rows = await r.json(), remote = (rows[0] && rows[0].data && rows[0].data.levels) || {};
+    let diff = false;
+    for (const k of Object.keys(remote)) if (!PROG.levels[k]) PROG.levels[k] = remote[k];
+    for (const k of Object.keys(PROG.levels)) if (!remote[k]) diff = true;
+    progSaveLocal();
+    if (diff) await progPush(a);
+    PROG.synced = true;
+  } catch (e) { PROG.synced = false; }
+  renderLevelGrid();
+}
+function progDone(n) {
+  if (PROG.levels[n]) return;
+  PROG.levels[n] = { at: new Date().toISOString() }; progSaveLocal();
+  const a = progAuth(); if (a) progPush(a).then(() => { PROG.synced = true; }).catch(() => {});
+}
+function levelUnlocked(i) { const L = LEVELS[i]; if (!L || L.locked) return false; return i === 0 || !!PROG.levels[LEVELS[i - 1].n]; }
+
 function reset() {
   const st = level ? level.start : { x: 30, y: MAP_H / 2 };
   co = makeCo(st.x, st.y);
@@ -1250,6 +1363,7 @@ function reset() {
   msgEl.style.display = 'none';
   centreCam();
   if (level && level.free) co.atencio = true;
+  objReset();
   tutOnReset();
 }
 
@@ -1704,7 +1818,8 @@ function contremarche() {
 // Una conversió és un gir rígid de tota la línia al voltant d'un punt (el pivot).
 //  WH-01 Par peloton à droite (gauche) – marche!: aturada; el pivot gira al lloc, l'extrem exterior va al pas accelerat; acaba amb «Halte».
 //  WH-02 À droite (gauche) conversion – marche!: en marxa; el pivot descriu un arc petit (radi 1 m); acaba amb «En avant».
-//  WH-03 Tournez à droite (gauche) – marche!: en marxa; quart de volta fix amb el pivot girant al lloc; després continua la marxa.
+//  WH-03 Tournez à droite (gauche) – marche!: en marxa; el primer home (pivot) fa un quart de volta al lloc i tots els altres CORREN
+//        a col·locar-se al seu costat (la línia no es manté durant el moviment); després tothom continua la marxa al mateix pas.
 //  WH-04 Par peloton en ligne – marche!: de columna en marxa a línia: les files s'incorporen una a una a l'esquerra del davanter.
 const WH_R_IN = 1.0;            // radi de l'arc del pivot en marxa (m)
 const LIGNE_DELAY = 0.4;        // s entre fileres en formar en línia (WH-04)
@@ -1716,6 +1831,7 @@ function pivotMan(dir) {          // home de l'extrem del costat dir (+1 dreta, 
 }
 function startWheel(kind, dir) {  // kind: 'stand' (WH-01) | 'move' (WH-02) | 'turn' (WH-03)
   if (busy() || formationName() !== 'línia') return;
+  if (kind === 'turn') { startTurn(dir); return; }
   if (kind === 'stand') { if (co.state !== 'parat' || !co.atencio || co.hdT !== 0) return; }
   else if (co.state !== 'marxa' || co.mode !== 'direct') return;
   say(kind === 'stand' ? (dir > 0 ? 'Par peloton à droite, marche!' : 'Par peloton à gauche, marche!')
@@ -1729,6 +1845,46 @@ function startWheel(kind, dir) {  // kind: 'stand' (WH-01) | 'move' (WH-02) | 't
   const cad = kind === 'move' ? curCadence() : PACES.accelerat.cad;
   co.conv = { kind, dir, px, py, R, omega: v / R, theta: 0, total: kind === 'turn' ? Math.PI / 2 : Infinity, cad, stepT: 0, pace: co.pace };
   co.state = 'conv'; co.haltReq = false; co.stepT = 0; lastKey = '';
+}
+const TURN_PIVOT_T = 0.45;      // s que triga el pivot a fer el quart de volta al lloc
+const TURN_RUN = 4.6;           // m/s: els homes corren a col·locar-se al costat del pivot
+const TURN_TURN = 9;            // rad/s: velocitat de gir del cos mentre corren
+function startTurn(dir) {         // WH-03 Tournez: el pivot gira 90° al lloc; la resta corre al lloc que tindria en un gir rígid
+  if (co.state !== 'marxa' || co.mode !== 'direct') return;
+  say(dir > 0 ? 'Tournez à droite, marche!' : 'Tournez à gauche, marche!');
+  const piv = pivotMan(dir), a = dir * Math.PI / 2, ca = Math.cos(a), sa = Math.sin(a), ks = (level && level.driftScale) || 1;
+  const px = piv.x - piv.dx, py = piv.y - piv.dy;
+  const items = co.members.map(m => {
+    const ix = m.x - m.dx - px, iy = m.y - m.dy - py;               // lloc ideal respecte al pivot
+    const isP = m === piv, n = isP ? 0 : 0.14 * ks;
+    const ddx = m.dx * ca - m.dy * sa + (Math.random() - 0.5) * n, ddy = m.dx * sa + m.dy * ca + (Math.random() - 0.5) * n;   // desordre girat + el de l'arribada
+    return { m, isP, ddx, ddy, tx: px + ix * ca - iy * sa + ddx, ty: py + ix * sa + iy * ca + ddy, th: m.h + a, h0: m.h, done: false };
+  });
+  co.conv = { kind: 'turn', dir, px: piv.x, py: piv.y, R: 1, items, t: 0, theta: 0, total: Math.PI / 2, cad: PACES.carrega.cad, stepT: 0, pace: co.pace };
+  co.state = 'conv'; co.haltReq = false; co.stepT = 0; lastKey = '';
+}
+function updateTurn(c, dt) {
+  c.t += dt;
+  let all = true;
+  for (const it of c.items) {
+    const m = it.m;
+    if (it.isP) {                                                      // el pivot gira al lloc
+      const f = Math.min(1, c.t / TURN_PIVOT_T); m.h = it.h0 + (it.th - it.h0) * f;
+      if (f < 1) all = false; else { m.h = it.th; }
+      continue;
+    }
+    if (it.done) continue;
+    all = false;
+    const dx = it.tx - m.x, dy = it.ty - m.y, d = Math.hypot(dx, dy), st = TURN_RUN * dt;
+    const dh = wrapA(it.th - m.h), sh = Math.sign(dh) * Math.min(Math.abs(dh), TURN_TURN * dt);
+    m.h += sh;
+    if (d <= st) { m.x = it.tx; m.y = it.ty; m.h = it.th; it.done = true; } else { m.x += dx / d * st; m.y += dy / d * st; }
+  }
+  c.theta = c.total * Math.min(1, c.t / TURN_PIVOT_T);
+  if (all) {
+    for (const it of c.items) { it.m.h = it.th; it.m.dx = it.ddx; it.m.dy = it.ddy; }
+    endConv();
+  }
 }
 function wheelDrift(c) {          // més desordre com més lluny del pivot (cada pas)
   const ks = (level && level.driftScale) || 1;
@@ -1792,6 +1948,8 @@ function updateConv(dt) {
       for (const it of c.items) { it.m.dx = 0; it.m.dy = 0; it.m.rank = it.rank; it.m.file = it.k; }
       endConv(); co.pace = co.pace;
     }
+  } else if (c.kind === 'turn') {
+    updateTurn(c, dt);
   } else {
     const d = Math.min(c.omega * dt, c.total - c.theta), sd = d * c.dir, cs = Math.cos(sd), sn = Math.sin(sd);
     for (const m of co.members) {
@@ -1907,6 +2065,9 @@ function syncMapHL() {
   document.querySelectorAll('#mapctl [data-cmd], #compass').forEach(e => e.classList.toggle('hl', hl.includes(e.dataset.cmd)));
 }
 function tutOpen() { return document.getElementById('tut').classList.contains('show'); }
+// Les ordres queden bloquejades mentre el diàleg del tutorial és obert (o a punt d'obrir-se); en tancar-lo s'habiliten i s'assenyalen.
+function tutLocked() { return tutOn() && (tutOpen() || performance.now() < (TUT.soon || 0)); }
+function tutSoon() { TUT.soon = performance.now() + 2100; lastKey = ''; }
 function tutShow() {
   const el = document.getElementById('tut');
   if (!tutOn()) { el.classList.remove('show'); return; }
@@ -1932,14 +2093,18 @@ function tutShow() {
   el.classList.add('show');
   const ok = document.getElementById('tutOk'); if (ok) ok.focus({ preventScroll: true });
 }
-function tutStart() { TUT.gStep = -1; TUT.g = 0; TUT.gNext = 0; document.getElementById('reac').classList.remove('show'); TUT.page = 0; TUT.pageStep = -1; TUT.cued = -1; TUT.pending = false; TUT.step = 0; TUT.reached = 0; TUT.intro = false; TUT.dismissed = false; tutShow(); }
+function tutStart() { TUT.snap = null; TUT.hinted = -1; TUT.idleSince = 0; TUT.soon = 0; TUT.gStep = -1; TUT.g = 0; TUT.gNext = 0; document.getElementById('reac').classList.remove('show'); TUT.page = 0; TUT.pageStep = -1; TUT.cued = -1; TUT.pending = false; TUT.step = 0; TUT.reached = 0; TUT.intro = false; TUT.dismissed = false; tutShow(); }
 function tutUpdate() {
   if (!tutOn() || paused) return;
   const st = level.tutorial.steps, s = st[TUT.step];
   if (TUT.pending) {
-    if (s && s.when && s.when()) { TUT.pending = false; setTimeout(() => { if (!paused) { SFX.chime(); tutShow(); } }, 1800); }
+    if (s && s.when && s.when()) { TUT.pending = false; tutSoon(); setTimeout(() => { if (!paused) { SFX.chime(); tutShow(); } }, 1800); }
     return;
   }
+  if (s && !s.guide && !tutLocked() && co.state === 'parat' && !pendingCmd) {          // si la unitat porta molt estona parada sense avançar el pas, es recorda el botó «Repetir el pas»
+    const t = performance.now(); if (!TUT.idleSince) TUT.idleSince = t;
+    if (t - TUT.idleSince > 35000 && TUT.hinted !== TUT.step && canRetry()) { TUT.hinted = TUT.step; reac('assenyala', 'Si t\'has encallat, obre el <b>Menú</b> i prem <b>Repetir el pas</b>.', 7000); }
+  } else TUT.idleSince = 0;
   if (s && s.guide && TUT.gStep === TUT.step) {
     const now = performance.now();
     if (TUT.gNext) { if (now >= TUT.gNext) { TUT.gNext = 0; if (TUT.g < s.guide.length) showGuide(s); } }
@@ -1953,8 +2118,23 @@ function tutUpdate() {
     TUT.step++; TUT.reached = Math.max(TUT.reached, TUT.step); TUT.dismissed = false; lastKey = '';
     if (st[TUT.step] && st[TUT.step].enter) st[TUT.step].enter();
     if (st[TUT.step] && st[TUT.step].when) TUT.pending = true;                  // el diàleg espera una condició
-    else setTimeout(() => { if (!paused) { SFX.chime(); tutShow(); } }, 1800);   // deixa veure l'ordre escrita abans del diàleg
+    else { if (!(st[TUT.step] && st[TUT.step].guide)) tutSoon(); setTimeout(() => { if (!paused) { SFX.chime(); tutShow(); } }, 1800); }   // deixa veure l'ordre escrita abans del diàleg
   }
+}
+// Punt de control: instantània de la unitat quan es tanca el diàleg d'un pas; «Repetir el pas» hi torna (per si s'ha entrat en un carreró sense sortida).
+function tutSnap() {
+  if (!tutOn()) return;
+  const s = level.tutorial.steps[TUT.step]; if (!s || s.guide) return;
+  if (co.state === 'conv' || co.state === 'gir' || co.state === 'auto' || co.pf || co.flank || co.fix || pendingCmd) return;
+  try { TUT.snap = { step: TUT.step, co: structuredClone(co) }; } catch (e) { TUT.snap = null; }
+}
+function canRetry() { return tutOn() && !!TUT.snap && TUT.snap.step === TUT.step; }
+function retryStep() {
+  if (!canRetry()) { startLevel(curLevel); return; }
+  co = structuredClone(TUT.snap.co); pendingCmd = null; lastKey = '';
+  msgEl.style.display = 'none'; centreCam(); TUT.cued = -1; TUT.idleSince = 0;
+  document.getElementById('reac').classList.remove('show');
+  showMsg('Tornem al principi d\'aquest pas', 2200);
 }
 function tutOnReset() {                       // després d'una col·lisió: es torna a l'inici però es conserva el que ja s'ha après
   if (!tutOn()) return;
@@ -2062,7 +2242,7 @@ function buildMapControls() {
   ob(ICONS.zoomOut, 'Allunyar (roda del ratolí o ↓)', 'zout', () => zoomStep(1 / 1.15));
   const pop = document.createElement('div'); pop.className = 'pop'; box.appendChild(pop);
   ob(ICONS.mic + '<span>Veu</span>', 'Activar el mode de veu (cridar les ordres)', 'mic', voiceToggle);
-  ob(ICONS.sound, 'Opcions de so i de veu', 'snd', e => { e.stopPropagation(); pop.classList.toggle('open'); });
+  ob(ICONS.sound, 'Menú i ajustos (so, veu, idioma)', 'snd', e => { e.stopPropagation(); openSide(); });
   document.addEventListener('pointerdown', e => { if (!e.target.closest('.pop, .mmb.snd')) pop.classList.remove('open'); });
   const tog = (label, key, tip, after) => {
     const l = document.createElement('label'); l.title = tip;
@@ -2077,11 +2257,12 @@ function buildMapControls() {
   buildVoiceOpts(pop);
   pop.appendChild(langRow());
   const gv = document.createElement('div'); gv.className = 'gver'; gv.dataset.v = '1'; gv.textContent = verText(true); pop.appendChild(gv);
+  const ss = document.getElementById('sideSet'); ss.innerHTML = ''; ss.appendChild(pop);          // els ajustos viuen al menú lateral
 }
 
 function estatText() {
   if (co.state === 'gir') return 'girant';
-  if (co.state === 'conv') { const c = co.conv; return c.kind === 'ligne' ? 'formant la línia' : 'conversió ' + Math.round(c.theta * 180 / Math.PI) + '°'; }
+  if (co.state === 'conv') { const c = co.conv; return c.kind === 'ligne' ? 'formant la línia' : c.kind === 'turn' ? 'Tournez en curs' : 'conversió ' + Math.round(c.theta * 180 / Math.PI) + '°'; }
   if (co.state === 'auto') return 'maniobra en curs';
   if (co.state === 'marxa') {
     if (co.pf) return 'par file en curs';
@@ -2106,7 +2287,7 @@ const FAMILIES = [
 function pre(o = {}) {                         // condicions comunes: retorna el motiu o null
   if (co.state === 'auto') return 'hi ha una maniobra en curs';
   if (co.state === 'gir') return 'la unitat està girant';
-  if (co.state === 'conv' && !o.conv) return co.conv.kind === 'ligne' ? 's\'està formant la línia' : 'hi ha una conversió en curs';
+  if (co.state === 'conv' && !o.conv) return co.conv.kind === 'ligne' ? 's\'està formant la línia' : co.conv.kind === 'turn' ? 'la tropa està fent el Tournez' : 'hi ha una conversió en curs';
   if (!co.atencio) return 'cal estar en atenció (Garde à vous)';
   if (co.hdT !== 0 && !o.fixe) return 'primer digues Fixe!';
   return null;
@@ -2147,7 +2328,7 @@ const ORDERS = [
     avail: aturatLinia, run: sd => startWheel('stand', sd) },
   { id: 'WH-02', des: 2.0, fam: 'conv', k: 'conv', sec: 'En marxa', fr: 'Conversion', full: 'À {s} conversion – marche!', gl: 'el pivot avança lentament; s\'acaba amb En avant', sides: true, icons: ['wheelL', 'wheelR'], cmdsS: { '-1': ['wh02L'], '1': ['wh02R'] },
     avail: marxaLinia, run: sd => startWheel('move', sd) },
-  { id: 'WH-03', des: 3.6, fam: 'conv', k: 'tournez', sec: 'En marxa', fr: 'Tournez', full: 'Tournez à {s} – marche!', gl: 'quart de volta fix i continua', sides: true, icons: ['wheelL', 'wheelR'], cmdsS: { '-1': ['wh03L'], '1': ['wh03R'] },
+  { id: 'WH-03', des: 3.6, fam: 'conv', k: 'tournez', sec: 'En marxa', fr: 'Tournez', full: 'Tournez à {s} – marche!', gl: 'el primer home gira 90° i la resta corre al seu costat; continua la marxa', sides: true, icons: ['wheelL', 'wheelR'], cmdsS: { '-1': ['wh03L'], '1': ['wh03R'] },
     avail: marxaLinia, run: sd => startWheel('turn', sd) },
   // Formacions
   { id: 'CD-01', des: 1.5, shot: true, fam: 'form', k: 'parfile', sec: 'Columna en marxa', fr: 'Par file', full: 'Par file à {s} – marche!', gl: 'la columna canvia de rumb pel mateix punt', sides: true, icons: ['snakeL', 'snakeR'], cmdsS: { '-1': ['pfG'], '1': ['pfD'] },
@@ -2211,7 +2392,7 @@ function runOrder(o, arg, exec) {
   lastKey = '';
 }
 function fire(o, arg) {
-  if (pendingCmd || o.avail(arg) !== true) return;
+  if (pendingCmd || tutLocked() || o.avail(arg) !== true) return;
   voiceLearnClick(o, arg);
   openMenu(null);
   const sp = splitOrder(o, arg);
@@ -2246,7 +2427,7 @@ function buildOrderPanel() {
   dpad.appendChild(padBtn(av, undefined, ICONS.forward + '<span>En avant</span>', 'avant', av.cmds));
   dpad.appendChild(padBtn(obl, 1, ICONS.obRight + '<small>oblique</small>', 'obl', obl.cmdsS['1']));
   const hb = document.createElement('button'); hb.id = 'halteBtn'; hb.className = 'pb halte'; hb.innerHTML = ICONS.halt + '<span>Halte</span>';
-  hb.onclick = () => { if (pendingCmd && pendingCmd.o === HALTE) return; pendingCmd = null; fire(HALTE); };
+  hb.onclick = () => { if (tutLocked() || (pendingCmd && pendingCmd.o === HALTE)) return; pendingCmd = null; fire(HALTE); };
   dpad.appendChild(hb); panel.halte = hb;
   dpad.appendChild(padBtn(ar, undefined, ICONS.back + '<span>En arrière</span>', 'arriere', ar.cmds));
   for (const [v, lab, ic] of pc.options.slice().reverse()) {
@@ -2288,8 +2469,9 @@ document.addEventListener('pointerdown', e => { if (openFam && !e.target.closest
 window.addEventListener('keydown', e => { if (e.key === 'Escape' && openFam) openMenu(null); });
 
 function renderUnitControls() {
-  const hl = tutOn() ? tutHL() : [];
-  const key = [co.state, co.atencio, co.haltReq, !!co.pf, !!co.flank, !!co.fix, co.hdT, formationName(), co.mode, co.pace, co.obSide,
+  const lock = tutLocked();
+  const hl = tutOn() && !lock ? tutHL() : [];
+  const key = [lock, co.state, co.atencio, co.haltReq, !!co.pf, !!co.flank, !!co.fix, co.hdT, formationName(), co.mode, co.pace, co.obSide,
                co.conv && co.conv.kind, !!pendingCmd, TUT.step, TUT.reached, hl.join(',')].join('|');
   if (key === lastKey) return;
   lastKey = key;
@@ -2305,7 +2487,7 @@ function renderUnitControls() {
     let anyOk = false;
     for (const it of rw.items) {
       const a = rw.o.avail(it.arg), ok = a === true, sel = !!(rw.o.selected && rw.o.selected(it.arg));
-      it.b.disabled = !ok || !!pendingCmd; it.b.title = it.title + (ok || sel ? '' : ' — ' + a);
+      it.b.disabled = !ok || !!pendingCmd || lock; it.b.title = it.title + (ok || sel ? '' : ' — ' + a);
       it.b.classList.toggle('hl', ok && has(it.cmds));
       it.b.classList.toggle('sel', sel);
       if (ok) anyOk = true;
@@ -2324,7 +2506,7 @@ function renderUnitControls() {
   }
   const hv = U(HALTE.k), ha = HALTE.avail();
   panel.halte.style.visibility = hv ? '' : 'hidden';
-  panel.halte.disabled = ha !== true;
+  panel.halte.disabled = ha !== true || lock;
   panel.halte.title = 'Peloton – halte!' + (ha === true ? '' : ' — ' + ha);
   panel.halte.classList.toggle('hl', ha === true && has(HALTE.cmds));
   panel.halte.querySelector('span').textContent = co.haltReq ? 'Halte…' : 'Halte';
@@ -2592,6 +2774,9 @@ function checkLevel() {
   if (Math.abs(wrapA(co.members[0].h - level.goalHeading)) > 0.35) return;
   if (disorderRms() > 0.03 || co.hdT !== 0) return;      // cal que la línia estigui alineada i amb el cap al front
   paused = true; SFX.ding();
+  if (typeof curLevel === 'number') progDone(LEVELS[curLevel].n);
+  OBJ.complete = true; objUpdate();
+  document.getElementById('btnNext').style.display = typeof curLevel === 'number' && levelUnlocked(curLevel + 1) ? '' : 'none';
   document.getElementById('tut').classList.remove('show');
   document.getElementById('endText').textContent = level.endText;
   document.querySelector('#endmsg .av2').src = AV.saluda;
@@ -2668,7 +2853,7 @@ let autoStepT = 0;
 const VOICE = { on: false, rec: null, running: false, tested: false, seg: {}, interim: '', state: '', failT: 0, lastFail: null,
   learn: { phr: {}, ex: {} }, shared: { phr: {}, ex: {} }, opt: { mode: 'cont', vol: true, log: false, tele: true, engine: '' }, log: [], recentExec: null, ptt: false, db: false, loading: false };
 // Connexió amb Supabase (la mateixa de la web: si el joc s'obre dins la web, agafa window.APP_CONFIG) i fonts del motor local Vosk
-const GAME_VERSION = '1.0.6';
+const GAME_VERSION = '1.1.0';
 const CFG = Object.assign({
   SUPABASE_URL: 'https://ltopullwhasagnkuqaek.supabase.co',
   SUPABASE_ANON_KEY: 'sb_publishable_DhHFUh-UrbBrI0l476Vcnw_tSn-Gmkr',
@@ -3337,7 +3522,7 @@ function loop(now) {
   last = now;
   if (screen === 'game') {
     if (!paused && !tutOpen() && !vtestOpen()) {
-      updateCo(dt); checkTrees(); checkLevel(); tutUpdate();
+      updateCo(dt); checkTrees(); checkLevel(); objUpdate(); tutUpdate();
       if (co.state === 'auto') { autoStepT += dt; if (autoStepT >= 60 / 76) { autoStepT = 0; SFX.step(co.members.length, false); } } else autoStepT = 0;
     }
     stepZoom(dt);
@@ -3422,6 +3607,13 @@ function buildLevel1() {
     w: 44, h: 48, start: { x: 10, y: 12 }, tents, obstacles: obs, scene: MapKit.scene(sc),
     zone: { x0: 19.5, y0: 28, x1: 38.5, y1: 41 }, driftScale: 0.8, goalHeading: Math.PI / 2,
     tutorial: { steps, gardeStep: 3 },
+    objectives: [
+      { t: 'Sortir de la plaça per l\'obertura del sud', ok: () => minY() > 20.4 },
+      { t: 'Travessar el corredor de tendes sense tocar-les', ok: () => lastPast() },
+      { t: 'Girar cap a l\'est amb el Par file', ok: () => lastPast() && co.state === 'marxa' && !co.pf && Math.abs(wrapA(co.members[0].h)) < 0.1 },
+      { t: 'Tornar a formar en línia dins la placeta', ok: () => co.state === 'parat' && formationName() === 'línia' && inLevelZone() },
+      { t: 'Alinear la línia, de cara al sud', ok: () => OBJ.complete }
+    ],
     goalText: 'Surt de la plaça, travessa el corredor de tendes i torna a formar en línia alineada, de cara al sud, dins la placeta marcada.',
     endText: 'Molt bé, chasseur: has sortit de la plaça, has passat el corredor i has tornat a formar i alinear la línia.'
   };
@@ -3429,7 +3621,7 @@ function buildLevel1() {
 
 function buildLevel2() {
   const A = MapKit.A, sc = [], obs = [];
-  const W = 56, H = 50, FX = 30, GY0 = 13.5, GY1 = 22.5, LX0 = 39, LX1 = 50, LY1 = 46;
+  const W = 58, H = 50, FX = 30, GY0 = 13.5, GY1 = 22.5, LX0 = 39, LX1 = 53, LY1 = 46;
   const rect = (x0, y0, x1, y1, msg) => obs.push({ x0, y0, x1, y1, msg });
   const MSG_F = 'Has tocat la tanca: torna-ho a provar', MSG_W = 'Has tocat el mur: torna-ho a provar';
   rect(FX, 0, FX + 1, GY0, MSG_F); rect(FX, GY1, FX + 1, H, MSG_F);                       // tanca amb porta
@@ -3437,7 +3629,7 @@ function buildLevel2() {
   wall(FX + 1, GY0, LX1, GY0); wall(FX + 1, GY1, LX0, GY1); wall(LX0, GY1, LX0, LY1); wall(LX1, GY0, LX1, LY1); wall(LX0, LY1, LX1, LY1);
   sc.push(
     A.field([[0, 0], [W, 0], [W, H], [0, H]], { kind: 'meadow' }),
-    A.road([[2, 10], [FX, 18], [LX0 + 5.5, 18], [LX0 + 5.5, 44]], { kind: 'track' }),
+    A.road([[2, 10], [FX, 18], [LX0 + 7, 18], [LX0 + 7, 44]], { kind: 'track' }),
     A.fence([[FX + 0.5, 0], [FX + 0.5, GY0]]), A.fence([[FX + 0.5, GY1], [FX + 0.5, H]]),
     A.wood([[2, 30], [24, 30], [24, 48], [2, 48]], { kind: 'mixed', seed: 9 }),
     A.label('Porte du jardin', 25.5, 8, { kind: 'place', scale: 0.55 }), A.label('Chemin couvert', 45, 11, { kind: 'town', scale: 0.55 }),
@@ -3447,9 +3639,11 @@ function buildLevel2() {
   const minX = () => Math.min(...co.members.map(m => m.x));
   const maxY = () => Math.max(...co.members.map(m => m.y));
   const head = () => co.members[0].h;
+  const corner1 = () => co.state === 'marxa' && co.mode === 'direct' && Math.abs(wrapA(head())) < 0.1 && pivotMan(1).x >= 39.7 && pivotMan(1).x < 44.2;
+  const corner2 = () => co.state === 'marxa' && co.mode === 'direct' && Math.abs(wrapA(head() - Math.PI / 2)) < 0.1 && maxY() >= 35.5 && maxY() < 40;
   const steps = [
-    { title: 'Oblics i conversions', pose: 'serios', hl: [], unlock: ['gir', 'mov', 'parfile', 'bataille', 'align', 'pace'], tag: 'Benvinguda', intro: true, btn: 'Comencem',
-      text: 'Bon dia, <b>chasseur</b>. Avui practicarem els <b>oblics</b> i les <b>conversions</b>: desplaçar la línia de costat o fer-la pivotar sense trencar-la.',
+    { title: 'Oblics i Tournez', pose: 'serios', hl: [], unlock: ['gir', 'mov', 'parfile', 'bataille', 'align', 'pace'], tag: 'Benvinguda', intro: true, btn: 'Comencem',
+      text: 'Bon dia, <b>chasseur</b>. Avui practicarem els <b>oblics</b> i el <b>Tournez</b>: desplaçar la línia de costat o girar-la un quart de volta sense trencar-la.',
       done: () => TUT.intro },
     { title: 'Marxa oblíqua', pose: 'assenyala', unlock: ['obl'],
       get hl() { if (co.state === 'parat') return ['avant']; if (co.state === 'marxa' && co.mode === 'direct') return cy() < 17.2 ? ['oblD'] : []; if (co.state === 'marxa' && co.mode === 'oblic') return cy() >= 17.2 ? ['avantR'] : []; return []; },
@@ -3457,19 +3651,18 @@ function buildLevel2() {
       text: ['Davant hi ha una tanca amb una <b>porta</b> una mica a la teva dreta. No cal girar: <b>Oblique à droite – marche!</b> fa caminar la unitat en diagonal sense girar-la. Cada home segueix mirant endavant, però avança un pas recte i un de costat, alternats.',
         'Comença amb <b>En avant</b>, després prem l\'<b>oblique</b> de la dreta (al costat d\'En avant), i quan la línia estigui davant la porta torna a caminar recte amb <b>En avant</b>: t\'avisaré. Si et passes, la línia toca la tanca.'],
       done: () => minX() > FX + 1.3 },
-    { title: 'Conversió en marxa', pose: 'mapa', unlock: ['conv', 'tournez'],
-      get hl() { if (co.state === 'conv') return Math.abs(wrapA(head() - Math.PI / 2)) < 0.4 ? ['convAvant'] : []; if (co.state === 'marxa' && co.mode === 'direct' && Math.abs(wrapA(head())) < 0.1 && pivotMan(1).x >= 39) return ['wh02R']; return []; },
-      cue: () => co.state === 'conv' && co.conv.kind === 'move' ? (Math.abs(wrapA(head() - Math.PI / 2)) < 0.27 ? 'Ara! En avant!' : '')
-              : (co.state === 'marxa' && co.mode === 'direct' && Math.abs(wrapA(head())) < 0.1 && pivotMan(1).x >= 39 && pivotMan(1).x < 44.5) ? 'Ara! À droite conversion!' : '',
-      text: ['Més endavant el camí gira cap al sud. Un <b>Par le flanc</b> convertiria la línia en columna; per mantenir-la en línia s\'usa una <b>conversió</b>: tota la línia gira rígida al voltant d\'un <b>pivot</b>, marcat amb un cercle vermell.',
-        '<b>À droite conversion – marche!</b>: l\'home de la dreta és el pivot i gairebé no avança, mentre els de l\'esquerra han de caminar més. Quan la línia miri al sud, digues <b>En avant – marche!</b>. Si prefereixes un gir exacte, <b>Tournez à droite</b> fa un quart de volta fix.'],
-      done: () => co.state === 'marxa' && Math.abs(wrapA(head() - Math.PI / 2)) < 0.25 && maxY() > 25 },
-    { title: 'Conversió des d\'aturat', pose: 'pensa', unlock: [],
-      when: () => maxY() > 36,
-      get hl() { if (co.state === 'marxa') return ['halte']; if (co.state === 'parat') return ['wh01L']; if (co.state === 'conv') return Math.abs(wrapA(head())) < 0.45 ? ['convHalte'] : []; return []; },
-      cue: () => (co.state === 'conv' && Math.abs(wrapA(head())) < 0.4) ? 'Ara! Halte!' : '',
-      text: ['Has arribat al final del camí. Cal fer front a l\'est, cap a l\'enemic. Atura la unitat amb <b>Halte</b> dins la zona vermella.',
-        '<b>Par peloton à gauche – marche!</b> és una conversió des d\'aturat: el pivot gira al lloc i l\'extrem de la dreta camina al <b>pas accéléré</b>. Quan la línia miri a l\'est digues <b>Halte</b>: la conversió no s\'atura sola.'],
+    { title: 'Tournez en marxa', pose: 'mapa', unlock: ['tournez'],
+      get hl() { return corner1() ? ['wh03R'] : []; },
+      cue: () => corner1() ? 'Ara! Tournez à droite!' : '',
+      text: ['Més endavant el camí gira cap al sud. Un <b>Par le flanc</b> convertiria la línia en columna; el <b>Tournez</b> la manté en línia: l\'home de la dreta (el pivot, marcat amb un cercle vermell) fa un quart de volta al lloc i tots els altres <b>corren</b> a col·locar-se al seu costat. La unitat no s\'atura: continua caminant.',
+        'Segueix caminant pel camí. Quan el pivot arribi a l\'entrada del camí cap al sud t\'avisaré: llavors, a <b>Conversions</b>, prem <b>Tournez → droite</b>. No hi ha res més a fer: no cal cap ordre per continuar.'],
+      done: () => co.state === 'marxa' && Math.abs(wrapA(head() - Math.PI / 2)) < 0.1 && maxY() > 25 },
+    { title: 'Tournez i halte', pose: 'pensa', unlock: [],
+      when: () => maxY() > 30,
+      get hl() { if (corner2()) return ['wh03L']; if (co.state === 'marxa' && Math.abs(wrapA(head())) < 0.1) return ['halte']; return []; },
+      cue: () => corner2() ? 'Ara! Tournez à gauche!' : (co.state === 'marxa' && Math.abs(wrapA(head())) < 0.1 ? 'Ara! Halte!' : ''),
+      text: ['Has arribat al final del camí. Cal fer front a l\'est, cap a l\'enemic, dins la zona vermella. Un altre <b>Tournez</b>, ara a l\'esquerra, ho resol sense desfer la línia.',
+        'Quan t\'avisi, prem <b>Tournez → gauche</b>. La unitat continuarà caminant cap a l\'est: digues <b>Halte</b> quan sigui dins la zona.'],
       done: () => co.state === 'parat' && Math.abs(wrapA(head())) < 0.35 && formationName() === 'línia' },
     { title: 'Alinear i acabar', pose: 'alerta', hl: ['align', 'alignD', 'fixe'], unlock: [],
       text: 'Amb tant de moviment els homes s\'han <b>desalineat</b>. Obre <b>Formacions</b>, fes <b>Alignement</b> cap a un costat i després digues <b>Fixe!</b>. Amb la línia ben alineada dins la zona i mirant a l\'est, el nivell estarà complet.',
@@ -3477,10 +3670,17 @@ function buildLevel2() {
   ];
   return {
     w: W, h: H, start: { x: 4, y: 10 }, obstacles: obs, scene: MapKit.scene(sc),
-    zone: { x0: 40, y0: 37, x1: 49, y1: 45 }, driftScale: 0.8, goalHeading: 0,
+    zone: { x0: 41, y0: 37, x1: 51, y1: 45 }, driftScale: 0.8, goalHeading: 0,
     tutorial: { steps, figs: [], startAtencio: true, resetStep: () => 1 },
-    goalText: 'Passa per la porta de la tanca, segueix el camí fins al final i fes front a l\'est, aturada i alineada, dins la zona marcada.',
-    endText: 'Molt bé, chasseur: has passat la porta en oblic, has girat la cantonada amb una conversió i has fet front a l\'est des d\'aturat.'
+    objectives: [
+      { t: 'Passar la porta de la tanca en oblic', ok: () => minX() > FX + 1.3 },
+      { t: 'Primer Tournez: girar cap al sud', ok: () => co.state === 'marxa' && Math.abs(wrapA(head() - Math.PI / 2)) < 0.15 && maxY() > 25 },
+      { t: 'Segon Tournez: fer front a l\'est', ok: () => (co.state === 'marxa' || co.state === 'parat') && Math.abs(wrapA(head())) < 0.15 && maxY() > 33 },
+      { t: 'Aturar la línia dins la zona marcada', ok: () => co.state === 'parat' && formationName() === 'línia' && inLevelZone() && Math.abs(wrapA(head())) < 0.35 },
+      { t: 'Alinear la línia, de cara a l\'est', ok: () => OBJ.complete }
+    ],
+    goalText: 'Passa per la porta de la tanca, gira la cantonada amb un Tournez, segueix el camí i fes front a l\'est, aturada i alineada, dins la zona marcada.',
+    endText: 'Molt bé, chasseur: has passat la porta en oblic i has girat dues vegades amb el Tournez sense desfer la línia.'
   };
 }
 
@@ -3529,13 +3729,19 @@ function buildLevel3() {
     w: W, h: H, start: { x: 5, y: 12 }, obstacles: obs, scene: MapKit.scene(sc),
     zone: { x0: 58, y0: 52, x1: 74, y1: 64 }, driftScale: 1, goalHeading: 0,
     tutorial: { steps, figs: [], startAtencio: true, resetStep: () => 1 },
+    objectives: [
+      { t: 'Passar la porta de la tanca', ok: () => co.members.every(m => m.x > FX + 1.3) },
+      { t: 'Travessar el camí estret en columna', ok: () => co.members.every(m => m.y > PY1 + 0.5) },
+      { t: 'Fer front a l\'est dins la zona marcada', ok: () => co.state === 'parat' && formationName() === 'línia' && inLevelZone() && Math.abs(wrapA(co.members[0].h)) < 0.35 },
+      { t: 'Alinear la línia, de cara a l\'est', ok: () => OBJ.complete }
+    ],
     goalText: 'Passa per la porta, travessa el camí estret en columna i fes front a l\'est, en línia alineada, dins la zona marcada.',
     endText: 'Molt bé, chasseur: porta, camí estret i formació final. Ja domines la instrucció bàsica del 9e Léger.'
   };
 }
 
 const LEVELS = [{ n: 1, title: 'Sortir de la plaça', desc: 'Tutorial: surt d\'una plaça tancada, passa un corredor de tendes i torna a formar.', build: buildLevel1 },
-  { n: 2, title: 'La porta i la cantonada', desc: 'Oblics i conversions: passa una porta en diagonal, gira una cantonada sense trencar la línia i fes front des d\'aturat.', build: buildLevel2 }];
+  { n: 2, title: 'La porta i la cantonada', desc: 'Oblics i Tournez: passa una porta en diagonal, gira dues cantonades sense trencar la línia i fes front a l\'est.', build: buildLevel2 }];
 LEVELS.push({ n: 3, title: 'Exercici de síntesi', desc: 'Practica el que has après: porta en oblic, camí estret en columna i formació final alineada, sense ajuda.', build: buildLevel3 });
 for (let i = 4; i <= 12; i++) LEVELS.push({ n: i, title: 'Properament', desc: 'Aquest nivell encara no està disponible.', locked: true });
 
@@ -3544,6 +3750,7 @@ function showScreen(name) {
   screen = name;
   document.getElementById('screenTitle').classList.toggle('show', name === 'title');
   document.getElementById('screenLevels').classList.toggle('show', name === 'levels');
+  if (name === 'levels') { renderLevelGrid(); progSync(); }
   const g = name === 'game';
   document.getElementById('controls').style.display = g ? 'grid' : 'none';
   document.getElementById('goal').style.display = g ? 'block' : 'none';
@@ -3557,14 +3764,15 @@ function showScreen(name) {
 }
 let curLevel = 0;
 function startLevel(i) {
-  curLevel = i; openMenu(null);
+  if (i !== 'free' && !levelUnlocked(i)) return;
+  curLevel = i; openMenu(null); closeSide(true);
   const L = i === 'free' ? FREE : LEVELS[i];
   level = L.build();
   paused = false; lastKey = '';
   document.getElementById('endmsg').classList.remove('show');
-  document.getElementById('goalText').textContent = level.goalText;
-  document.querySelector('#goal b').textContent = level.free ? 'Mode lliure' : 'Objectiu';
-  document.getElementById('btnMenu').textContent = level.free ? '‹ Inici' : '‹ Nivells';
+  document.getElementById('goalText').textContent = level.objectives ? '' : level.goalText;
+  document.getElementById('goalH').textContent = level.free ? 'Mode lliure' : 'Objectius';
+  document.getElementById('sideLevelsT').textContent = level.free ? 'Tornar a l\'inici' : 'Tornar als nivells';
   MAP_W = level.w; MAP_H = level.h;
   showScreen('game');
   zoom = 1.3; zoomTarget = 1.3; M = BASE_M * 1.3; rot = 0; rotGoal = null;
@@ -3573,21 +3781,26 @@ function startLevel(i) {
   reset();
   buildMini();
 }
-(function buildLevelGrid() {
-  const grid = document.getElementById('lvlGrid');
+function renderLevelGrid() {
+  const grid = document.getElementById('lvlGrid'); grid.innerHTML = '';
   LEVELS.forEach((L, i) => {
+    const done = !!PROG.levels[L.n], ok = levelUnlocked(i);
     const b = document.createElement('button');
-    b.className = 'lvl'; b.disabled = !!L.locked;
-    b.innerHTML = '<span class="n">' + L.n + '</span><span class="t">' + L.title + '</span><span class="d">' + L.desc + '</span><span class="tag">' + (L.locked ? 'Bloquejat' : 'Disponible') + '</span>';
+    b.className = 'lvl'; b.disabled = !ok;
+    const tag = done ? 'Completat ✓' : ok ? 'Disponible' : L.locked ? 'Bloquejat' : 'Bloquejat: supera el nivell anterior';
+    b.innerHTML = '<span class="n">' + L.n + '</span><span class="t">' + L.title + '</span><span class="d">' + L.desc + '</span><span class="tag' + (done ? ' done' : '') + '">' + tag + '</span>';
     b.onclick = () => startLevel(i);
     grid.appendChild(b);
   });
-})();
+  const note = document.getElementById('lvlNote');
+  if (note) note.textContent = PROG.uid ? 'El teu progrés es desa al teu compte.' : 'El progrés es desa en aquest navegador. Inicia sessió a la web per desar-lo al teu compte.';
+}
+renderLevelGrid(); progSync();
 document.getElementById('tutOk').onclick = () => {
   const s = level.tutorial.steps[TUT.step], n = [].concat(s ? s.text : '').length;
   if (TUT.page < n - 1) { TUT.page++; tutShow(); return; }
   if (s && s.ack) s.acked = true;
-  if (TUT.step === 0) TUT.intro = true; TUT.dismissed = true; tutShow();
+  if (TUT.step === 0) TUT.intro = true; TUT.dismissed = true; tutShow(); tutSnap(); TUT.idleSince = 0;
 };
 // Brúixola i teclat: ← → giren el mapa; clic a la brúixola el torna al nord; arrossegar-la el gira lliurement
 const keysDown = new Set();
@@ -3620,7 +3833,35 @@ function updateRot(dt) {
 window.addEventListener('keydown', e => { if (tutOpen() && (e.key === 'Escape' || e.key === 'Enter')) { e.preventDefault(); document.getElementById('tutOk').click(); } });
 document.getElementById('btnLevels').onclick = () => showScreen('levels');
 document.getElementById('btnBackTitle').onclick = () => showScreen('title');
-document.getElementById('btnMenu').onclick = () => showScreen(level && level.free ? 'title' : 'levels');
+// Menú lateral (estil Age of Empires): continuar, repetir el pas, reiniciar, ajustos i sortir. Pausa el joc mentre és obert.
+let sideOpen = false, sidePaused = false;
+function openSide() {
+  if (screen !== 'game' || sideOpen) return;
+  openMenu(null); sideOpen = true;
+  if (!paused) { paused = true; sidePaused = true; }
+  const r = document.getElementById('sideRetry'); r.style.display = level && level.free ? 'none' : ''; r.disabled = !canRetry();
+  r.title = canRetry() ? 'Torna al principi del pas actual (conserva el que ja has superat)' : 'Encara no hi ha cap pas començat';
+  document.getElementById('side').classList.add('open');
+}
+function closeSide(quiet) {
+  if (!sideOpen && !quiet) return;
+  document.getElementById('side').classList.remove('open'); sideOpen = false;
+  if (sidePaused) { paused = false; sidePaused = false; }
+}
+document.getElementById('btnMenu').onclick = openSide;
+document.getElementById('sideX').onclick = () => closeSide();
+document.getElementById('sideBack').onclick = () => closeSide();
+document.querySelector('#side .bk').onclick = () => closeSide();
+document.getElementById('sideRetry').onclick = () => { closeSide(); retryStep(); };
+document.getElementById('sideRestart').onclick = () => { closeSide(); startLevel(curLevel); };
+document.getElementById('sideLevels').onclick = () => { const f = level && level.free; closeSide(); showScreen(f ? 'title' : 'levels'); };
+window.addEventListener('keydown', e => {
+  if (e.key !== 'Escape' || screen !== 'game') return;
+  if (sideOpen) { e.preventDefault(); closeSide(); return; }
+  if (tutOpen() || openFam || vtestOpen() || document.getElementById('endmsg').classList.contains('show')) return;
+  e.preventDefault(); openSide();
+});
+document.getElementById('btnNext').onclick = () => { if (levelUnlocked(curLevel + 1)) startLevel(curLevel + 1); };
 document.getElementById('btnFree').onclick = () => startLevel('free');
 function updVoiceTitle() { const b = document.getElementById('btnVoice'); if (b) b.innerHTML = ICONS.mic + '<span>' + (VOICE.on ? 'Mode de veu: activat' : 'Mode de veu') + '</span>'; }
 VOICE.on = !!VOICE.want && voiceSupported(); VOICE.tested = VOICE.on;
