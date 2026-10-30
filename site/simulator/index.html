@@ -2512,10 +2512,27 @@ let autoStepT = 0;
 // · Aprèn com parla el jugador: correccions d'un clic, calibratge a la «sala d'instrucció», i (si el joc està publicat amb base de dades)
 //   un diccionari compartit entre tots els jugadors. També es pot exportar i importar.
 const VOICE = { on: false, rec: null, running: false, tested: false, seg: {}, interim: '', state: '', failT: 0, lastFail: null,
-  learn: { phr: {}, ex: {} }, shared: { phr: {}, ex: {} }, opt: { mode: 'cont', vol: true, log: false }, log: [], recentExec: null, ptt: false, db: null };
+  learn: { phr: {}, ex: {} }, shared: { phr: {}, ex: {} }, opt: { mode: 'cont', vol: true, log: false, tele: true, engine: '' }, log: [], recentExec: null, ptt: false, db: false, loading: false };
+// Connexió amb Supabase (la mateixa de la web: si el joc s'obre dins la web, agafa window.APP_CONFIG) i fonts del motor local Vosk
+const GAME_VERSION = '1.0.1';
+const CFG = Object.assign({
+  SUPABASE_URL: 'https://ltopullwhasagnkuqaek.supabase.co',
+  SUPABASE_ANON_KEY: 'sb_publishable_DhHFUh-UrbBrI0l476Vcnw_tSn-Gmkr',
+  VOSK_LIB: 'https://cdn.jsdelivr.net/npm/vosk-browser@0.0.8/dist/vosk.js',
+  VOSK_MODEL_URLS: ['https://ltopullwhasagnkuqaek.supabase.co/storage/v1/object/public/public-media/vosk/vosk-model-small-fr-pguyot-0.3.tar.gz',
+                    'https://ccoreilly.github.io/vosk-browser/models/vosk-model-small-fr-pguyot-0.3.tar.gz']
+}, window.APP_CONFIG || {}, window.GAME_CONFIG || {});
+function sbFetch(path, opts = {}) {
+  if (!CFG.SUPABASE_URL || !CFG.SUPABASE_ANON_KEY) return Promise.reject(new Error('no config'));
+  return fetch(CFG.SUPABASE_URL + path, Object.assign({}, opts, { headers: Object.assign({ apikey: CFG.SUPABASE_ANON_KEY, Authorization: 'Bearer ' + CFG.SUPABASE_ANON_KEY, 'Content-Type': 'application/json' }, opts.headers || {}) }))
+    .then(r => { if (!r.ok) throw new Error('http ' + r.status); return r; });
+}
 try { const v = JSON.parse(localStorage.getItem('9eVeu') || 'null'); if (v) { VOICE.learn = Object.assign(VOICE.learn, v.learn || {}); VOICE.want = !!v.want; Object.assign(VOICE.opt, v.opt || {}); } } catch (e) {}
 function voiceSave() { try { localStorage.setItem('9eVeu', JSON.stringify({ learn: VOICE.learn, want: VOICE.on, opt: VOICE.opt })); } catch (e) {} }
-const voiceSupported = () => !!(window.SpeechRecognition || window.webkitSpeechRecognition);
+const webSpeechOk = () => !!(window.SpeechRecognition || window.webkitSpeechRecognition);
+const voskOk = () => !!(window.WebAssembly && (window.AudioContext || window.webkitAudioContext) && navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+const vEngine = () => VOICE.opt.engine || (webSpeechOk() ? 'web' : 'vosk');
+const voiceSupported = () => vEngine() === 'vosk' ? voskOk() : webSpeechOk();
 const VOICE_EXEC_WAIT = 6;            // segons per donar la veu executiva després de la preventiva
 const VSTOP = { a: 0.4, le: 0.4, la: 0.4, par: 0.6, en: 0.6, sur: 0.6 };
 function vNorm(s) { return s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim(); }
@@ -2578,7 +2595,7 @@ function vPrior(c) {
   if (st === 'parat' && ['FD-04', 'FD-05', 'WH-01', 'CD-03', 'MA-02', 'FD-02', 'FD-03'].includes(id)) return 1.03;
   return 1;
 }
-const vLearnedPhr = nh => VOICE.learn.phr[nh] || VOICE.shared.phr[nh];
+const vLearnedPhr = nh => VOICE.learn.phr[nh] ? Object.assign({ w: 0.95 }, VOICE.learn.phr[nh]) : VOICE.shared.phr[nh];
 const vLearnedEx = hk => VOICE.learn.ex[hk] || VOICE.shared.ex[hk];
 function voiceExecAt(E, H, from) {                // posició de la veu executiva dins l'escoltat (o null)
   const ek = vKey(E[E.length - 1]);
@@ -2596,7 +2613,7 @@ function vRank(alts) {
     for (const c of cands) {
       const m = vMatch(c.P, H);
       let s = m.s * (0.8 + 0.2 * Math.min(1, m.cnt / Math.max(1, H.length))) * (0.85 + 0.15 * (al.c || 0.7));   // premia la frase que explica més del que s'ha sentit
-      const lk = vLearnedPhr(nh); if (lk && lk.key === c.key) s = Math.max(s, 0.95);
+      const lk = vLearnedPhr(nh); if (lk && lk.key === c.key) s = Math.max(s, lk.w || 0.95);
       s *= vPrior(c);
       if (c.o.avail(c.arg) !== true) s *= 0.85;
       const k = c.key, cur = byO.get(k);
@@ -2605,7 +2622,22 @@ function vRank(alts) {
   }
   return [...byO.values()].sort((a, b) => b.s - a.s);
 }
-function vlog(kind, text, detail) {
+const TELE = { q: [], session: Math.random().toString(36).slice(2, 12) };
+function tele(kind, heard, detail, data) {
+  if (!VOICE.opt.tele) return;
+  TELE.q.push({ session: TELE.session, version: GAME_VERSION, engine: vEngine(), level: String(curLevel), state: co ? co.state : '', kind: String(kind).slice(0, 12),
+    heard: String(heard || '').slice(0, 300), detail: String(detail || '').slice(0, 300), data: data || null });
+  if (TELE.q.length >= 20) teleFlush();
+}
+function teleFlush(keep) {
+  if (!TELE.q.length) return;
+  const rows = TELE.q.splice(0, 50);
+  sbFetch('/rest/v1/voice_events', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(rows), keepalive: !!keep }).catch(() => {});
+}
+setInterval(teleFlush, 5000);
+window.addEventListener('pagehide', () => teleFlush(true));
+function vlog(kind, text, detail, data) {
+  tele(kind, text, detail, data);
   VOICE.log.unshift({ t: new Date().toLocaleTimeString('ca', { hour: '2-digit', minute: '2-digit', second: '2-digit' }), kind, text, detail: detail || '' });
   if (VOICE.log.length > 40) VOICE.log.length = 40;
   if (VOICE.opt.log) renderVoiceLog();
@@ -2649,7 +2681,8 @@ function voiceProcess(alts, idx, fin) {
   const second = (rank.find(r => r.c.o !== (best && best.c.o)) || { s: 0 }).s;
   const need = fin ? 0.62 : 0.8;
   if (fin) vlog('sent', alts.map(a => a.t + (a.c ? ' (' + Math.round(a.c * 100) + '%)' : '')).join(' · '),
-    rank.slice(0, 3).map(r => (r.c.prev || r.c.exec) + ' ' + Math.round(r.s * 100)).join(' / '));
+    rank.slice(0, 3).map(r => (r.c.prev || r.c.exec) + ' ' + Math.round(r.s * 100)).join(' / '),
+    { alts: alts.slice(0, 5).map(a => [a.t.slice(0, 80), Math.round((a.c || 0) * 100)]), top: rank.slice(0, 4).map(r => [r.c.key, Math.round(r.s * 100)]), pending: pendingCmd && pendingCmd.voice ? pendingCmd.cand.key : null });
   if (!best || best.s < need || best.s - second < 0.04) {
     if (fin && text.trim()) {
       VOICE.lastFail = { nh: vNorm(text), t: performance.now() }; VOICE.state = 'fail'; VOICE.failT = performance.now(); VOICE.failText = text;
@@ -2706,23 +2739,21 @@ function voiceLearnClick(o, arg) {                     // una frase no entesa se
   const f = VOICE.lastFail; if (!VOICE.on || !f || performance.now() - f.t > 8000) return;
   voiceTeachPhr(f.nh, (o.id || 'HALTE') + '|' + arg, 'clic'); VOICE.lastFail = null;
 }
-async function vShareInit() {                          // diccionari compartit: només si el joc s'obre publicat amb base de dades
+async function vShareInit() {                          // diccionari compartit de tots els jugadors (Supabase)
   try {
-    if (!window.claude || !window.claude.use) return;
-    const db = await window.claude.use('db'); if (!db) return;
-    VOICE.db = db;
-    const snap = await db.collection('aliases').limit(1000).get();
-    for (const d of snap.docs) { const v = d.data(); if (v && v.h && v.key && (v.kind === 'phr' || v.kind === 'ex')) VOICE.shared[v.kind][v.h] = v.kind === 'phr' ? { key: v.key } : v.key; }
-  } catch (e) { VOICE.db = null; }
+    const r = await sbFetch('/rest/v1/voice_aliases?select=kind,heard,key,n&order=n.desc&limit=5000');
+    const rows = await r.json(), best = {};
+    for (const v of rows) { const id = v.kind + '|' + v.heard; if (!best[id] || v.n > best[id].n) best[id] = v; }       // si dues ordres competeixen, guanya la més confirmada
+    for (const v of Object.values(best)) {
+      if (v.kind === 'phr') VOICE.shared.phr[v.heard] = { key: v.key, w: v.n >= 3 ? 0.92 : v.n >= 2 ? 0.86 : 0.76 };
+      else if (v.kind === 'ex' && v.n >= 1) VOICE.shared.ex[v.heard] = v.key;
+    }
+    VOICE.db = true;
+  } catch (e) { VOICE.db = false; }
 }
-async function vShare(kind, h, key) {
-  const db = VOICE.db; if (!db) return;
-  try {
-    const id = (kind + '_' + h + '_' + key).replace(/[^a-zA-Z0-9_-]+/g, '-').slice(0, 120);
-    const ref = db.collection('aliases').doc(id), cur = await ref.get();
-    await ref.set({ kind, h, key, n: ((cur.exists && cur.data().n) || 0) + 1, at: Date.now() });
-    VOICE.shared[kind][h] = kind === 'phr' ? { key } : key;
-  } catch (e) {}
+function vShare(kind, h, key) {
+  if (!VOICE.opt.tele) return;                      // qui no vol compartir dades tampoc comparteix el diccionari
+  sbFetch('/rest/v1/rpc/voice_learn', { method: 'POST', body: JSON.stringify({ p_kind: kind, p_heard: String(h).slice(0, 80), p_key: key }) }).catch(() => {});
 }
 function voiceExport() {
   const blob = new Blob([JSON.stringify({ app: '9e-simulator-veu', v: 1, learn: VOICE.learn }, null, 1)], { type: 'application/json' });
@@ -2742,10 +2773,67 @@ function voiceImport() {
 }
 function voiceForget() { VOICE.learn = { phr: {}, ex: {} }; voiceSave(); showMsg('S\'ha oblidat el que s\'havia après de la teva veu', 2500); }
 
+// ---- Motor local (Vosk): reconeixement dins del navegador, amb vocabulari tancat a les paraules de les ordres ----
+const VK = { model: null, loading: null, rec: null, ctx: null, node: null, src: null, stream: null, listening: false, capture: null, seg: 0, interim: null };
+function loadScript(src) { return new Promise((res, rej) => { const s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = () => rej(new Error('script')); document.head.appendChild(s); }); }
+async function voskLoad() {
+  if (VK.model) return VK.model;
+  if (!VK.loading) VK.loading = (async () => {
+    if (!window.Vosk) await loadScript(CFG.VOSK_LIB);
+    let err;
+    for (const url of [].concat(CFG.VOSK_MODEL_URLS)) { try { VK.model = await window.Vosk.createModel(url); VK.modelUrl = url; return VK.model; } catch (e) { err = e; } }
+    throw err || new Error('model');
+  })().catch(e => { VK.loading = null; throw e; });
+  return VK.loading;
+}
+function voskGrammar() {                                // totes les frases de totes les ordres (preventiva, executiva i les dues juntes)
+  const set = new Set(['halte', 'peloton halte']);
+  const clean = s => s.toLowerCase().replace(/[!,.;:–]/g, ' ').replace(/-/g, ' ').replace(/\s+/g, ' ').trim();
+  for (const o of ORDERS.concat([HALTE])) {
+    const args = o.sides ? [-1, 1] : o.options ? o.options.map(x => x[0]) : [undefined];
+    for (const arg of args) { const t = orderTitle(o, arg), i = t.indexOf(' – '); if (i < 0) set.add(clean(t)); else { const a = clean(t.slice(0, i)), b = clean(t.slice(i + 3)); set.add(a); set.add(b); set.add(a + ' ' + b); } }
+  }
+  return JSON.stringify([...set, '[unk]']);
+}
+async function voskStart() {
+  await voskLoad();
+  if (VK.rec) return;
+  VK.stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, channelCount: 1 } });
+  VK.ctx = new (window.AudioContext || window.webkitAudioContext)();
+  VK.rec = new VK.model.KaldiRecognizer(VK.ctx.sampleRate, voskGrammar());
+  VK.rec.on('result', m => voskResult(((m && m.result && m.result.text) || '').trim(), true));
+  VK.rec.on('partialresult', m => voskResult(((m && m.result && m.result.partial) || '').trim(), false));
+  VK.node = VK.ctx.createScriptProcessor(4096, 1, 1);
+  VK.node.onaudioprocess = e => { if (!VK.listening) return; try { VK.rec.acceptWaveform(e.inputBuffer); } catch (err) {} };
+  VK.src = VK.ctx.createMediaStreamSource(VK.stream); VK.src.connect(VK.node); VK.node.connect(VK.ctx.destination);
+}
+function voskAudioStop() {
+  VK.listening = false;
+  try { if (VK.src) VK.src.disconnect(); if (VK.node) VK.node.disconnect(); } catch (e) {}
+  if (VK.stream) VK.stream.getTracks().forEach(t => t.stop());
+  if (VK.ctx) try { VK.ctx.close(); } catch (e) {}
+  if (VK.rec) try { VK.rec.remove(); } catch (e) {}
+  VK.rec = VK.ctx = VK.node = VK.src = VK.stream = null;
+}
+function voskResult(text, fin) {
+  const t = text.replace(/\[unk\]/g, '').replace(/\s+/g, ' ').trim();
+  if (VK.capture) { if (VK.capture.partial) VK.capture.partial(t); if (fin && t) { const cb = VK.capture; VK.capture = null; cb.done(t, [{ t, c: 0.9 }]); } return; }
+  if (!t) { if (fin) VK.seg++; return; }
+  voiceProcess([{ t, c: fin ? 0.9 : 0 }], 'vk' + VK.seg, fin);
+  if (fin) VK.seg++;
+}
+
 // ---- Escolta: continua (robusta) o mantenint premut ----
 function voiceStart() {
   if (!voiceSupported()) return false;
   vadStart();
+  if (vEngine() === 'vosk') {
+    if (VK.rec) { VK.listening = VOICE.opt.mode === 'cont'; return true; }
+    VOICE.loading = true; updVoicePill(true);
+    voskStart().then(() => { VOICE.loading = false; VK.listening = VOICE.on && screen === 'game' && VOICE.opt.mode === 'cont'; vlog('motor', 'Vosk', VK.modelUrl); updVoicePill(true); })
+      .catch(e => { VOICE.loading = false; vlog('error', 'Vosk', String(e && e.message || e)); showMsg('No s\'ha pogut carregar el reconeixement local (Vosk)', 4000); updVoicePill(true); });
+    return true;
+  }
   if (VOICE.rec) return true;
   const R = window.SpeechRecognition || window.webkitSpeechRecognition, r = new R();
   r.lang = 'fr-FR'; r.continuous = true; r.interimResults = true; r.maxAlternatives = 5;
@@ -2769,12 +2857,20 @@ function voiceStart() {
   if (VOICE.opt.mode === 'cont') { try { r.start(); } catch (e) {} }
   return true;
 }
-function voiceStop() { const r = VOICE.rec; VOICE.rec = null; VOICE.running = false; if (r) { try { r.onend = null; r.abort(); } catch (e) {} } vadStop(); }
+function voiceStop() { const r = VOICE.rec; VOICE.rec = null; VOICE.running = false; if (r) { try { r.onend = null; r.abort(); } catch (e) {} } voskAudioStop(); vadStop(); }
 setInterval(() => {                                     // vigilant: si l'escolta continua s'ha aturat sola, es torna a engegar
-  if (VOICE.on && VOICE.rec && !VOICE.running && screen === 'game' && VOICE.opt.mode === 'cont' && !vtestOpen()) { try { VOICE.rec.start(); } catch (e) {} }
+  if (vEngine() === 'web' && VOICE.on && VOICE.rec && !VOICE.running && screen === 'game' && VOICE.opt.mode === 'cont' && !vtestOpen()) { try { VOICE.rec.start(); } catch (e) {} }
 }, 3000);
-function pttDown() { if (!VOICE.on || VOICE.opt.mode !== 'ptt' || VOICE.ptt || !VOICE.rec) return; VOICE.ptt = true; try { VOICE.rec.start(); } catch (e) {} updVoicePill(); }
-function pttUp() { if (!VOICE.ptt) return; VOICE.ptt = false; try { VOICE.rec.stop(); } catch (e) {} updVoicePill(); }
+function pttDown() {
+  if (!VOICE.on || VOICE.opt.mode !== 'ptt' || VOICE.ptt) return;
+  if (vEngine() === 'vosk') { if (!VK.rec) return; VOICE.ptt = true; VK.listening = true; updVoicePill(); return; }
+  if (!VOICE.rec) return; VOICE.ptt = true; try { VOICE.rec.start(); } catch (e) {} updVoicePill();
+}
+function pttUp() {
+  if (!VOICE.ptt) return; VOICE.ptt = false;
+  if (vEngine() === 'vosk') { setTimeout(() => { if (!VOICE.ptt) { VK.listening = false; try { VK.rec && VK.rec.retrieveFinalResult && VK.rec.retrieveFinalResult(); } catch (e) {} } }, 350); updVoicePill(); return; }
+  try { VOICE.rec.stop(); } catch (e) {} updVoicePill();
+}
 window.addEventListener('keydown', e => { if (e.code === 'Space' && screen === 'game' && VOICE.on && VOICE.opt.mode === 'ptt' && !tutOpen() && !vtestOpen()) { e.preventDefault(); if (!e.repeat) pttDown(); } });
 window.addEventListener('keyup', e => { if (e.code === 'Space' && VOICE.ptt) { e.preventDefault(); pttUp(); } });
 window.addEventListener('blur', () => pttUp());
@@ -2788,6 +2884,7 @@ function voiceToggle() {
   if (VOICE.on) { voiceSet(false); return; }
   if (!VOICE.tested) openVoiceTest(); else voiceSet(true);
 }
+function setVoiceEngine(e) { VOICE.opt.engine = e; voiceSave(); if (VOICE.on) { voiceStop(); voiceStart(); } updVoicePill(true); syncVoiceOpts(); }
 function setVoiceMode(m) { VOICE.opt.mode = m; voiceSave(); if (VOICE.on) { voiceStop(); voiceStart(); } updVoicePill(); syncVoiceOpts(); }
 
 // ---- Píndola d'estat (sota el mapa, a sobre del tauler) ----
@@ -2800,7 +2897,8 @@ function updVoicePill(force) {
   const fail = VOICE.state === 'fail' && performance.now() - VOICE.failT < 5000;
   const ptt = VOICE.opt.mode === 'ptt';
   let html, key;
-  if (pendingCmd && pendingCmd.voice) { const ph = VOICE.vad.phase; html = '<b>«' + vEsc(pendingCmd.cand.prev) + '…»</b> <span>ara la veu executiva: <i>' + vEsc(pendingCmd.cand.exec) + '</i>' + (VOICE.opt.vol && VOICE.vad.an ? (ph === 'armed' ? ' <em>(a punt)</em>' : '') : '') + '</span>'; key = 'w' + ph + pendingCmd.cand.key; }
+  if (VOICE.loading) { html = '<span>Carregant el reconeixement local… (uns 40 MB, només la primera vegada)</span>'; key = 'load'; }
+  else if (pendingCmd && pendingCmd.voice) { const ph = VOICE.vad.phase; html = '<b>«' + vEsc(pendingCmd.cand.prev) + '…»</b> <span>ara la veu executiva: <i>' + vEsc(pendingCmd.cand.exec) + '</i>' + (VOICE.opt.vol && VOICE.vad.an ? (ph === 'armed' ? ' <em>(a punt)</em>' : '') : '') + '</span>'; key = 'w' + ph + pendingCmd.cand.key; }
   else if (fail) {
     html = '<span class="no">No t\'he entès: «' + vEsc(VOICE.failText) + '»</span>' + ((VOICE.guesses || []).length ? ' <span class="q">Volies dir…</span>' + VOICE.guesses.map((c, i) => '<button data-g="' + i + '">' + vEsc(c.prev || c.exec) + '</button>').join('') : '');
     key = 'f' + VOICE.failT;
@@ -2835,7 +2933,9 @@ function syncVoiceOpts() {
   p.querySelectorAll('input[name=vmode]').forEach(i => i.checked = i.value === VOICE.opt.mode);
   const v = p.querySelector('input[data-o=vol]'); if (v) v.checked = !!VOICE.opt.vol;
   const l = p.querySelector('input[data-o=log]'); if (l) l.checked = !!VOICE.opt.log;
-  const sh = p.querySelector('.shared'); if (sh) sh.textContent = VOICE.db ? 'Diccionari compartit: actiu' : 'Diccionari compartit: només si el joc està publicat';
+  const t = p.querySelector('input[data-o=tele]'); if (t) t.checked = !!VOICE.opt.tele;
+  p.querySelectorAll('input[name=veng]').forEach(i => { i.checked = i.value === vEngine(); i.disabled = i.value === 'web' ? !webSpeechOk() : !voskOk(); });
+  const sh = p.querySelector('.shared'); if (sh) sh.textContent = VOICE.db ? 'Diccionari compartit: ' + Object.keys(VOICE.shared.phr).length + ' frases apreses pels jugadors' : 'Diccionari compartit: sense connexió';
 }
 function buildVoiceOpts(pop) {
   const d = document.createElement('div'); d.className = 'vopts';
@@ -2843,12 +2943,17 @@ function buildVoiceOpts(pop) {
     '<label title="El micròfon escolta tota l\'estona"><input type="radio" name="vmode" value="cont"><span>Escolta contínua</span></label>' +
     '<label title="Només escolta mentre mantens premut el botó o la barra d\'espai: menys errors"><input type="radio" name="vmode" value="ptt"><span>Mantenir premut per parlar</span></label>' +
     '<label title="Després de la preventiva i una pausa, un crit curt executa l\'ordre"><input type="checkbox" data-o="vol"><span>Executiva per volum</span></label>' +
+    '<label title="Reconeixement de Google (Chrome/Edge, cal connexió)"><input type="radio" name="veng" value="web"><span>Motor de Google</span></label>' +
+    '<label title="Reconeixement dins del navegador, amb el vocabulari de les ordres (uns 40 MB la primera vegada)"><input type="radio" name="veng" value="vosk"><span>Motor local</span></label>' +
     '<label title="Mostra què sent el navegador i què n\'entén el joc"><input type="checkbox" data-o="log"><span>Registre de veu</span></label>' +
+    '<label title="Envia de manera anònima el text que sent el joc i què n\'entén (mai l\'àudio), i comparteix les pronunciacions apreses"><input type="checkbox" data-o="tele"><span>Compartir dades anònimes</span></label>' +
     '<div class="vb"><button data-a="cal">Calibrar la veu…</button><button data-a="exp">Exportar</button><button data-a="imp">Importar</button><button data-a="del">Oblidar</button></div><small class="shared"></small>';
   pop.appendChild(d);
   d.querySelectorAll('input[name=vmode]').forEach(i => i.onchange = () => setVoiceMode(i.value));
   d.querySelector('input[data-o=vol]').onchange = e => { VOICE.opt.vol = e.target.checked; voiceSave(); };
   d.querySelector('input[data-o=log]').onchange = e => { VOICE.opt.log = e.target.checked; voiceSave(); renderVoiceLog(); };
+  d.querySelector('input[data-o=tele]').onchange = e => { VOICE.opt.tele = e.target.checked; voiceSave(); };
+  d.querySelectorAll('input[name=veng]').forEach(i => i.onchange = () => setVoiceEngine(i.value));
   d.querySelector('[data-a=cal]').onclick = () => { pop.classList.remove('open'); openCalib(); };
   d.querySelector('[data-a=exp]').onclick = voiceExport;
   d.querySelector('[data-a=imp]').onclick = voiceImport;
@@ -2863,6 +2968,7 @@ function openVoiceTest() { const el = document.getElementById('vtest'); el.class
 function closeVoiceTest() { vtCleanup(); CAL.on = false; document.getElementById('vtest').classList.remove('show'); updVoicePill(); }
 function vtCleanup() {
   clearTimeout(VT.timer); cancelAnimationFrame(VT.raf);
+  if (VK.capture) { VK.capture = null; VK.listening = VOICE.on && VOICE.opt.mode === 'cont' && screen === 'game'; }
   if (VT.rec) { try { VT.rec.onend = null; VT.rec.onerror = null; VT.rec.abort(); } catch (e) {} VT.rec = null; }
   if (VT.stream) { VT.stream.getTracks().forEach(t => t.stop()); VT.stream = null; }
 }
@@ -2877,9 +2983,11 @@ function vtView(kind, extra) {
     img.src = AV.pensa;
     p.innerHTML = '<p>Amb el <b>mode de veu</b> cridaràs tu les ordres, en francès: primer la <b>veu preventiva</b> («En avant…») i després l\'<b>executiva</b> («…marche!»). La unitat executa en sentir l\'executiva.</p>' +
       '<ul><li>Quan el navegador ho demani, <b>dona permís</b> per fer servir el micròfon.</li>' +
-      '<li>Funciona millor a <b>Chrome</b> o <b>Edge</b>. A Firefox no hi ha reconeixement de veu i a Safari falla sovint.</li>' +
-      '<li>Chrome envia l\'àudio al seu servei de reconeixement: cal <b>connexió a internet</b>.</li></ul>' +
+      '<li>Hi ha dos motors. El de <b>Google</b> (Chrome o Edge) envia l\'àudio al seu servei i cal connexió. El <b>local</b> funciona dins del navegador, també a Firefox, i només coneix les paraules de les ordres; la primera vegada descarrega uns 40 MB.</li>' +
+      '<li>Per millorar el reconeixement, el joc envia de manera <b>anònima</b> el text que sent i què n\'entén (mai l\'àudio). Ho pots desactivar a les opcions de veu.</li></ul>' +
+      '<p>Motor: <label><input type="radio" name="vteng" value="web"' + (vEngine() === 'web' ? ' checked' : '') + (webSpeechOk() ? '' : ' disabled') + '> Google</label> &nbsp; <label><input type="radio" name="vteng" value="vosk"' + (vEngine() === 'vosk' ? ' checked' : '') + (voskOk() ? '' : ' disabled') + '> Local</label></p>' +
       '<p>Primer fem una prova curta.</p>';
+    p.querySelectorAll('input[name=vteng]').forEach(i => i.onchange = () => setVoiceEngine(i.value));
     vtButtons([['Començar la prova', vtRun, true], ['Ara no', closeVoiceTest]]);
   } else if (kind === 'listen') {
     img.src = AV.assenyala; meter.style.display = 'block';
@@ -2906,6 +3014,17 @@ function vtMeter() {
 }
 // Escolta una sola frase (prova i calibratge). onDone(text, alts) | onFail(motiu)
 function vtListen(onDone, onFail) {
+  if (vEngine() === 'vosk') {
+    const st0 = document.querySelector('#vtest .st'); if (st0 && !VK.rec) st0.textContent = 'Carregant el reconeixement local… (uns 40 MB, només la primera vegada)';
+    voskStart().then(() => {
+      const st = document.querySelector('#vtest .st'); if (st) st.textContent = 'Escoltant…';
+      VK.listening = true;
+      VK.capture = { done: (t, alts) => { clearTimeout(VT.timer); VK.listening = false; onDone(t, alts); },
+                     partial: t => { const s = document.querySelector('#vtest .st'); if (s && t) s.innerHTML = 'He sentit: <i>«' + vEsc(t) + '»</i>'; } };
+      VT.timer = setTimeout(() => { if (VK.capture) { VK.capture = null; VK.listening = false; onFail('No t\'he sentit. Comprova que el micròfon és el correcte i no està silenciat.'); } }, 9000);
+    }).catch(e => onFail('No s\'ha pogut carregar el reconeixement local (' + vEsc(String(e && e.message || e)) + ').'));
+    return;
+  }
   const R = window.SpeechRecognition || window.webkitSpeechRecognition, r = new R(); VT.rec = r;
   r.lang = 'fr-FR'; r.continuous = false; r.interimResults = true; r.maxAlternatives = 5;
   let heard = '', alts = [];
@@ -2921,8 +3040,8 @@ function vtListen(onDone, onFail) {
 }
 async function vtRun() {
   vtCleanup();
-  if (!voiceSupported()) { vtView('fail', 'Aquest navegador no té reconeixement de veu. Prova-ho amb <b>Chrome</b> o <b>Edge</b>.'); return; }
-  voiceStop();
+  if (!voiceSupported()) { vtView('fail', vEngine() === 'vosk' ? 'Aquest navegador no pot fer servir el reconeixement local.' : 'Aquest navegador no té reconeixement de Google. Prova-ho amb <b>Chrome</b> o <b>Edge</b>, o tria el <b>reconeixement local</b>.'); if (vEngine() === 'web' && voskOk()) vtButtons([['Provar el reconeixement local', () => { setVoiceEngine('vosk'); vtRun(); }, true], ['Saltar la prova', () => { closeVoiceTest(); voiceSet(false); }]]); return; }
+  if (vEngine() === 'web') voiceStop();
   try { VT.stream = await navigator.mediaDevices.getUserMedia({ audio: true }); }
   catch (e) { vtView('fail', 'No hi ha permís per fer servir el micròfon (o no se n\'ha trobat cap). Revisa el permís del micròfon a la barra d\'adreces del navegador.'); return; }
   vtView('listen'); vtMeter();
@@ -2948,7 +3067,7 @@ function calItems() {
 function openCalib() {
   if (!voiceSupported()) { showMsg('Aquest navegador no té reconeixement de veu', 3000); return; }
   const el = document.getElementById('vtest'); el.classList.add('show'); el.querySelector('h4').textContent = 'Sala d\'instrucció';
-  voiceStop(); CAL.on = true; CAL.items = calItems(); CAL.i = 0; CAL.results = [];
+  if (vEngine() === 'web') voiceStop(); else VK.listening = false; CAL.on = true; CAL.items = calItems(); CAL.i = 0; CAL.results = [];
   calShow();
 }
 function calShow(msg) {
@@ -2983,7 +3102,7 @@ function calListen() {
       else if (!hk || hk.length < 2 || other) { res = 'dubte'; note = 'He sentit <i>«' + vEsc(heard) + '»</i>' + (other ? ', que sembla «' + vEsc(other.say) + '»' : '') + '. No ho aprenc: torna-ho a provar o salta-la.'; CAL.i--; }
       else { voiceTeachEx(hk, it.ek); res = 'apres'; note = 'He sentit <i>«' + vEsc(heard) + '»</i>: ara ja sé que és «' + vEsc(it.say) + '».'; }
     }
-    CAL.results.push(res); CAL.i++; calShow(note);
+    vlog('calib', heard, it.say + ' → ' + res); CAL.results.push(res); CAL.i++; calShow(note);
   }, why => calShow('<span style="color:var(--ecarlate)">' + why + '</span>'));
 }
 
@@ -3280,6 +3399,7 @@ document.getElementById('btnFree').onclick = () => startLevel('free');
 function updVoiceTitle() { const b = document.getElementById('btnVoice'); if (b) b.innerHTML = ICONS.mic + '<span>' + (VOICE.on ? 'Mode de veu: activat' : 'Mode de veu') + '</span>'; }
 VOICE.on = !!VOICE.want && voiceSupported(); VOICE.tested = VOICE.on;
 vShareInit().then(syncVoiceOpts);
+setInterval(() => { if (VOICE.on) vShareInit(); }, 120000);   // es refresca el diccionari compartit cada 2 minuts mentre es juga amb la veu
 document.getElementById('btnToLevels').onclick = () => showScreen('levels');
 document.getElementById('btnAgain').onclick = () => startLevel(curLevel);
 
