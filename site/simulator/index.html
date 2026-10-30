@@ -1115,7 +1115,7 @@ const TUNE = {
               escalf: 0.45,                   // la descàrrega s'escampa en aquests segons (trrrrt)
               vent: [0.35, -0.12],            // deriva del fum (m/s)
               fum: 6,                         // segons que dura el fum
-              obertura: 0.1745,               // semiobertura de la franja de foc (±10°)
+              obertura: 0.0436,               // semiobertura de la franja de foc (±2,5°)
               abast: 50,                      // metres: a més distància, els trets no fan efecte
               punteria: [0.55, 0.15] }        // probabilitat d'encert per tret a boca de canó i a l'abast màxim
 };
@@ -3081,7 +3081,7 @@ function renderUnitControls() {
     el.badge.textContent = fi.avail ? fi.avail : '';
   }
   if (panel.fire) {
-    document.getElementById('fireBox').style.display = armMode() && co.loaded && co.state === 'parat' ? '' : 'none';   // només surt amb les armes carregades
+    document.getElementById('fireBox').style.display = armMode() && co.loaded ? '' : 'none';   // només surt amb les armes carregades
     for (const b of panel.fire) {
       const o = ORDER_BY_ID[b.dataset.id], a = o.avail();
       if (o.id === 'FI-03') b.style.display = co.arm === 'joue' ? '' : 'none';           // Redressez només surt quan estan apuntant
@@ -3421,7 +3421,7 @@ function drawCo() {
     ctx.strokeStyle = T.tick; ctx.lineWidth = Math.max(1, 0.06 * M);
     ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(px + Math.cos(a) * 0.45 * M, py + Math.sin(a) * 0.45 * M); ctx.stroke();
   }
-  if (armMode() && co.arm === 'joue') drawFireStrip();
+  if (armMode() && co.arm === 'joue' && co.loaded) drawFireStrip();
   if (FX.length) drawFx();
 }
 
@@ -3455,7 +3455,7 @@ let autoStepT = 0;
 const VOICE = { on: false, rec: null, running: false, tested: false, seg: {}, interim: '', state: '', failT: 0, lastFail: null,
   learn: { phr: {}, ex: {} }, shared: { phr: {}, ex: {} }, opt: { mode: 'cont', vol: true, log: false, tele: true, engine: '' }, log: [], recentExec: null, ptt: false, db: false, loading: false };
 // Connexió amb Supabase (la mateixa de la web: si el joc s'obre dins la web, agafa window.APP_CONFIG) i fonts del motor local Vosk
-const GAME_VERSION = '1.4.11';
+const GAME_VERSION = '1.4.12';
 const CFG = Object.assign({
   SUPABASE_URL: 'https://ltopullwhasagnkuqaek.supabase.co',
   SUPABASE_ANON_KEY: 'sb_publishable_DhHFUh-UrbBrI0l476Vcnw_tSn-Gmkr',
