@@ -646,3 +646,7 @@ table.sq-att td.sq-chk{min-width:6.5rem}
 .sim-box{position:relative}
 .sim-tools{display:flex;justify-content:flex-end;margin-bottom:.35rem}
 .sim-fs{display:inline-flex;align-items:center;padding:.3rem .5rem}
+.sim-box.fit{position:fixed;left:0;right:0;bottom:0;top:var(--barh,0px);z-index:40;background:var(--bg,#fff);display:flex;flex-direction:column;padding:.35rem .5rem}
+.sim-box.fit .sim-tools{flex:none}
+.sim-box.fit iframe{flex:1;height:auto!important;min-height:0!important}
+body.sim-fit{overflow:hidden}
