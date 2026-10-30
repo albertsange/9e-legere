@@ -247,21 +247,22 @@
   #controls{grid-template-columns:250px 1fr 340px;grid-template-rows:minmax(0,1fr);}
   #unit{justify-content:center;align-items:stretch;padding:8px 14px;}
   #deck{display:flex;align-items:center;gap:18px;height:100%;}
-  #fireBox{position:absolute;bottom:calc(100% + 22px);right:370px;display:flex;align-items:center;gap:10px;z-index:90;}
+  #fireBox{position:absolute;bottom:calc(100% + 14px);right:370px;display:flex;align-items:center;gap:8px;z-index:90;
+    padding:6px 6px 6px 16px;background:var(--sheet);border:1px solid var(--line);border-radius:999px;box-shadow:0 6px 18px rgba(0,0,0,.18);}
   #controls #fireBox button{font-family:inherit;cursor:pointer;}
-  #fireBox .fst{display:flex;align-items:center;gap:7px;height:38px;padding:0 14px;border-radius:999px;background:var(--sheet);border:1.5px solid #2e7d32;color:#2e7d32;font-weight:700;font-size:14px;letter-spacing:.03em;box-shadow:0 3px 10px rgba(0,0,0,.15);}
+  #fireBox .fst{display:flex;align-items:center;gap:7px;padding-right:12px;margin-right:2px;border-right:1px solid var(--line);color:#2e7d32;font-weight:700;font-size:14px;letter-spacing:.03em;height:30px;}
   #fireBox .fst i{width:9px;height:9px;border-radius:50%;background:#2e7d32;}
-  #controls #fireBox .fstep{height:54px;min-width:92px;padding:4px 12px;border-radius:10px;border:2px solid var(--bleu);background:var(--sheet);color:var(--bleu);
-    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:14px;box-shadow:0 3px 10px rgba(0,0,0,.18);}
-  #controls #fireBox .fstep.go{background:var(--bleu);color:#fff;animation:pulse 1.3s ease-in-out infinite;}
-  #controls #fireBox .fstep:disabled{opacity:.45;box-shadow:none;cursor:default;}
-  #controls #fireBox .feu{width:88px;height:88px;padding:0;border-radius:50%;border:3px solid #fff;
-    background:radial-gradient(circle at 40% 35%,#d8463b,#9e1f17);color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;
-    box-shadow:0 6px 18px rgba(0,0,0,.35);}
+  #controls #fireBox .fstep{height:40px;min-width:0;padding:0 14px;border-radius:999px;border:none;background:transparent;color:var(--bleu);
+    display:flex;flex-direction:row;align-items:center;justify-content:center;gap:6px;font-size:14px;box-shadow:none;}
+  #controls #fireBox .fstep svg{width:16px;height:16px;}
+  #controls #fireBox .fstep.go{background:var(--bleu);color:#fff;}
+  #controls #fireBox .fstep:disabled{opacity:.4;cursor:default;}
+  #controls #fireBox .feu{width:52px;height:52px;padding:0;margin:-4px -2px -4px 2px;border-radius:50%;border:2px solid #fff;
+    background:radial-gradient(circle at 40% 35%,#d8463b,#9e1f17);color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;box-shadow:0 2px 6px rgba(0,0,0,.25);}
   #controls #fireBox .feu.go{animation:feuPulse 1.1s ease-in-out infinite;}
-  #controls #fireBox .feu:disabled{opacity:.4;filter:grayscale(.6);cursor:default;}
-  #controls #fireBox .feu b{font-size:22px;line-height:1;} #controls #fireBox .feu small{font-size:10px;opacity:.85;margin-top:3px;text-transform:uppercase;letter-spacing:.08em;}
-  @keyframes feuPulse{0%,100%{box-shadow:0 6px 18px rgba(0,0,0,.35),0 0 0 4px rgba(179,38,30,.35);}50%{box-shadow:0 6px 18px rgba(0,0,0,.35),0 0 0 12px rgba(179,38,30,.12);}}
+  #controls #fireBox .feu:disabled{opacity:.35;filter:grayscale(.6);cursor:default;}
+  #controls #fireBox .feu b{font-size:15px;line-height:1;} #controls #fireBox .feu small{font-size:8px;opacity:.85;margin-top:2px;text-transform:uppercase;letter-spacing:.08em;}
+  @keyframes feuPulse{0%,100%{box-shadow:0 2px 6px rgba(0,0,0,.25),0 0 0 3px rgba(179,38,30,.35);}50%{box-shadow:0 2px 6px rgba(0,0,0,.25),0 0 0 8px rgba(179,38,30,.1);}}
   @media (max-width:1350px){#fireBox{right:330px;}}
   #pad{display:flex;gap:10px;align-items:stretch;padding-right:18px;border-right:1px dashed var(--line);flex:none;}
   .dpad{display:grid;grid-template-columns:58px 96px 58px;grid-template-rows:42px 50px 34px;gap:5px;}
@@ -1526,7 +1527,7 @@ function updateStamina(dt) {
     if (!co.atencio) r = E.repos;
     else if (adv) {                                  // aturats en atenció: recuperen una mica i, si s'hi estan massa estona, es tornen a cansar
       co.idleT = (co.idleT || 0) + dt;
-      if (armMode() && !(co.idleT < E.halteDurant && co.cansament < E.halteFins)) r = E.quiet * (E.arma[co.arm] || 1);   // amb el mosquet, la posició de l'arma cansa des del primer moment
+      if (armMode()) r = E.quiet * (E.arma[co.arm] || 1);   // amb el mosquet, la posició de l'arma cansa des del primer moment
       else if (co.idleT < E.halteDurant) { r = co.cansament < E.halteFins ? E.halteRecupera : 0; cap = E.halteFins; }
       else r = co.idleT > E.quietDesDe ? E.quiet : 0;
     } else r = E.atencio;
@@ -3260,7 +3261,7 @@ let autoStepT = 0;
 const VOICE = { on: false, rec: null, running: false, tested: false, seg: {}, interim: '', state: '', failT: 0, lastFail: null,
   learn: { phr: {}, ex: {} }, shared: { phr: {}, ex: {} }, opt: { mode: 'cont', vol: true, log: false, tele: true, engine: '' }, log: [], recentExec: null, ptt: false, db: false, loading: false };
 // Connexió amb Supabase (la mateixa de la web: si el joc s'obre dins la web, agafa window.APP_CONFIG) i fonts del motor local Vosk
-const GAME_VERSION = '1.4.4';
+const GAME_VERSION = '1.4.5';
 const CFG = Object.assign({
   SUPABASE_URL: 'https://ltopullwhasagnkuqaek.supabase.co',
   SUPABASE_ANON_KEY: 'sb_publishable_DhHFUh-UrbBrI0l476Vcnw_tSn-Gmkr',
