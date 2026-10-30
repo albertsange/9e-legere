@@ -250,6 +250,7 @@
   #fireBox{position:absolute;bottom:calc(100% + 14px);right:370px;display:flex;align-items:center;gap:8px;z-index:90;
     padding:6px 6px 6px 16px;background:var(--sheet);border:1px solid var(--line);border-radius:999px;box-shadow:0 6px 18px rgba(0,0,0,.18);}
   #controls #fireBox button{font-family:inherit;cursor:pointer;}
+  #controls.menuOpen #fireBox{display:none !important;}
   #fireBox .fst{display:flex;align-items:center;gap:7px;padding-right:12px;margin-right:2px;border-right:1px solid var(--line);color:#2e7d32;font-weight:700;font-size:14px;letter-spacing:.03em;height:30px;}
   #fireBox .fst i{width:9px;height:9px;border-radius:50%;background:#2e7d32;}
   #controls #fireBox .fstep{height:40px;min-width:0;padding:0 14px;border-radius:999px;border:none;background:transparent;color:var(--bleu);
@@ -2743,6 +2744,7 @@ function openMenu(id) {
   clearTimeout(closeT);
   if (id === null || id !== famPinned) famPinned = null;
   openFam = id;
+  document.getElementById('controls').classList.toggle('menuOpen', !!id);   // amb un menú obert, la barra de foc s'amaga
   for (const f of FAMILIES) {
     const el = panel.fams[f.id]; if (!el) continue;
     const on = f.id === id; el.wrap.classList.toggle('open', on);
@@ -2894,7 +2896,7 @@ function renderUnitControls() {
     el.badge.textContent = fi.avail ? fi.avail : '';
   }
   if (panel.fire) {
-    document.getElementById('fireBox').style.display = armMode() && co.loaded ? '' : 'none';   // només surt amb les armes carregades
+    document.getElementById('fireBox').style.display = armMode() && co.loaded && co.state === 'parat' ? '' : 'none';   // només surt amb les armes carregades
     for (const b of panel.fire) {
       const o = ORDER_BY_ID[b.dataset.id], a = o.avail();
       b.disabled = a !== true || !!pendingCmd || lock; b.classList.toggle('go', a === true);
