@@ -1781,7 +1781,7 @@ function feu() {
     const c = unitCentre(), h = co.members[0].h; let best = null;
     for (const e of ENEMY) { const d = Math.hypot(e.cx - c.x, e.cy - c.y), off = Math.abs(wrapA(Math.atan2(e.cy - c.y, e.cx - c.x) - h)); if (enAlive(e) && (!best || d < best.d)) best = { e, d, off }; }
     if (best) {
-      const inRange = best.d <= T.abast, facing = best.off < 0.45, ok = inRange && facing; let hits = 0;
+      const inRange = best.d <= T.abast, facing = best.off < 0.6, ok = inRange && facing; let hits = 0;
       if (ok) {
         const pr = T.punteria[0] + (T.punteria[1] - T.punteria[0]) * best.d / T.abast;
         for (let i = 0; i < co.members.length; i++) { const al = best.e.men.filter(m => m.alive); if (al.length && Math.random() < pr) { const v = al[Math.floor(Math.random() * al.length)]; v.alive = false; v.a = Math.random() * 3; hits++; } }
@@ -1793,7 +1793,18 @@ function feu() {
     }
   }
 }
+function updateBayonet() {                      // càrrega a la baioneta: amb l'arma creuada, tocar els homes que queden els fa caure
+  if (!ENEMY.length || co.arm !== 'croise' || co.stab || co.state === 'gir') return;
+  let touch = false;
+  for (const e of ENEMY) for (const v of e.men) if (v.alive && co.members.some(m => Math.hypot(m.x - v.x, m.y - v.y) < 1.0)) { touch = true; break; }
+  if (!touch) return;
+  if (!(co.volley && co.volley.ok)) { if (!co.stabWarn || performance.now() - co.stabWarn > 8000) { co.stabWarn = performance.now(); reac('louis', '<b>Louis:</b> Sense haver disparat primer? Així no, chasseur: <b>recula</b>, carrega i fes una <b>descàrrega</b> abans de la baioneta.', 5000); } return; }
+  let n = 0; for (const e of ENEMY) for (const v of e.men) if (v.alive) { v.alive = false; v.a = Math.random() * 3; n++; }
+  co.stab = { t: performance.now(), n }; SFX.hit();
+  reac('aprova', 'A la baioneta! Has acabat amb els <b>' + n + '</b> austríacs que quedaven.', 4500);
+}
 function updateMusket(dt) {
+  updateBayonet();
   if (co.arm === 'charge' && !co.ldSnd) { co.ldSnd = true; SFX.loadStart(() => co.arm === 'charge' ? 0.4 + 0.6 * co.members.filter(m => m.ld < 1).length / co.members.length : 0); }
   else if (co.arm !== 'charge' && co.ldSnd) { co.ldSnd = false; SFX.loadStop(); }
   if (co.arm === 'charge') {
@@ -2742,7 +2753,7 @@ function pre(o = {}) {                         // condicions comunes: retorna el
   if (co.state === 'conv' && !o.conv) return co.conv.kind === 'ligne' ? 's\'està formant la línia' : co.conv.kind === 'turn' ? 'la tropa està fent el Tournez' : co.conv.kind === 'cm' ? 'la tropa fa la contramarxa' : 'hi ha una conversió en curs';
   if (!co.atencio) return 'cal estar en atenció (Garde à vous)';
   if (co.hdT !== 0 && !o.fixe) return 'primer digues Fixe!';
-  if (!o.arm && armMode() && co.arm !== 'portez') return 'cal tenir l\'arma a l\'espatlla (Portez)';
+  if (!o.arm && armMode() && co.arm !== 'portez' && co.arm !== 'croise') return 'cal tenir l\'arma a l\'espatlla (Portez) o amb la baioneta calada';
   return null;
 }
 const aturat = () => pre() || (co.state !== 'parat' ? 'cal estar aturat' : busy() ? 'espera que acabi la maniobra' : true);
@@ -3398,7 +3409,7 @@ let autoStepT = 0;
 const VOICE = { on: false, rec: null, running: false, tested: false, seg: {}, interim: '', state: '', failT: 0, lastFail: null,
   learn: { phr: {}, ex: {} }, shared: { phr: {}, ex: {} }, opt: { mode: 'cont', vol: true, log: false, tele: true, engine: '' }, log: [], recentExec: null, ptt: false, db: false, loading: false };
 // Connexió amb Supabase (la mateixa de la web: si el joc s'obre dins la web, agafa window.APP_CONFIG) i fonts del motor local Vosk
-const GAME_VERSION = '1.4.7';
+const GAME_VERSION = '1.4.8';
 const CFG = Object.assign({
   SUPABASE_URL: 'https://ltopullwhasagnkuqaek.supabase.co',
   SUPABASE_ANON_KEY: 'sb_publishable_DhHFUh-UrbBrI0l476Vcnw_tSn-Gmkr',
@@ -4445,17 +4456,20 @@ function buildLevel5() {
 
 function buildLevel6() {
   const A = MapKit.A, sc = [];
-  const W = 110, H = 50, EX = 88, EY = 26, R = TUNE.mosquet.abast;
+  const W = 110, H = 50, EX = 40, EY = 10, R = TUNE.mosquet.abast;
   sc.push(
     A.field([[0, 0], [W, 0], [W, H], [0, H]], { kind: 'meadow' }),
-    A.road([[0, 26], [40, 26], [60, 24], [W, 24]], { kind: 'track' }),
-    A.wood([[4, 2], [40, 2], [44, 10], [6, 11]], { kind: 'mixed', seed: 61 }), A.wood([[48, 40], [104, 40], [104, 48], [50, 48]], { kind: 'broad', seed: 62 }),
-    A.wood([[60, 2], [104, 2], [104, 9], [62, 10]], { kind: 'mixed', seed: 63 }),
-    A.label('Els austríacs', EX, 17, { kind: 'town', scale: 0.55 }), A.label('Camp de tir', 40, 21, { kind: 'place', scale: 0.55 })
+    A.road([[0, 40], [40, 40], [40, 16]], { kind: 'track' }),
+    A.wood([[4, 1], [30, 1], [32, 5], [6, 6]], { kind: 'mixed', seed: 61 }), A.wood([[56, 32], [104, 32], [104, 48], [58, 48]], { kind: 'broad', seed: 62 }),
+    A.wood([[68, 1], [104, 1], [104, 14], [70, 12]], { kind: 'mixed', seed: 63 }),
+    A.label('Els austríacs', 52, 17, { kind: 'town', scale: 0.55 }), A.label('Camp de tir', 22, 45, { kind: 'place', scale: 0.55 })
   );
-  const dist = () => { const c = unitCentre(); return Math.hypot(EX - c.x, EY - c.y); };
-  const facing = () => { const c = unitCentre(); return Math.abs(wrapA(Math.atan2(EY - c.y, EX - c.x) - co.members[0].h)) < 0.45; };
+  const near = () => { const c = unitCentre(); return Math.hypot(EX - c.x, EY - c.y); };
+  const dist = near;
+  const facing = () => { const c = unitCentre(); return Math.abs(wrapA(Math.atan2(EY - c.y, EX - c.x) - co.members[0].h)) < 0.6; };
   const approach = () => co.state === 'parat' && dist() <= R - 3 && facing() && co.arm === 'portez' && formationName() === 'línia';
+  const left = () => ENEMY.length ? enAlive(ENEMY[0]) : 0;
+  const fired = () => !!(co.volley && co.volley.ok);
   const fireHint = () => {
     const d = Math.round(dist());
     if (co.chaos) return '…';
@@ -4465,10 +4479,19 @@ function buildLevel6() {
     if (!facing()) return 'Gira cap als austríacs (<b>Girs</b> o <b>Tournez</b>).';
     return co.arm === 'portez' ? 'A ' + d + ' m: <b>Apprêtez</b>, <b>Joue</b> i <b>Feu!</b> (barra de dalt de les ordres).' : co.arm === 'apprete' ? '<b>Joue!</b> per apuntar.' : co.arm === 'joue' ? '<b>Feu!</b> (botó vermell o tecla espai).' : '…';
   };
+  const stabHint = () => {
+    const d = Math.round(dist());
+    if (co.arm === 'joue' || co.arm === 'apprete' || co.arm === 'charge') return co.arm === 'charge' ? 'Carregant…' : '<b>Mosquet → Portez vos armes</b>, i després <b>Croisez la baïonnette</b>.';
+    if (co.arm === 'portez') return '<b>Mosquet → Croisez la baïonnette</b>: amb l\'arma calada sí que es pot caminar.';
+    if (co.arm === 'repose') return '<b>Mosquet → Portez vos armes</b> primer.';
+    if (!facing() && co.state === 'parat') return 'Encara els austríacs (<b>Tournez</b> o <b>Par peloton</b>) i <b>carrega</b>.';
+    const c = unitCentre(), off = Math.abs(wrapA(Math.atan2(EY - c.y, EX - c.x) - co.members[0].h));
+    return 'A la baioneta! <b>En avant</b> cap als austríacs (a ' + d + ' m). Queden ' + left() + '.' + (off > 0.2 && co.state === 'marxa' ? ' Corregeix la direcció amb un <b>oblic</b>.' : '');
+  };
   const ALL = ['gir', 'mov', 'pace', 'parfile', 'bataille', 'align', 'obl', 'conv', 'tournez', 'ligne', 'form', 'repos'];
   const steps = [
     { title: 'La guerra comença', pose: 'serios', hl: [], unlock: ALL, tag: 'Benvinguda', intro: true, btn: 'Endavant',
-      text: ['<b>Chasseur</b>, s\'han acabat els exercicis: <b>la guerra comença</b>. A l\'est, a uns <b>75 metres</b>, hi ha una unitat <b>austríaca</b> (els veuràs de blanc) i volem que la companyia pugui <b>disparar ja</b>.',
+      text: ['<b>Chasseur</b>, s\'han acabat els exercicis: <b>la guerra comença</b>. Al nord-est, a uns <b>45 metres</b>, hi ha una unitat <b>austríaca</b> (els veuràs de blanc) i volem que la companyia pugui <b>disparar ja</b>.',
         'Passa el ratolí per sobre d\'una unitat i et dirà <b>qui és</b>, <b>quants homes</b> té i quina <b>bandera</b> porta. Els austríacs no es mouran: nosaltres sí.'],
       done: () => TUT.intro },
     { title: 'Carregar', pose: 'assenyala', tag: 'Mosquet', hl: [], unlock: ['musket'], btn: 'Entesos', ack: true,
@@ -4477,32 +4500,40 @@ function buildLevel6() {
       done() { return !!this.acked; } },
     { title: 'Carrega', pose: 'assenyala', unlock: [], mini: 'Obre <b>Mosquet</b> i dóna <b>Chargez</b>. Espera que tots els rellotges es posin en verd.',
       get hl() { return co.loaded ? [] : ['chargez']; }, cue: () => co.loaded || co.arm === 'charge' ? '' : 'Mosquet → Chargez!', done: () => co.loaded },
-    { title: 'Apropa\'t', pose: 'assenyala', tag: 'Distància', hl: [], unlock: [], btn: 'Som-hi', ack: true,
+    { title: 'Apropa\'t i encara\'ls', pose: 'assenyala', tag: 'Distància', hl: [], unlock: [], btn: 'Som-hi', ack: true,
       text: ['Els mosquets d\'aquest temps només són eficaços fins a uns <b>' + R + ' metres</b>: més lluny, malgastaràs la pólvora. I com més a prop, millor punteria.',
-        '<b>Avança</b> en línia cap als austríacs (<b>En avant</b>) fins a menys de <b>' + R + ' m</b>, fes <b>Halte</b> i queda\'t de cara a ells.'],
+        'Els austríacs no són just davant nostre, sinó en <b>diagonal</b>: <b>avança</b> una mica i fes una <b>conversió</b> (<b>Tournez</b> en marxa) per <b>encarar-los</b>. Quan siguis a menys de <b>' + R + ' m</b> i de cara a ells, fes <b>Halte</b>.'],
       done() { return !!this.acked; } },
-    { title: 'Avança', pose: 'assenyala', unlock: [], get hl() { return co.state === 'marxa' ? (dist() <= R - 3 ? ['halte'] : []) : co.state === 'parat' && !approach() ? ['avant'] : []; },
-      mini: () => co.state === 'marxa' ? (dist() <= R - 3 ? 'A ' + Math.round(dist()) + ' m: <b>Halte!</b>' : 'Distància als austríacs: <b>' + Math.round(dist()) + ' m</b>. Continua fins a menys de ' + R + ' m.') : approach() ? 'A punt!' : 'Fes <b>En avant</b> cap a l\'est. Els austríacs són a <b>' + Math.round(dist()) + ' m</b>.',
+    { title: 'Avança', pose: 'assenyala', unlock: [],
+      get hl() { return co.state === 'marxa' ? (dist() <= R - 3 && facing() ? ['halte'] : !facing() ? ['wh03L'] : []) : co.state === 'parat' && !approach() ? ['avant'] : []; },
+      mini: () => co.state === 'marxa' ? (dist() <= R - 3 && facing() ? 'A ' + Math.round(dist()) + ' m i de cara: <b>Halte!</b>' : !facing() ? 'Encara\'ls amb un <b>Tournez</b> (<b>Conversions</b>). Distància: <b>' + Math.round(dist()) + ' m</b>.' : 'Distància als austríacs: <b>' + Math.round(dist()) + ' m</b>. Continua fins a menys de ' + R + ' m.') : approach() ? 'A punt!' : 'Fes <b>En avant</b> i encara\'ls amb un <b>Tournez</b>. Els austríacs són a <b>' + Math.round(dist()) + ' m</b>.',
       done: () => approach() },
     { title: 'Foc', pose: 'serios', tag: 'Foc!', hl: [], unlock: [], btn: 'Entesos', ack: true,
       text: ['La seqüència de foc: <b>Apprêtez</b> (preparar l\'arma), <b>Joue</b> (apuntar) i <b>Feu!</b> (disparar). Les tens a la barra <b>Carregats</b>, i <b>Feu!</b> també amb la tecla <b>espai</b>.',
-        'No tots els fusells surten alhora: sentiràs un <b>traqueteig</b>. Després de disparar els homes queden descarregats; si vols tornar a tirar, <b>Chargez</b> un altre cop.'],
+        'No tots els fusells surten alhora: sentiràs un <b>traqueteig</b>. Després de disparar els homes queden descarregats.'],
       done() { return !!this.acked; } },
     { title: 'Dispara', pose: 'assenyala', unlock: [], get hl() { return !co.loaded ? ['chargez'] : co.state !== 'parat' ? ['halte'] : co.arm === 'portez' && dist() <= R && facing() ? ['appretez'] : co.arm === 'apprete' ? ['joue'] : co.arm === 'joue' ? ['feu'] : []; },
-      mini: fireHint, resetStep: () => 3, done: () => false }
+      mini: fireHint, resetStep: () => 3, done: () => fired() },
+    { title: 'A la baioneta', pose: 'serios', tag: 'Baioneta', hl: [], unlock: [], btn: 'Endavant!', ack: true,
+      text: ['Una descàrrega no basta: els austríacs que queden no fugiran. Ara toca <b>acabar amb ells a la baioneta</b>.',
+        'Dóna <b>Mosquet → Portez vos armes</b> i després <b>Croisez la baïonnette</b>: amb l\'arma calada <b>sí que es pot caminar</b>. Avança (<b>En avant</b>, millor al <b>pas de charge</b>) fins que la baioneta els toqui. El nivell s\'acaba quan els hagis atacat.'],
+      done() { return !!this.acked; } },
+    { title: 'Carrega!', pose: 'assenyala', unlock: [], get hl() { return co.arm === 'portez' ? ['croisez'] : co.arm === 'croise' && co.state === 'parat' ? ['avant'] : co.arm !== 'croise' && co.arm !== 'charge' ? ['portez'] : []; },
+      mini: stabHint, resetStep: () => 3, done: () => false }
   ];
   return {
-    w: W, h: H, start: { x: 14, y: 26 }, obstacles: [], scene: MapKit.scene(sc), zone: null, musket: true, driftScale: 0.5, goalHeading: 0,
-    enemies: [{ name: 'Regiment austríac', flag: 'aut', cx: EX, cy: EY, h: Math.PI }],
+    w: W, h: H, start: { x: 8, y: 40 }, obstacles: [], scene: MapKit.scene(sc), zone: null, musket: true, driftScale: 0.5, goalHeading: 0,
+    enemies: [{ name: 'Regiment austríac', flag: 'aut', cx: EX, cy: EY, h: Math.PI / 2 }],
     tutorial: { steps, figs: [], startAtencio: true, resetStep: () => 3 },
-    win: () => !!(co.volley && co.volley.ok && performance.now() - co.volley.t > 3200),
+    win: () => !!(co.stab && performance.now() - co.stab.t > 3200),
     objectives: [
-      { t: 'Carregar els mosquets', ok: () => co.loaded || (co.volley && co.volley.ok) || OBJ.done[0] },
-      { t: 'Apropar-se a menys de ' + R + ' m i aturar-se de cara als austríacs', ok: () => OBJ.done[0] && (approach() || (co.volley && co.volley.ok)) || OBJ.done[1] },
-      { t: 'Disparar contra els austríacs', ok: () => OBJ.done[1] && !!(co.volley && co.volley.ok) }
+      { t: 'Carregar els mosquets', ok: () => co.loaded || fired() || OBJ.done[0] },
+      { t: 'Apropar-se i encarar els austríacs a menys de ' + R + ' m', ok: () => OBJ.done[0] && (approach() || fired()) || OBJ.done[1] },
+      { t: 'Disparar contra els austríacs', ok: () => OBJ.done[1] && fired() },
+      { t: 'Acabar amb ells a la baioneta', ok: () => !!co.stab }
     ],
-    goalText: 'Carrega, apropa\'t a menys de ' + R + ' m dels austríacs i dispara.',
-    endText: 'Primera descàrrega feta, chasseur: has carregat, t\'has apropat a distància de tir i has fet foc sobre els austríacs. La guerra no ha fet més que començar.'
+    goalText: 'Carrega, encara els austríacs a menys de ' + R + ' m, dispara i acaba amb ells a la baioneta.',
+    endText: 'Molt bé, chasseur: has carregat, t\'has encarat als austríacs, has fet foc i els has acabat a la baioneta. La guerra no ha fet més que començar.'
   };
 }
 
