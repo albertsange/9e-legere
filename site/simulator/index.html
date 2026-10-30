@@ -247,6 +247,13 @@
   #controls{grid-template-columns:250px 1fr 340px;grid-template-rows:minmax(0,1fr);}
   #unit{justify-content:center;align-items:stretch;padding:8px 14px;}
   #deck{display:flex;align-items:center;gap:18px;height:100%;}
+  #controls #feuBtn{position:absolute;bottom:calc(100% + 26px);right:380px;width:92px;height:92px;padding:0;border-radius:50%;border:3px solid #fff;
+    background:radial-gradient(circle at 40% 35%,#d8463b,#9e1f17);color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;
+    box-shadow:0 6px 18px rgba(0,0,0,.35),0 0 0 4px rgba(179,38,30,.35);cursor:pointer;animation:feuPulse 1.1s ease-in-out infinite;z-index:90;font-family:inherit;}
+  #controls #feuBtn b{font-size:22px;letter-spacing:.02em;line-height:1;} #controls #feuBtn small{font-size:10px;opacity:.85;margin-top:3px;text-transform:uppercase;letter-spacing:.08em;}
+  #controls #feuBtn:hover:not(:disabled){filter:brightness(1.12);background:radial-gradient(circle at 40% 35%,#e0544a,#a8231a);} #controls #feuBtn:disabled{animation:none;opacity:.5;cursor:default;}
+  @keyframes feuPulse{0%,100%{box-shadow:0 6px 18px rgba(0,0,0,.35),0 0 0 4px rgba(179,38,30,.35);}50%{box-shadow:0 6px 18px rgba(0,0,0,.35),0 0 0 12px rgba(179,38,30,.12);}}
+  @media (max-width:1350px){#controls #feuBtn{right:340px;}}
   #pad{display:flex;gap:10px;align-items:stretch;padding-right:18px;border-right:1px dashed var(--line);flex:none;}
   .dpad{display:grid;grid-template-columns:58px 96px 58px;grid-template-rows:42px 50px 34px;gap:5px;}
   #controls .pb{flex-direction:column;justify-content:center;gap:1px;padding:2px 6px;font-size:14.5px;}
@@ -1083,7 +1090,14 @@ const TUNE = {
               altres: -0.1, columna: 0.6,     // en columna es cansen menys
               verd: 50, groc: 20,             // colors de la barra (%)
               rondina: 25, rearma: 50,        // el Lefon rondina per sota de «rondina»
-              minMarxa: 15 }                  // per sota d'això (nivells amb esgotament) no es pot tornar a marxar
+              minMarxa: 15,                   // per sota d'això (nivells amb esgotament) no es pot tornar a marxar
+              arma: { portez: 1, repose: 0.3, charge: 1, apprete: 1.5, joue: 1.8, croise: 1.5 } },  // aturats en atenció: com cansa cada posició de l'arma (× quiet)
+  mosquet:  { carrega: 18,                    // segons de mitjana per carregar (LS-01)
+              varia: 0.3,                     // dispersió entre homes (±15 %)
+              cansats: 0.6,                   // sense energia, carreguen un 60 % més lent
+              escalf: 0.45,                   // la descàrrega s'escampa en aquests segons (trrrrt)
+              vent: [0.35, -0.12],            // deriva del fum (m/s)
+              fum: 6 }                        // segons que dura el fum
 };
 const CONV_ORDER = { stand: 'WH-01', move: 'WH-02', turn: 'WH-03', ligne: 'WH-04', cm: 'CD-06' };   // maniobra en curs → ordre que la descriu
 function orderPct() { return Math.round(100 * Math.max(0, 1 - disorderRms() / TUNE.ordre.rmsZero)); }
@@ -1285,6 +1299,15 @@ const SFX = (() => {
     },
     stomp() { if (!ready()) return; const t = ac.currentTime; tone(t, 120, 55, 0.16, 0.3); for (let i = 0; i < 6; i++) noise(t + Math.random() * 0.03, 0.12, { f: 260 + Math.random() * 200, q: .6, gain: 0.12 }); },
     hit() { if (!ready()) return; const t = ac.currentTime; tone(t, 150, 40, 0.35, 0.4, 'sawtooth'); noise(t, 0.25, { f: 500, q: .5, gain: 0.4 }); },
+    shot(delay) {                                    // un tret de mosquet: espetec + cos + cop greu
+      if (!ready()) return; const t = ac.currentTime + delay, g = 0.75 + Math.random() * 0.35;
+      noise(t, 0.05, { type: 'highpass', f: 1800 + Math.random() * 900, gain: 0.32 * g, attack: 0.001 });
+      noise(t, 0.32 + Math.random() * 0.15, { f: 380 + Math.random() * 260, q: 0.6, gain: 0.5 * g, attack: 0.002 });
+      tone(t, 95 + Math.random() * 25, 38, 0.2, 0.32 * g);
+    },
+    rumble(delay, dur) {                             // ressò de la descàrrega
+      if (!ready()) return; noise(ac.currentTime + delay, dur, { type: 'lowpass', f: 300, q: 0.4, gain: 0.22, attack: 0.05 });
+    },
     chime() { if (!ready()) return; const t = ac.currentTime; tone(t, 660, 660, 0.35, 0.09); tone(t + 0.12, 990, 990, 0.45, 0.08); },
     ding() { if (!ready()) return; const t = ac.currentTime; [523, 659, 784, 1046].forEach((f, i) => { tone(t + i * 0.13, f, f, 0.7, 0.1); tone(t + i * 0.13, f * 2, f * 2, 0.4, 0.03); }); },
     rustle() {                                       // moviment sec: roba, correatges i equip, sense cos greu
@@ -1451,6 +1474,7 @@ function reset() {
   msgEl.style.display = 'none';
   centreCam();
   if (level && level.free) co.atencio = true;
+  co.arm = 'portez'; co.loaded = false; FX.length = 0;
   objReset();
   tutOnReset();
 }
@@ -1494,7 +1518,7 @@ function updateStamina(dt) {
     else if (adv) {                                  // aturats en atenció: recuperen una mica i, si s'hi estan massa estona, es tornen a cansar
       co.idleT = (co.idleT || 0) + dt;
       if (co.idleT < E.halteDurant) { r = co.cansament < E.halteFins ? E.halteRecupera : 0; cap = E.halteFins; }
-      else r = co.idleT > E.quietDesDe ? E.quiet : 0;
+      else r = co.idleT > E.quietDesDe ? E.quiet * (armMode() ? E.arma[co.arm] || 1 : 1) : 0;
     } else r = E.atencio;
   }
   else if (co.state === 'marxa') r = E.marxa * orderEn(marchOrderId()) * paceMul(co.pace) * (formationName() === 'columna' ? E.columna : 1);
@@ -1512,6 +1536,7 @@ function updateStamina(dt) {
 }
 function updateCo(dt) {
   tickPending(dt);
+  updateMusket(dt);
   updateStamina(dt);
   updateChaos();
   updateFixeReminder(dt);
@@ -1602,6 +1627,107 @@ function updateCo(dt) {
     if (m.x < 0.5 || m.x > MAP_W - 0.5 || m.y < 0.5 || m.y > MAP_H - 0.5) {
       stopCo('Límit del terreny');
       return;
+    }
+  }
+}
+
+// ---------- Maneig del mosquet i foc (MD-01, MD-02, MD-10, LS-01, FI-01…04): de moment només al mode lliure ----------
+// co.arm: 'portez' (espatlla) · 'repose' (a terra) · 'croise' (baioneta) · 'charge' (carregant) · 'apprete' · 'joue'.  co.loaded: arma carregada.
+const armMode = () => !!(level && level.musket);
+const FX = [];                                  // flaixos i fum de les descàrregues (coordenades de món)
+function armOrder(fn) {                         // condicions comunes de les ordres de l'arma
+  if (!armMode()) return 'no disponible en aquest nivell';
+  const r = pre({ arm: true }); if (r) return r;
+  if (co.state !== 'parat') return 'cal estar aturat';
+  if (busy()) return 'espera que acabi la maniobra';
+  if (co.arm === 'charge') return 'estan carregant';
+  return fn();
+}
+function setArm(a, text) { say(text); co.arm = a; SFX.rustle(); lastKey = ''; }
+function startLoad() {
+  const T = TUNE.mosquet, slow = 1 + T.cansats * (1 - co.cansament / 100);
+  say('Chargez vos armes!'); co.arm = 'charge'; lastKey = '';
+  for (const m of co.members) { m.ld = 0; m.ldDur = T.carrega * (1 - T.varia / 2 + Math.random() * T.varia) * slow; m.okT = 0; }
+}
+function feu() {
+  say('Feu!'); co.loaded = false; lastKey = '';
+  const T = TUNE.mosquet; let tMax = 0;
+  for (const m of co.members) {
+    const d = Math.random() * T.escalf * (Math.random() < 0.12 ? 1.6 : 1);   // no tots alhora: alguns trets surten tard
+    tMax = Math.max(tMax, d);
+    const a = m.h, len = 1.25;
+    FX.push({ k: 'shot', x: m.x + Math.cos(a) * len, y: m.y + Math.sin(a) * len, a, t: -d });
+    SFX.shot(d);
+  }
+  SFX.rumble(0.08, tMax + 1.2);
+}
+function updateMusket(dt) {
+  if (co.arm === 'charge') {
+    let done = 0;
+    for (const m of co.members) {
+      if (m.ld < 1) { m.ld = Math.min(1, m.ld + dt / m.ldDur); if (m.ld >= 1) m.okT = 1.4; }
+      else { done++; if (m.okT > 0) m.okT -= dt; }
+    }
+    if (done === co.members.length) { co.arm = 'portez'; co.loaded = true; lastKey = ''; say('Portez vos armes!'); }
+  } else for (const m of co.members) if (m.okT > 0) m.okT -= dt;
+  const T = TUNE.mosquet;
+  for (let i = FX.length - 1; i >= 0; i--) {
+    const f = FX[i], t0 = f.t; f.t += dt;
+    if (f.k === 'shot' && t0 < 0 && f.t >= 0) {                   // el tret surt: flaix i bufades de fum
+      for (let j = 0; j < 4; j++) {
+        const sp = 1.5 + Math.random() * 2.5, da = (Math.random() - 0.5) * 0.5;
+        FX.push({ k: 'smoke', x: f.x, y: f.y, vx: Math.cos(f.a + da) * sp, vy: Math.sin(f.a + da) * sp, r0: 0.25 + Math.random() * 0.2, t: 0, life: T.fum * (0.7 + Math.random() * 0.6) });
+      }
+    }
+    if (f.k === 'smoke') {
+      const drag = Math.exp(-1.6 * dt); f.vx *= drag; f.vy *= drag;
+      f.x += (f.vx + T.vent[0]) * dt; f.y += (f.vy + T.vent[1]) * dt;
+      if (f.t > f.life) FX.splice(i, 1);
+    } else if (f.t > 0.12) FX.splice(i, 1);
+  }
+}
+function drawMusket(m, px, py, a, rS) {        // l'arma, vista des de dalt
+  const c = Math.cos(a), s = Math.sin(a), lx = s, ly = -c;     // (lx, ly) = costat esquerre
+  const L = (x0, y0, x1, y1, col, w) => { ctx.strokeStyle = col; ctx.lineWidth = w; ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke(); };
+  const wood = '#5a3a1e', steel = '#c9ccd1', w = Math.max(1.2, 0.07 * M);
+  L(px, py, px + c * 0.32 * M, py + s * 0.32 * M, T.tick, Math.max(1, 0.05 * M));     // cap on miren (curta)
+  const sx = px + lx * rS * 0.9, sy = py + ly * rS * 0.9, rx = px - lx * rS * 0.9, ry = py - ly * rS * 0.9;
+  switch (co.arm) {
+    case 'portez': L(sx, sy, sx - c * 0.45 * M, sy - s * 0.45 * M, wood, w); break;                    // espatlla esquerra, cap enrere
+    case 'repose': ctx.fillStyle = wood; ctx.beginPath(); ctx.arc(rx + c * 0.12 * M, ry + s * 0.12 * M, Math.max(1.4, 0.07 * M), 0, Math.PI * 2); ctx.fill(); break;   // a terra, al peu dret
+    case 'charge': L(px + c * 0.15 * M + lx * 0.1 * M, py + s * 0.15 * M + ly * 0.1 * M, px + c * 0.45 * M + lx * 0.3 * M, py + s * 0.45 * M + ly * 0.3 * M, wood, w); break;
+    case 'apprete': L(rx, ry, rx + (c * 0.55 + lx * 0.3) * M, ry + (s * 0.55 + ly * 0.3) * M, wood, w); break;
+    case 'joue': L(rx, ry, rx + c * 1.2 * M, ry + s * 1.2 * M, wood, w); break;
+    case 'croise': { const ex = rx + c * 0.95 * M, ey = ry + s * 0.95 * M; L(rx, ry, ex, ey, wood, w); L(ex, ey, ex + c * 0.4 * M, ey + s * 0.4 * M, steel, Math.max(1, 0.05 * M)); break; }
+  }
+  if (co.arm === 'charge' || m.okT > 0) {                       // rellotge de càrrega (i ✓ verd quan acaben)
+    const R = Math.max(3.5, 0.17 * M), cx = px - c * 0.42 * M - lx * 0.3 * M, cy = py - s * 0.42 * M - ly * 0.3 * M;
+    if (m.ld < 1) {
+      ctx.fillStyle = 'rgba(255,255,255,.85)'; ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#c79a2b'; ctx.beginPath(); ctx.moveTo(cx, cy); ctx.arc(cx, cy, R * 0.85, -Math.PI / 2 - rot, -Math.PI / 2 - rot + m.ld * Math.PI * 2); ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = '#7a5d14'; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.stroke();
+    } else {
+      ctx.globalAlpha = Math.min(1, m.okT / 0.4); ctx.fillStyle = '#2e7d32'; ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.fill();
+      ctx.save(); ctx.translate(cx, cy); ctx.rotate(-rot); ctx.strokeStyle = '#fff'; ctx.lineWidth = Math.max(1.2, R * 0.28);
+      ctx.beginPath(); ctx.moveTo(-R * 0.45, 0); ctx.lineTo(-R * 0.1, R * 0.38); ctx.lineTo(R * 0.5, -R * 0.4); ctx.stroke(); ctx.restore(); ctx.globalAlpha = 1;
+    }
+  }
+}
+function drawFx() {
+  for (const f of FX) {
+    if (f.k === 'smoke') {
+      const k = f.t / f.life, r = (f.r0 + 2.4 * Math.sqrt(k)) * M, al = 0.5 * (1 - k) * Math.min(1, f.t / 0.08);
+      const g = ctx.createRadialGradient(f.x * M, f.y * M, 0, f.x * M, f.y * M, r);
+      g.addColorStop(0, 'rgba(232,230,224,' + al + ')'); g.addColorStop(0.6, 'rgba(214,212,206,' + al * 0.6 + ')'); g.addColorStop(1, 'rgba(210,208,202,0)');
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(f.x * M, f.y * M, r, 0, Math.PI * 2); ctx.fill();
+    } else if (f.t >= 0) {                                       // flaix de boca
+      const L = 1.3 * M * (1 - f.t / 0.12 * 0.5), c = Math.cos(f.a), s = Math.sin(f.a), x = f.x * M, y = f.y * M, wd = 0.28 * M;
+      const g = ctx.createRadialGradient(x, y, 0, x, y, L);
+      g.addColorStop(0, 'rgba(255,250,210,1)'); g.addColorStop(0.35, 'rgba(255,190,60,.95)'); g.addColorStop(1, 'rgba(230,90,20,0)');
+      ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(x - s * wd * 0.3, y + c * wd * 0.3);
+      ctx.lineTo(x + c * L - s * wd, y + s * L + c * wd); ctx.lineTo(x + c * L * 1.15, y + s * L * 1.15); ctx.lineTo(x + c * L + s * wd, y + s * L - c * wd);
+      ctx.lineTo(x + s * wd * 0.3, y - c * wd * 0.3); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,235,.95)'; ctx.beginPath(); ctx.arc(x + c * 0.15 * M, y + s * 0.15 * M, Math.max(2, 0.16 * M), 0, Math.PI * 2); ctx.fill();
     }
   }
 }
@@ -2365,7 +2491,11 @@ const ICONS = {
   ligne:     IC('<path d="M4 20V4M9 20v-8h11M16 8l4 4-4 4"/>'),
   mic:       IC('<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3M8 21h8"/>'),
   gear:      IC('<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/>'),
-  batL:      IC('<path d="M17 21v-8H7M11 9L7 13l4 4"/>')
+  batL:      IC('<path d="M17 21v-8H7M11 9L7 13l4 4"/>'),
+  musket:    IC('<path d="M3 20L19 4M17 3l4 4M6 14l3 3M5 21l-2-2"/>'),
+  bayonet:   IC('<path d="M4 20L16 8M16 8l5-5M14 6l4 4M5 21l-2-2"/>'),
+  load:      IC('<path d="M12 3v12M8 11l4 4 4-4"/><rect x="9" y="17" width="6" height="4" rx="1"/>'),
+  aim:       IC('<circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="1.5"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/>')
 };
 function addBtn(container, text, fn, disabled, icon, tip, cmd) {
   const b = document.createElement('button');
@@ -2468,7 +2598,8 @@ const FAMILIES = [
   { id: 'pos',  name: 'Posició',     icon: 'attention' },
   { id: 'gir',  name: 'Girs',        icon: 'right' },
   { id: 'conv', name: 'Conversions', icon: 'wheelR' },
-  { id: 'form', name: 'Formacions',  icon: 'align' }
+  { id: 'form', name: 'Formacions',  icon: 'align' },
+  { id: 'arm',  name: 'Mosquet',     icon: 'musket', lvl: 'musket' }
 ];
 function pre(o = {}) {                         // condicions comunes: retorna el motiu o null
   if (co.state === 'auto') return 'hi ha una maniobra en curs';
@@ -2476,6 +2607,7 @@ function pre(o = {}) {                         // condicions comunes: retorna el
   if (co.state === 'conv' && !o.conv) return co.conv.kind === 'ligne' ? 's\'està formant la línia' : co.conv.kind === 'turn' ? 'la tropa està fent el Tournez' : co.conv.kind === 'cm' ? 'la tropa fa la contramarxa' : 'hi ha una conversió en curs';
   if (!co.atencio) return 'cal estar en atenció (Garde à vous)';
   if (co.hdT !== 0 && !o.fixe) return 'primer digues Fixe!';
+  if (!o.arm && armMode() && co.arm !== 'portez') return 'cal tenir l\'arma a l\'espatlla (Portez)';
   return null;
 }
 const aturat = () => pre() || (co.state !== 'parat' ? 'cal estar aturat' : busy() ? 'espera que acabi la maniobra' : true);
@@ -2489,7 +2621,7 @@ const ORDERS = [
   { id: 'FD-02', des: 0, fam: 'pos', fr: 'Garde à vous', full: 'Garde à vous – peloton!', gl: 'posar-se en atenció', icon: 'attention', cmds: ['garde'],
     avail: () => co.state !== 'parat' ? 'cal estar aturat' : co.atencio ? 'ja està en atenció' : true, run: () => gardeAVous() },
   { id: 'FD-03', des: 0, fam: 'pos', k: 'repos', fr: 'En place – Repos!', gl: 'tornar al repòs', icon: 'rest', cmds: ['repos'],
-    avail: () => co.state !== 'parat' ? 'cal estar aturat' : !co.atencio ? 'ja està en repòs' : co.hdT !== 0 ? 'primer digues Fixe!' : true, run: () => enPlaceRepos() },
+    avail: () => co.state !== 'parat' ? 'cal estar aturat' : !co.atencio ? 'ja està en repòs' : co.hdT !== 0 ? 'primer digues Fixe!' : armMode() && co.arm !== 'repose' ? 'primer cal Reposez (arma a terra)' : true, run: () => enPlaceRepos() },
   // Marxa
   { id: 'MA-01', des: 0.8, fam: 'mar', k: 'mov', fr: 'En avant', full: 'En avant – marche!', gl: 'endavant; en oblic o en conversió, torna a la marxa recta', icon: 'forward', cmds: ['avant', 'avantR', 'convAvant'],
     avail: () => { if (co.state === 'conv') return co.conv.kind === 'move' ? true : pre(); const r = pre(); if (r) return r;
@@ -2530,7 +2662,24 @@ const ORDERS = [
   { id: 'CD-03b', des: 0, fam: 'form', k: 'align', sec: 'Línia aturada', fr: 'Fixe!', full: 'Fixe!', gl: 'tornar el cap al front', icon: 'attention', cmds: ['fixe'],
     avail: () => co.state !== 'parat' ? 'cal estar aturat' : co.hdT === 0 ? 'només després d\'alinear' : true, run: () => fixe() },
   { id: 'CD-06', des: 1, shot: true, fam: 'form', k: 'form', sec: 'Línia aturada', fr: 'Contremarche', full: 'Contremarche!', gl: 'mitja volta de tota la unitat', icon: 'counter', cmds: ['counter'],
-    avail: aturatLinia, run: () => contremarche() }
+    avail: aturatLinia, run: () => contremarche() },
+  // Mosquet (maneig i foc)
+  { id: 'MD-01', des: 0, fam: 'arm', lvl: 'musket', fr: 'Portez', full: 'Portez – vos armes!', gl: 'arma a l\'espatlla: cal per moure\'s', icon: 'musket', cmds: ['portez'],
+    avail: () => armOrder(() => co.arm === 'portez' ? 'ja la tenen a l\'espatlla' : co.arm === 'joue' && co.loaded ? 'primer Redressez' : true), run: () => setArm('portez', 'Portez vos armes!') },
+  { id: 'MD-02', des: 0, fam: 'arm', lvl: 'musket', fr: 'Reposez', full: 'Reposez-vous – sur vos armes!', gl: 'arma a terra: es cansen menys', icon: 'rest', cmds: ['reposez'],
+    avail: () => armOrder(() => co.arm === 'repose' ? 'ja la tenen a terra' : co.arm !== 'portez' ? 'cal tenir-la a l\'espatlla' : true), run: () => setArm('repose', 'Reposez-vous sur vos armes!') },
+  { id: 'MD-10', des: 0, fam: 'arm', lvl: 'musket', fr: 'Croisez la baïonnette', full: 'Croisez – la baïonnette!', gl: 'baioneta en càrrega, mirant endavant', icon: 'bayonet', cmds: ['croisez'],
+    avail: () => armOrder(() => co.arm === 'croise' ? 'ja la tenen creuada' : co.arm !== 'portez' ? 'cal tenir-la a l\'espatlla' : true), run: () => setArm('croise', 'Croisez la baïonnette!') },
+  { id: 'LS-01', des: 0, fam: 'arm', lvl: 'musket', fr: 'Chargez', full: 'Chargez – vos armes!', gl: 'carregar (uns 18 s, més si estan cansats)', icon: 'load', cmds: ['chargez'],
+    avail: () => armOrder(() => co.loaded ? 'ja estan carregats' : co.arm !== 'portez' && co.arm !== 'joue' ? 'cal tenir-la a l\'espatlla' : true), run: () => startLoad() },
+  { id: 'FI-01', des: 0, fam: 'arm', lvl: 'musket', fr: 'Apprêtez', full: 'Apprêtez – vos armes!', gl: 'preparar per disparar (cal estar carregats)', icon: 'aim', cmds: ['appretez'],
+    avail: () => armOrder(() => co.arm !== 'portez' ? 'cal tenir-la a l\'espatlla' : !co.loaded ? 'primer cal carregar (Chargez)' : true), run: () => setArm('apprete', 'Apprêtez vos armes!') },
+  { id: 'FI-02', des: 0, fam: 'arm', lvl: 'musket', fr: 'Joue', full: 'Joue!', gl: 'apuntar (des d\'Apprêtez)', icon: 'aim', cmds: ['joue'],
+    avail: () => armOrder(() => co.arm !== 'apprete' ? 'primer Apprêtez' : true), run: () => setArm('joue', 'Joue!') },
+  { id: 'FI-03', des: 0, fam: 'arm', lvl: 'musket', fr: 'Redressez', full: 'Redressez – vos armes!', gl: 'de Joue tornen a Apprêtez sense disparar', icon: 'back', cmds: ['redressez'],
+    avail: () => armOrder(() => co.arm !== 'joue' || !co.loaded ? 'només apuntant amb l\'arma carregada' : true), run: () => setArm('apprete', 'Redressez vos armes!') },
+  { id: 'FI-04', des: 0.15, shot: true, fam: 'arm', float: true, lvl: 'musket', fr: 'Feu', full: 'Feu!', gl: 'disparar', icon: 'aim', cmds: ['feu'],
+    avail: () => armOrder(() => co.arm !== 'joue' ? 'primer Joue' : !co.loaded ? 'no estan carregats' : true), run: () => feu() }
 ];
 // Camps interns de cada ordre (vegeu TUNE, a dalt):
 //  «des» = quant desordena. Ordres contínues (marxa, conversions): multiplicador del soroll per pas; el pas l'escala amb desOpt.
@@ -2538,7 +2687,7 @@ const ORDERS = [
 //  «en»  = quant cansa (multiplicador de TUNE.energia.marxa o .maniobra; 1 si no hi és).
 const ORDER_BY_ID = Object.fromEntries(ORDERS.map(o => [o.id, o]));
 // Caos (ordre ≈ 0 %): només es poden fer Halte, Garde à vous i Alignement (+ Fixe!) fins que la unitat torna a estar alineada.
-const CHAOS_OK = new Set(['FD-02', 'CD-03', 'CD-03b']), CHAOS_WHY = 'el Louis no et deixa moure fins que alineïs';
+const CHAOS_OK = new Set(['FD-02', 'CD-03', 'CD-03b', 'MD-01']), CHAOS_WHY = 'el Louis no et deixa moure fins que alineïs';
 for (const o of ORDERS) if (!CHAOS_OK.has(o.id)) { const a = o.avail; o.avail = function (arg) { return co && co.chaos ? CHAOS_WHY : a.call(this, arg); }; }
 function updateFixeReminder(dt) {              // després d'un Alignement, recorda dir Fixe! si el jugador no ho fa
   const R = TUNE.recordatori;
@@ -2662,7 +2811,7 @@ function buildOrderPanel() {
       else { openMenu(f.id); famPinned = f.id; }
     });
     panel.fams[f.id] = { wrap, btn, menu, badge: btn.querySelector('.badge') };
-    for (const o of ORDERS.filter(x => x.fam === f.id)) {
+    for (const o of ORDERS.filter(x => x.fam === f.id && !x.float)) {
       const r = document.createElement('div'); r.className = 'mrow';
       const items = [];
       const mk = (html, arg, cmds, cls) => {
@@ -2680,7 +2829,16 @@ function buildOrderPanel() {
       panel.rows.push({ o, r, items, fam: f.id });
     }
   }
+  if (!document.getElementById('feuBtn')) {                  // Feu! (FI-04): botó flotant, només quan apunten carregats
+    const fo = ORDER_BY_ID['FI-04'], fb = document.createElement('button'); fb.id = 'feuBtn'; fb.innerHTML = '<b>Feu!</b><small>espai</small>';
+    fb.onclick = () => fire(fo); document.getElementById('controls').appendChild(fb);
+  }
+  panel.feu = document.getElementById('feuBtn');
 }
+window.addEventListener('keydown', e => {                    // espai = Feu! (si no s'usa per parlar)
+  if (e.code !== 'Space' || screen !== 'game' || e.repeat || (VOICE.on && VOICE.opt.mode === 'ptt') || tutOpen()) return;
+  const fo = ORDER_BY_ID['FI-04']; if (armMode() && fo.avail() === true) { e.preventDefault(); fire(fo); }
+});
 document.addEventListener('pointerdown', e => { if (openFam && !e.target.closest('#famrow')) openMenu(null); });
 window.addEventListener('keydown', e => { if (e.key === 'Escape' && openFam) openMenu(null); });
 
@@ -2688,7 +2846,7 @@ function renderUnitControls() {
   const lock = tutLocked();
   const hl = tutOn() && !lock ? tutHL() : [];
   const key = [lock, co.state, co.atencio, co.haltReq, !!co.pf, !!co.flank, !!co.fix, co.hdT, formationName(), co.mode, co.pace, co.obSide,
-               co.conv && co.conv.kind, !!pendingCmd, TUT.step, TUT.reached, hl.join(',')].join('|');
+               co.conv && co.conv.kind, !!pendingCmd, TUT.step, TUT.reached, hl.join(','), co.arm, co.loaded, !!co.chaos].join('|');
   if (key === lastKey) return;
   lastKey = key;
   if (!panel.halte) buildOrderPanel();
@@ -2696,7 +2854,7 @@ function renderUnitControls() {
   const famInfo = {};
   for (const f of FAMILIES) famInfo[f.id] = { vis: 0, avail: 0, hl: false };
   for (const rw of panel.rows) {
-    const vis = !rw.o.k || U(rw.o.k);
+    const vis = (!rw.o.k || U(rw.o.k)) && (!rw.o.lvl || !!(level && level[rw.o.lvl]));
     if (rw.pad) rw.r.style.visibility = vis ? '' : 'hidden'; else rw.r.style.display = vis ? '' : 'none';
     if (!vis) continue;
     const fi = famInfo[rw.fam]; if (fi) fi.vis++;
@@ -2720,6 +2878,11 @@ function renderUnitControls() {
     el.btn.classList.toggle('hl', fi.hl);
     el.badge.textContent = fi.avail ? fi.avail : '';
   }
+  if (panel.feu) {
+    const fo = ORDER_BY_ID['FI-04'], fa = fo.avail();
+    panel.feu.style.display = armMode() && co.arm === 'joue' && co.loaded ? '' : 'none';
+    panel.feu.disabled = fa !== true || !!pendingCmd || lock; panel.feu.title = 'Feu!' + (fa === true ? ' (tecla espai)' : ' — ' + fa);
+  }
   const hv = U(HALTE.k), ha = HALTE.avail();
   panel.halte.style.visibility = hv ? '' : 'hidden';
   panel.halte.disabled = ha !== true || lock;
@@ -2732,7 +2895,7 @@ function renderUnitControls() {
 function buildUnitCard() {
   const c = document.getElementById('ucard');
   c.innerHTML = '<div class="section">Unitat · 20 homes</div><div class="ucbody"><canvas id="ucGlyph" width="76" height="76"></canvas>' +
-    '<dl><dt>Forma</dt><dd id="ucForm"></dd><dt>Posició</dt><dd id="ucPos"></dd><dt>Estat</dt><dd id="ucEst"></dd><dt>Pas</dt><dd id="ucPas"></dd></dl></div>' +
+    '<dl><dt>Forma</dt><dd id="ucForm"></dd><dt>Posició</dt><dd id="ucPos"></dd><dt>Estat</dt><dd id="ucEst"></dd><dt>Pas</dt><dd id="ucPas"></dd><dt class="ucArm">Arma</dt><dd class="ucArm" id="ucArm"></dd></dl></div>' +
     '<div class="ucord"><span id="ucOrdLbl">Ordre</span><div class="bar"><i id="ucBar"></i></div><b id="ucPct"></b></div>' +
     '<div class="ucord" id="ucEnRow" style="display:none"><span>Energia</span><div class="bar"><i id="ucEnBar"></i></div><b id="ucEnPct"></b></div>';
 }
@@ -2743,6 +2906,12 @@ function updateInfo() {
   $('ucPos').textContent = co.atencio ? 'atenció' : 'repòs';
   $('ucEst').textContent = estatText();
   $('ucPas').textContent = co.state === 'marxa' ? (co.mode === 'enrere' ? 'mitjos passos' : PACES[co.pace].nom.replace('Pas ', '') + ' · ' + curCadence() + '/min') : '—';
+  const am = armMode(); for (const e of document.querySelectorAll('.ucArm')) e.style.display = am ? '' : 'none';
+  if (am) {
+    const AN = { portez: 'a l\'espatlla', repose: 'a terra', croise: 'baioneta creuada', apprete: 'apprêtez', joue: 'apuntant' };
+    $('ucArm').textContent = co.arm === 'charge' ? 'carregant ' + co.members.filter(m => m.ld >= 1).length + '/' + co.members.length
+      : AN[co.arm] + ' · ' + (co.loaded ? 'carregada' : 'descarregada');
+  }
   const pct = orderPct(), T = TUNE;
   $('ucPct').textContent = pct + '%'; $('ucBar').style.width = pct + '%';
   $('ucBar').style.background = pct > T.ordre.verd ? 'var(--chasseur)' : pct > T.ordre.groc ? '#c79a2b' : 'var(--ecarlate)';
@@ -3036,9 +3205,11 @@ function drawCo() {
     const px = m.x * M, py = m.y * M, a = m.h + (m.hd || 0);
     ctx.fillStyle = m.rank === 0 ? T['u-front'] : T['u-rear'];
     ctx.beginPath(); ctx.arc(px, py, rS, 0, Math.PI * 2); ctx.fill();
+    if (armMode()) { drawMusket(m, px, py, a, rS); continue; }
     ctx.strokeStyle = T.tick; ctx.lineWidth = Math.max(1, 0.06 * M);
     ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(px + Math.cos(a) * 0.45 * M, py + Math.sin(a) * 0.45 * M); ctx.stroke();
   }
+  if (FX.length) drawFx();
 }
 
 function draw() {
@@ -3070,7 +3241,7 @@ let autoStepT = 0;
 const VOICE = { on: false, rec: null, running: false, tested: false, seg: {}, interim: '', state: '', failT: 0, lastFail: null,
   learn: { phr: {}, ex: {} }, shared: { phr: {}, ex: {} }, opt: { mode: 'cont', vol: true, log: false, tele: true, engine: '' }, log: [], recentExec: null, ptt: false, db: false, loading: false };
 // Connexió amb Supabase (la mateixa de la web: si el joc s'obre dins la web, agafa window.APP_CONFIG) i fonts del motor local Vosk
-const GAME_VERSION = '1.4.3';
+const GAME_VERSION = '1.4.4';
 const CFG = Object.assign({
   SUPABASE_URL: 'https://ltopullwhasagnkuqaek.supabase.co',
   SUPABASE_ANON_KEY: 'sb_publishable_DhHFUh-UrbBrI0l476Vcnw_tSn-Gmkr',
@@ -3141,6 +3312,7 @@ function voiceCands() {
   const out = [];
   for (const o of ORDERS.concat([HALTE])) {
     if (o.k && !tutUnlocked(o.k)) continue;
+    if (o.lvl && !(level && level[o.lvl])) continue;
     const args = o.sides ? [-1, 1] : o.options ? o.options.map(x => x[0]) : [undefined];
     for (const arg of args) {
       const t = orderTitle(o, arg), i = t.indexOf(' – ');
@@ -3925,7 +4097,7 @@ function buildFree() {
   );
   for (let k = 0; k < 4; k++) sc.push(A.tent(18 + k * 4.2, 22, { w: 2.5, rot: 0 }), A.tent(18 + k * 4.2, 28, { w: 2.5, rot: Math.PI }));
   return {
-    w: W, h: H, start: { x: 55, y: 66 }, obstacles: [], scene: MapKit.scene(sc), zone: null, free: true, advanced: true, warnDisorder: true, driftScale: 1, goalHeading: 0,
+    w: W, h: H, start: { x: 55, y: 66 }, obstacles: [], scene: MapKit.scene(sc), zone: null, free: true, musket: true, advanced: true, warnDisorder: true, driftScale: 1, goalHeading: 0,
     goalText: 'Un camp obert per provar totes les ordres del joc. No hi ha cap objectiu ni obstacles: practica amb calma.', endText: ''
   };
 }
