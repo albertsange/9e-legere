@@ -2402,7 +2402,7 @@ const ORDERS = [
       if (co.state === 'parat') return busy() ? 'espera que acabi la maniobra' : (level && level.exhaust && co.cansament < 15) ? 'massa cansats: descansa primer' : true;
       return co.mode === 'oblic' ? true : co.mode === 'enrere' ? 'cal aturar-se primer' : 'ja camina endavant'; },
     run: () => co.state === 'conv' ? convEnAvant() : co.state === 'parat' ? setPace('ordinari') : reprendreRecte() },
-  { id: 'MA-02', des: 0.6, fam: 'mar', k: 'mov', fr: 'En arrière', full: 'En arrière – marche!', gl: 'recular a mitjos passos', icon: 'back', cmds: ['arriere'],
+  { id: 'MA-02', des: 1, fam: 'mar', k: 'mov', fr: 'En arrière', full: 'En arrière – marche!', gl: 'recular a mitjos passos', icon: 'back', cmds: ['arriere'],
     avail: aturat, run: () => enArriere() },
   { id: 'MA-07', des: 1.2, fam: 'mar', k: 'obl', fr: 'Oblique', full: 'Oblique à {s} – marche!', gl: 'en diagonal, sense girar la línia', sides: true, icons: ['obLeft', 'obRight'], cmdsS: { '-1': ['oblG'], '1': ['oblD'] },
     avail: sd => pre() || (co.state !== 'marxa' ? 'cal estar en marxa' : co.mode === 'enrere' ? 'no es pot reculant' : busy() ? 'espera que acabi el par file' : (co.mode === 'oblic' && co.obSide === sd) ? 'ja va en oblic cap aquí' : true),
@@ -2437,7 +2437,7 @@ const ORDERS = [
     avail: aturatLinia, run: () => contremarche() }
 ];
 // Camp intern «des» (invisible): desordre que genera l'ordre. Per a les ordres contínues és un multiplicador del soroll per pas
-// (marxa = 0,8; pivot = 1,6; tournez = 2,4; el pas l'escala amb desOpt). Si l'ordre és instantània (shot) és una sacsejada única.
+// (En avant = 0,8; En arrière = 1; Tournez = 3,6; el pas l'escala amb desOpt). Si l'ordre és instantània (shot) és una sacsejada única.
 const ORDER_BY_ID = Object.fromEntries(ORDERS.map(o => [o.id, o]));
 const paceMul = p => (ORDER_BY_ID['MA-04'].desOpt[p]) || 1;
 // Caminar en columna (front estret) desordena i cansa menys que en línia
