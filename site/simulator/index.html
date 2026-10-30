@@ -263,6 +263,22 @@
   /* ---- Mode de veu ---- */
   #vtest{position:fixed;inset:0;z-index:120;display:none;align-items:center;justify-content:center;background:rgba(20,30,60,.38);padding:16px;}
   #vtest.show{display:flex;}
+  #vload{position:fixed;inset:0;z-index:130;display:none;align-items:center;justify-content:center;background:rgba(20,30,60,.55);padding:16px;}
+  #vload.show{display:flex;}
+  #vload .card{width:min(520px,100%);background:var(--sheet);border:1px solid var(--line);border-top:4px solid var(--ecarlate);border-radius:6px;padding:16px 18px;box-shadow:0 14px 40px rgba(10,15,40,.35);}
+  #vload .av{float:left;width:96px;margin:0 14px 4px -6px;text-align:center;}
+  #vload .av img{width:100%;display:block;filter:drop-shadow(0 3px 4px rgba(10,15,40,.35));}
+  #vload .av span{display:block;font-family:var(--label);font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-top:2px;}
+  #vload .n{font-family:var(--label);letter-spacing:.08em;text-transform:uppercase;font-size:12px;color:var(--ecarlate);}
+  #vload h4{font-family:var(--display);font-weight:400;font-size:1.5rem;color:var(--bleu);margin:1px 0 8px;}
+  #vload p{font-size:16px;line-height:1.4;color:var(--ink);margin:0 0 8px;}
+  #vload .vl-note{font-size:14px;color:var(--muted);}
+  #vload .vl-bar{clear:both;height:12px;background:var(--quote-bg);border-radius:6px;overflow:hidden;margin:10px 0 8px;}
+  #vload .vl-bar i{display:block;height:100%;width:0;background:var(--chasseur);transition:width .25s;}
+  #vload .vl-bar.ind i{width:40%;animation:vlind 1.1s ease-in-out infinite alternate;}
+  @keyframes vlind{from{margin-left:0}to{margin-left:60%}}
+  #vload .vbtns .btn-sec,#vload .vbtns .btn-main{font-size:1rem;padding:.45rem 1.2rem;}
+  #vload .vbtns{clear:both;display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end;padding-top:6px;}
   #vtest .card{width:min(520px,100%);max-height:100%;overflow:auto;background:var(--sheet);border:1px solid var(--line);border-top:4px solid var(--ecarlate);border-radius:4px;padding:16px 22px 18px;box-shadow:0 24px 60px -20px rgba(10,15,40,.7);}
   #vtest .av{float:left;width:104px;margin:0 14px 4px -6px;text-align:center;}
   #vtest .av img{width:100%;display:block;filter:drop-shadow(0 3px 4px rgba(10,15,40,.35));}
@@ -353,6 +369,7 @@
 <div id="info"></div>
 <div id="msg"></div>
 <div id="vtest"><div class="card"><div class="av"><img alt="Capitaine Le Jay"><span>Capitaine Le Jay</span></div><div class="n">Mode de veu</div><h4>Prova del micròfon</h4><div class="vbody"></div><div class="meter"><i></i></div><div class="vbtns"></div></div></div>
+<div id="vload"><div class="card"><div class="av"><img alt="Capitaine Le Jay"><span>Capitaine Le Jay</span></div><div class="n">Mode de veu</div><h4>Preparant el reconeixement de veu</h4><p class="vl-st"></p><div class="vl-bar"><i></i></div><p class="vl-note">Només cal fer-ho una vegada: el model es guarda al navegador i després el joc carrega a l'instant.</p><div class="vbtns"></div></div></div>
 <div id="vlog"><div class="h">Registre de veu <small>el més nou a dalt</small></div><div class="l"></div></div>
 <div id="vpill"><span class="dot"></span><span class="t"></span></div>
 <div id="reac"><img alt=""><div class="t"></div></div>
@@ -2518,7 +2535,7 @@ let autoStepT = 0;
 const VOICE = { on: false, rec: null, running: false, tested: false, seg: {}, interim: '', state: '', failT: 0, lastFail: null,
   learn: { phr: {}, ex: {} }, shared: { phr: {}, ex: {} }, opt: { mode: 'cont', vol: true, log: false, tele: true, engine: '' }, log: [], recentExec: null, ptt: false, db: false, loading: false };
 // Connexió amb Supabase (la mateixa de la web: si el joc s'obre dins la web, agafa window.APP_CONFIG) i fonts del motor local Vosk
-const GAME_VERSION = '1.0.2';
+const GAME_VERSION = '1.0.3';
 const CFG = Object.assign({
   SUPABASE_URL: 'https://ltopullwhasagnkuqaek.supabase.co',
   SUPABASE_ANON_KEY: 'sb_publishable_DhHFUh-UrbBrI0l476Vcnw_tSn-Gmkr',
@@ -2780,15 +2797,77 @@ function voiceForget() { VOICE.learn = { phr: {}, ex: {} }; voiceSave(); showMsg
 // ---- Motor local (Vosk): reconeixement dins del navegador, amb vocabulari tancat a les paraules de les ordres ----
 const VK = { model: null, loading: null, rec: null, ctx: null, node: null, src: null, stream: null, listening: false, capture: null, seg: 0, interim: null };
 function loadScript(src) { return new Promise((res, rej) => { const s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = () => rej(new Error('script')); document.head.appendChild(s); }); }
+const VKP = { p: 0, got: 0, total: 0, stage: '' };      // progrés de la càrrega del model
+const vlMB = n => (n / 1048576).toFixed(1).replace('.', ',');
+async function voskFetch(url, signal) {                // descarrega amb progrés i guarda el model a la memòria cau del navegador
+  let cache = null;
+  try { cache = await caches.open('9e-vosk-v1'); const hit = await cache.match(url); if (hit) { const b = await hit.blob(); if (b.size > 1e6) { VKP.p = 1; VKP.got = VKP.total = b.size; vloadUI(); return b; } } } catch (e) { cache = null; }
+  const r = await fetch(url, { signal }); if (!r.ok) throw new Error('HTTP ' + r.status);
+  const total = +r.headers.get('content-length') || 0, EST = 41e6;
+  if (!r.body || !r.body.getReader) { const b = await r.blob(); VKP.p = 1; vloadUI(); return b; }
+  const rd = r.body.getReader(), parts = []; let got = 0;
+  for (;;) { const { done, value } = await rd.read(); if (done) break; parts.push(value); got += value.length; VKP.got = got; VKP.total = total; VKP.p = Math.min(.99, got / (total || EST)); vloadUI(); }
+  const blob = new Blob(parts);
+  try { if (cache && blob.size > 1e6) await cache.put(url, new Response(blob)); } catch (e) {}
+  return blob;
+}
 async function voskLoad() {
   if (VK.model) return VK.model;
-  if (!VK.loading) VK.loading = (async () => {
-    if (!window.Vosk) await loadScript(CFG.VOSK_LIB);
-    let err;
-    for (const url of [].concat(CFG.VOSK_MODEL_URLS)) { try { VK.model = await window.Vosk.createModel(url); VK.modelUrl = url; return VK.model; } catch (e) { err = e; } }
-    throw err || new Error('model');
-  })().catch(e => { VK.loading = null; throw e; });
+  if (!VK.loading) {
+    VK.ac = new AbortController();
+    VK.loading = (async () => {
+      VKP.stage = 'lib'; VKP.p = 0; vloadUI();
+      if (!window.Vosk) await loadScript(CFG.VOSK_LIB);
+      let err;
+      for (const url of [].concat(CFG.VOSK_MODEL_URLS)) {
+        try {
+          VKP.stage = 'dl'; VKP.p = 0; VKP.got = 0; vloadUI();
+          const blob = await voskFetch(url, VK.ac.signal);
+          VKP.stage = 'init'; vloadUI();
+          const obj = URL.createObjectURL(blob);
+          try { VK.model = await window.Vosk.createModel(obj); } catch (e) { VK.model = await window.Vosk.createModel(url); }
+          VK.modelUrl = url; VKP.stage = 'done'; vloadUI(); return VK.model;
+        } catch (e) { err = e; if (VK.ac.signal.aborted) throw e; }
+      }
+      throw err || new Error('model');
+    })().catch(e => { VK.loading = null; throw e; });
+  }
   return VK.loading;
+}
+// Pantalla de càrrega: resol true quan el motor local és llest, false si l'usuari tria continuar sense veu
+let vlState = 'go', vlErr = '';
+function vlRender() {
+  const el = document.getElementById('vload'); if (!el.classList.contains('show')) return;
+  const st = el.querySelector('.vl-st'), bar = el.querySelector('.vl-bar'), fill = bar.querySelector('i');
+  const pct = Math.round(VKP.p * 100);
+  let txt = '', ind = false, w = pct;
+  if (vlState === 'err') { txt = 'No s\'ha pogut carregar el reconeixement local. Comprova la connexió i torna-ho a provar' + (vlErr ? ' (' + vEsc(vlErr) + ')' : '') + '.'; w = 0; }
+  else if (vlState === 'ok' || VKP.stage === 'done') { txt = 'Llest!'; w = 100; }
+  else if (VKP.stage === 'init') { txt = 'Preparant el model… (uns segons)'; ind = true; }
+  else if (VKP.stage === 'dl') { txt = 'Descarregant el model de veu… ' + vlMB(VKP.got) + (VKP.total ? ' / ' + vlMB(VKP.total) : '') + ' MB (' + pct + '%)'; }
+  else { txt = 'Descarregant el motor de veu…'; ind = true; }
+  st.innerHTML = txt; bar.classList.toggle('ind', ind); fill.style.width = ind ? '' : w + '%';
+}
+function vloadUI() { vlRender(); if (VOICE.loading) updVoicePill(); }
+function voskEnsure() {
+  if (VK.model) return Promise.resolve(true);
+  const el = document.getElementById('vload'); el.querySelector('img').src = AV.serios; el.classList.add('show');
+  const btns = el.querySelector('.vbtns');
+  return new Promise(resolve => {
+    let done = false;
+    const finish = ok => { if (done) return; done = true; el.classList.remove('show'); resolve(ok); };
+    const skip = () => { if (!VK.model && VK.loading) { try { VK.ac.abort(); } catch (e) {} } finish(false); };
+    const run = () => {
+      vlState = 'go'; vlErr = ''; btns.innerHTML = '';
+      const b = document.createElement('button'); b.className = 'btn-sec'; b.textContent = 'Continua sense veu'; b.onclick = skip; btns.appendChild(b);
+      vlRender();
+      voskLoad().then(() => { if (done) return; vlState = 'ok'; vlRender(); setTimeout(() => finish(true), 400); })
+        .catch(e => { if (done) return; vlState = 'err'; vlErr = String(e && e.message || e); btns.innerHTML = '';
+          const r = document.createElement('button'); r.className = 'btn-main'; r.textContent = 'Torna-ho a provar'; r.onclick = run;
+          const c = document.createElement('button'); c.className = 'btn-sec'; c.textContent = 'Continua sense veu'; c.onclick = skip; btns.append(c, r); vlRender(); });
+    };
+    run();
+  });
 }
 function voskGrammar() {                                // totes les frases de totes les ordres (preventiva, executiva i les dues juntes)
   const set = new Set(['halte', 'peloton halte']);
@@ -2888,7 +2967,10 @@ function voiceToggle() {
   if (VOICE.on) { voiceSet(false); return; }
   if (!VOICE.tested) openVoiceTest(); else voiceSet(true);
 }
-function setVoiceEngine(e) { VOICE.opt.engine = e; voiceSave(); if (VOICE.on) { voiceStop(); voiceStart(); } updVoicePill(true); syncVoiceOpts(); }
+function setVoiceEngine(e) {
+  const go = () => { VOICE.opt.engine = e; voiceSave(); if (VOICE.on) { voiceStop(); voiceStart(); } updVoicePill(true); syncVoiceOpts(); };
+  if (e === 'vosk' && !VK.model) voskEnsure().then(ok => { if (ok) go(); else syncVoiceOpts(); }); else go();
+}
 function setVoiceMode(m) { VOICE.opt.mode = m; voiceSave(); if (VOICE.on) { voiceStop(); voiceStart(); } updVoicePill(); syncVoiceOpts(); }
 
 // ---- Píndola d'estat (sota el mapa, a sobre del tauler) ----
@@ -2901,7 +2983,7 @@ function updVoicePill(force) {
   const fail = VOICE.state === 'fail' && performance.now() - VOICE.failT < 5000;
   const ptt = VOICE.opt.mode === 'ptt';
   let html, key;
-  if (VOICE.loading) { html = '<span>Carregant el reconeixement local… (uns 40 MB, només la primera vegada)</span>'; key = 'load'; }
+  if (VOICE.loading) { const lp = VKP.stage === 'dl' ? ' ' + Math.round(VKP.p * 100) + '%' : ''; html = '<span>Carregant el reconeixement local…' + lp + '</span>'; key = 'load' + lp; }
   else if (pendingCmd && pendingCmd.voice) { const ph = VOICE.vad.phase; html = '<b>«' + vEsc(pendingCmd.cand.prev) + '…»</b> <span>ara la veu executiva: <i>' + vEsc(pendingCmd.cand.exec) + '</i>' + (VOICE.opt.vol && VOICE.vad.an ? (ph === 'armed' ? ' <em>(a punt)</em>' : '') : '') + '</span>'; key = 'w' + ph + pendingCmd.cand.key; }
   else if (fail) {
     html = '<span class="no">No t\'he entès: «' + vEsc(VOICE.failText) + '»</span>' + ((VOICE.guesses || []).length ? ' <span class="q">Volies dir…</span>' + VOICE.guesses.map((c, i) => '<button data-g="' + i + '">' + vEsc(c.prev || c.exec) + '</button>').join('') : '');
@@ -3019,8 +3101,7 @@ function vtMeter() {
 // Escolta una sola frase (prova i calibratge). onDone(text, alts) | onFail(motiu)
 function vtListen(onDone, onFail) {
   if (vEngine() === 'vosk') {
-    const st0 = document.querySelector('#vtest .st'); if (st0 && !VK.rec) st0.textContent = 'Carregant el reconeixement local… (uns 40 MB, només la primera vegada)';
-    voskStart().then(() => {
+    voskEnsure().then(ok => { if (!ok) throw new Error('has continuat sense veu'); return voskStart(); }).then(() => {
       const st = document.querySelector('#vtest .st'); if (st) st.textContent = 'Escoltant…';
       VK.listening = true;
       VK.capture = { done: (t, alts) => { clearTimeout(VT.timer); VK.listening = false; onDone(t, alts); },
@@ -3403,6 +3484,7 @@ document.getElementById('btnFree').onclick = () => startLevel('free');
 function updVoiceTitle() { const b = document.getElementById('btnVoice'); if (b) b.innerHTML = ICONS.mic + '<span>' + (VOICE.on ? 'Mode de veu: activat' : 'Mode de veu') + '</span>'; }
 VOICE.on = !!VOICE.want && voiceSupported(); VOICE.tested = VOICE.on;
 vShareInit().then(syncVoiceOpts);
+if (vEngine() === 'vosk' && voskOk()) voskEnsure();     // motor local: es carrega en iniciar, amb pantalla de càrrega
 document.getElementById('verTitle').textContent = 'Versió ' + GAME_VERSION;
 setInterval(() => { if (VOICE.on) vShareInit(); }, 120000);   // es refresca el diccionari compartit cada 2 minuts mentre es juga amb la veu
 document.getElementById('btnToLevels').onclick = () => showScreen('levels');
