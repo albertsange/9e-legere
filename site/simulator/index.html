@@ -1351,6 +1351,18 @@ const SFX = (() => {
     },
     chime() { if (!ready()) return; const t = ac.currentTime; tone(t, 660, 660, 0.35, 0.09); tone(t + 0.12, 990, 990, 0.45, 0.08); },
     ding() { if (!ready()) return; const t = ac.currentTime; [523, 659, 784, 1046].forEach((f, i) => { tone(t + i * 0.13, f, f, 0.7, 0.1); tone(t + i * 0.13, f * 2, f * 2, 0.4, 0.03); }); },
+    cry(n = 7, g = 0.06) {                           // crit de la tropa en calar la baioneta: «uh!»
+      if (!ready()) return; const t0 = ac.currentTime;
+      for (let i = 0; i < n; i++) {
+        const t = t0 + Math.random() * 0.18, f0 = 95 + Math.random() * 45, o = ac.createOscillator(); o.type = 'sawtooth';
+        o.frequency.setValueAtTime(f0, t); o.frequency.exponentialRampToValueAtTime(f0 * 1.3, t + 0.14); o.frequency.exponentialRampToValueAtTime(f0 * 0.85, t + 0.5);
+        const f1 = ac.createBiquadFilter(); f1.type = 'bandpass'; f1.frequency.value = 330 + Math.random() * 90; f1.Q.value = 3;
+        const f2 = ac.createBiquadFilter(); f2.type = 'bandpass'; f2.frequency.value = 780 + Math.random() * 120; f2.Q.value = 4;
+        const gn = ac.createGain(); gn.gain.setValueAtTime(0.0001, t); gn.gain.linearRampToValueAtTime(g * (0.7 + Math.random() * 0.5), t + 0.05); gn.gain.exponentialRampToValueAtTime(0.0001, t + 0.55);
+        o.connect(f1); o.connect(f2); f1.connect(gn); f2.connect(gn); gn.connect(master); o.start(t); o.stop(t + 0.6);
+      }
+      noise(t0, 0.4, { type: 'bandpass', f: 600, q: 0.6, gain: g * 0.5, attack: 0.04 });
+    },
     loadStart(get) { ldGet = get; if (!ldT) ldTick(); },
     loadStop() { ldGet = null; clearTimeout(ldT); ldT = null; },
     rustle() {                                       // moviment sec: roba, correatges i equip, sense cos greu
@@ -1737,10 +1749,12 @@ function drawEnemies() {
   const rS = Math.max(1.8, 0.2 * M);
   for (const e of ENEMY) for (const m of e.men) {
     const px = m.x * M, py = m.y * M;
-    if (m.alive) {
+    if (m.gone) continue;
+    if (m.alive || m.fl) {
+      ctx.globalAlpha = m.fl ? Math.max(0, Math.min(1, 1 - (m.fl.t - 2.5) / 1.5)) : 1;
       ctx.fillStyle = '#f7f5ee'; ctx.strokeStyle = '#6c6a63'; ctx.lineWidth = Math.max(1, 0.05 * M);
       ctx.beginPath(); ctx.arc(px, py, rS, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-      ctx.strokeStyle = '#8a877e'; ctx.lineWidth = Math.max(1, 0.06 * M); ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(px + Math.cos(e.h) * 0.32 * M, py + Math.sin(e.h) * 0.32 * M); ctx.stroke();
+      ctx.strokeStyle = '#8a877e'; ctx.lineWidth = Math.max(1, 0.06 * M); ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(px + Math.cos(e.h) * 0.32 * M, py + Math.sin(e.h) * 0.32 * M); ctx.stroke(); ctx.globalAlpha = 1;
     } else {                                                                                  // caigut: una taca fosca i un punt vermell
       ctx.fillStyle = 'rgba(90,86,78,.45)'; ctx.beginPath(); ctx.ellipse(px, py, rS * 1.15, rS * 0.7, m.a || 0, 0, Math.PI * 2); ctx.fill();
       ctx.fillStyle = '#b3261e'; ctx.beginPath(); ctx.arc(px, py, rS * 0.4, 0, Math.PI * 2); ctx.fill();
@@ -1799,12 +1813,18 @@ function updateBayonet() {                      // càrrega a la baioneta: amb l
   for (const e of ENEMY) for (const v of e.men) if (v.alive && co.members.some(m => Math.hypot(m.x - v.x, m.y - v.y) < 1.0)) { touch = true; break; }
   if (!touch) return;
   if (!(co.volley && co.volley.ok)) { if (!co.stabWarn || performance.now() - co.stabWarn > 8000) { co.stabWarn = performance.now(); reac('louis', '<b>Louis:</b> Sense haver disparat primer? Així no, chasseur: <b>recula</b>, carrega i fes una <b>descàrrega</b> abans de la baioneta.', 5000); } return; }
-  let n = 0; for (const e of ENEMY) for (const v of e.men) if (v.alive) { v.alive = false; v.a = Math.random() * 3; n++; }
-  co.stab = { t: performance.now(), n }; SFX.hit();
-  reac('aprova', 'A la baioneta! Has acabat amb els <b>' + n + '</b> austríacs que quedaven.', 4500);
+  let dead = 0, fled = 0, cx = 0, cy = 0; const c = unitCentre();
+  for (const e of ENEMY) for (const v of e.men) if (v.alive) {              // uns cauen i els altres fugen corrents cap enrere
+    v.alive = false;
+    if (Math.random() < 0.5) { v.a = Math.random() * 3; dead++; }
+    else { const a = Math.atan2(v.y - c.y, v.x - c.x) + (Math.random() - 0.5) * 0.9, sp = 3.2 + Math.random() * 2; v.fl = { vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, t: -Math.random() * 0.4 }; fled++; }
+  }
+  co.stab = { t: performance.now(), n: dead + fled, dead, fled }; SFX.hit(); SFX.cry(5, 0.07);
+  reac('aprova', 'A la baioneta! <b>' + dead + '</b> austríacs han caigut i <b>' + fled + '</b> fugen corrents.', 4500);
 }
 function updateMusket(dt) {
   updateBayonet();
+  for (const e of ENEMY) for (const v of e.men) if (v.fl && !v.gone) { v.fl.t += dt; if (v.fl.t > 0) { v.x += v.fl.vx * dt; v.y += v.fl.vy * dt; } if (v.fl.t > 4) v.gone = true; }
   if (co.arm === 'charge' && !co.ldSnd) { co.ldSnd = true; SFX.loadStart(() => co.arm === 'charge' ? 0.4 + 0.6 * co.members.filter(m => m.ld < 1).length / co.members.length : 0); }
   else if (co.arm !== 'charge' && co.ldSnd) { co.ldSnd = false; SFX.loadStop(); }
   if (co.arm === 'charge') {
@@ -2814,10 +2834,10 @@ const ORDERS = [
     avail: () => armOrder(() => co.arm === 'portez' ? 'ja la tenen a l\'espatlla' : co.arm === 'joue' && co.loaded ? 'primer Redressez' : true), run: () => setArm('portez', 'Portez vos armes!') },
   { id: 'MD-02', des: 0, fam: 'arm', k: 'musket', lvl: 'musket', fr: 'Reposez vos armes', pair: true, full: 'Reposez-vous – sur vos armes!', gl: 'arma a terra: es cansen menys', icon: 'rest', cmds: ['reposez'],
     avail: () => armOrder(() => co.arm === 'repose' ? 'ja la tenen a terra' : co.arm !== 'portez' ? 'cal tenir-la a l\'espatlla' : true), run: () => setArm('repose', 'Reposez-vous sur vos armes!') },
-  { id: 'LS-01', des: 0, fam: 'arm', k: 'musket', lvl: 'musket', fr: 'Chargez', full: 'Chargez – vos armes!', gl: 'carregar (uns 18 s, més si estan cansats)', icon: 'load', cmds: ['chargez'],
+  { id: 'LS-01', des: 0, fam: 'arm', k: 'musket', lvl: 'musket', fr: 'Chargez', full: 'Chargez – vos armes!', gl: 'carregar: un bon chasseur fa 3 trets per minut; cansats, tarden més', icon: 'load', cmds: ['chargez'],
     avail: () => armOrder(() => co.loaded ? 'ja estan carregats' : co.arm !== 'portez' && co.arm !== 'joue' ? 'cal tenir-la a l\'espatlla' : true), run: () => startLoad() },
   { id: 'MD-10', des: 0, fam: 'arm', k: 'musket', lvl: 'musket', fr: 'Croisez la baïonnette', full: 'Croisez – la baïonnette!', gl: 'baioneta en càrrega, mirant endavant', icon: 'bayonet', cmds: ['croisez'],
-    avail: () => armOrder(() => co.arm === 'croise' ? 'ja la tenen creuada' : co.arm !== 'portez' ? 'cal tenir-la a l\'espatlla' : true), run: () => setArm('croise', 'Croisez la baïonnette!') },
+    avail: () => armOrder(() => co.arm === 'croise' ? 'ja la tenen creuada' : co.arm !== 'portez' ? 'cal tenir-la a l\'espatlla' : true), run: () => { setArm('croise', 'Croisez la baïonnette!'); SFX.cry(); } },
   { id: 'FI-01', des: 0, fam: 'arm', float: true, lvl: 'musket', fr: 'Apprêtez', full: 'Apprêtez – vos armes!', gl: 'preparar per disparar (cal estar carregats)', icon: 'aim', cmds: ['appretez'],
     avail: () => armOrder(() => co.arm !== 'portez' ? 'cal tenir-la a l\'espatlla' : !co.loaded ? 'primer cal carregar (Chargez)' : true), run: () => setArm('apprete', 'Apprêtez vos armes!') },
   { id: 'FI-02', des: 0, fam: 'arm', float: true, lvl: 'musket', fr: 'Joue', full: 'Joue!', gl: 'apuntar (des d\'Apprêtez)', icon: 'aim', cmds: ['joue'],
@@ -3409,7 +3429,7 @@ let autoStepT = 0;
 const VOICE = { on: false, rec: null, running: false, tested: false, seg: {}, interim: '', state: '', failT: 0, lastFail: null,
   learn: { phr: {}, ex: {} }, shared: { phr: {}, ex: {} }, opt: { mode: 'cont', vol: true, log: false, tele: true, engine: '' }, log: [], recentExec: null, ptt: false, db: false, loading: false };
 // Connexió amb Supabase (la mateixa de la web: si el joc s'obre dins la web, agafa window.APP_CONFIG) i fonts del motor local Vosk
-const GAME_VERSION = '1.4.8';
+const GAME_VERSION = '1.4.9';
 const CFG = Object.assign({
   SUPABASE_URL: 'https://ltopullwhasagnkuqaek.supabase.co',
   SUPABASE_ANON_KEY: 'sb_publishable_DhHFUh-UrbBrI0l476Vcnw_tSn-Gmkr',
@@ -4473,13 +4493,14 @@ function buildLevel6() {
   const fireHint = () => {
     const d = Math.round(dist());
     if (co.chaos) return '…';
-    if (!co.loaded) return co.arm === 'charge' ? 'Carregant… espera que els rellotges es posin en <b>verd</b>.' : 'Estan descarregats: <b>Mosquet → Chargez</b> (uns 18 s).';
+    if (!co.loaded) return co.arm === 'charge' ? 'Carregant… espera que els rellotges es posin en <b>verd</b>.' : 'Estan descarregats: <b>Mosquet → Chargez</b>.';
     if (co.state !== 'parat') return 'Atura\'t amb <b>Halte</b> abans de disparar.';
     if (d > R) return 'Massa lluny (' + d + ' m): apropa\'t a menys de ' + R + ' m (<b>En avant</b>).';
     if (!facing()) return 'Gira cap als austríacs (<b>Girs</b> o <b>Tournez</b>).';
     return co.arm === 'portez' ? 'A ' + d + ' m: <b>Apprêtez</b>, <b>Joue</b> i <b>Feu!</b> (barra de dalt de les ordres).' : co.arm === 'apprete' ? '<b>Joue!</b> per apuntar.' : co.arm === 'joue' ? '<b>Feu!</b> (botó vermell o tecla espai).' : '…';
   };
   const stabHint = () => {
+    if (co.stab) return 'Els austríacs fugen!';
     const d = Math.round(dist());
     if (co.arm === 'joue' || co.arm === 'apprete' || co.arm === 'charge') return co.arm === 'charge' ? 'Carregant…' : '<b>Mosquet → Portez vos armes</b>, i després <b>Croisez la baïonnette</b>.';
     if (co.arm === 'portez') return '<b>Mosquet → Croisez la baïonnette</b>: amb l\'arma calada sí que es pot caminar.';
@@ -4495,7 +4516,7 @@ function buildLevel6() {
         'Passa el ratolí per sobre d\'una unitat i et dirà <b>qui és</b>, <b>quants homes</b> té i quina <b>bandera</b> porta. Els austríacs no es mouran: nosaltres sí.'],
       done: () => TUT.intro },
     { title: 'Carregar', pose: 'assenyala', tag: 'Mosquet', hl: [], unlock: ['musket'], btn: 'Entesos', ack: true,
-      text: ['Un mosquet descarregat només serveix de pal. Obre <b>Mosquet → Chargez</b>: cada soldat carrega al seu ritme (uns <b>18 segons</b>, més si estan cansats) i el seu <b>rellotge</b> es posa en <b>verd</b> quan acaba.',
+      text: ['Un mosquet descarregat només serveix de pal. Obre <b>Mosquet → Chargez</b>: cada soldat carrega al seu ritme (un bon chasseur fa <b>3 trets per minut</b>, però quan està <b>cansat</b> tarda més en recarregar) i el seu <b>rellotge</b> es posa en <b>verd</b> quan acaba.',
         'Quan tots hagin acabat veuràs la barra <b>Carregats</b> sobre el tauler, amb les ordres de foc. Per moure\'s, els homes han de tenir l\'arma a l\'espatlla (<b>Portez</b>); tornen a aquesta posició sols en acabar de carregar.'],
       done() { return !!this.acked; } },
     { title: 'Carrega', pose: 'assenyala', unlock: [], mini: 'Obre <b>Mosquet</b> i dóna <b>Chargez</b>. Espera que tots els rellotges es posin en verd.',
@@ -4515,8 +4536,8 @@ function buildLevel6() {
     { title: 'Dispara', pose: 'assenyala', unlock: [], get hl() { return !co.loaded ? ['chargez'] : co.state !== 'parat' ? ['halte'] : co.arm === 'portez' && dist() <= R && facing() ? ['appretez'] : co.arm === 'apprete' ? ['joue'] : co.arm === 'joue' ? ['feu'] : []; },
       mini: fireHint, resetStep: () => 3, done: () => fired() },
     { title: 'A la baioneta', pose: 'serios', tag: 'Baioneta', hl: [], unlock: [], btn: 'Endavant!', ack: true,
-      text: ['Una descàrrega no basta: els austríacs que queden no fugiran. Ara toca <b>acabar amb ells a la baioneta</b>.',
-        'Dóna <b>Mosquet → Portez vos armes</b> i després <b>Croisez la baïonnette</b>: amb l\'arma calada <b>sí que es pot caminar</b>. Avança (<b>En avant</b>, millor al <b>pas de charge</b>) fins que la baioneta els toqui. El nivell s\'acaba quan els hagis atacat.'],
+      text: ['<b>Bona descàrrega!</b> Ara acabem amb aquests <b>covards</b> amb la baioneta!',
+        'Dóna <b>Mosquet → Portez vos armes</b> i després <b>Croisez la baïonnette</b>, i avança (<b>En avant</b>, millor al <b>pas de charge</b>) fins que la baioneta els toqui. Com més <b>ràpid</b> vagi la tropa en entrar en contacte amb l\'enemic, <b>més baixes</b> els causarà. Els que no caiguin, fugiran.'],
       done() { return !!this.acked; } },
     { title: 'Carrega!', pose: 'assenyala', unlock: [], get hl() { return co.arm === 'portez' ? ['croisez'] : co.arm === 'croise' && co.state === 'parat' ? ['avant'] : co.arm !== 'croise' && co.arm !== 'charge' ? ['portez'] : []; },
       mini: stabHint, resetStep: () => 3, done: () => false }
