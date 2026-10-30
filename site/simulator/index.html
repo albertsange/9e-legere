@@ -1066,7 +1066,8 @@ const TUNE = {
   ordre:    { rmsZero: 0.2,                   // desviació mitjana (m) que equival a 0 % d'ordre
               verd: 85, groc: 60,             // colors de la barra (%)
               avis: 25, rearma: 50,         // el Louis surt per sota d'«avis» i torna a poder sortir per sobre de «rearma»
-              caos: 3, calma: 85 },           // ordre ≤ «caos» %: només Halte, Garde à vous i Alignement fins a tornar a «calma» %
+              caos: 3, calma: 85 },
+  recordatori: { fixe: 6, repeteix: 14 },   // segons sense dir Fixe! després d'un Alignement abans del primer avís, i entre avisos           // ordre ≤ «caos» %: només Halte, Garde à vous i Alignement fins a tornar a «calma» %
   desordre: { pas: 0.06,                      // soroll per pas en marxa (× des de l'ordre de marxa × pas)
               roda: 0.07,                     // soroll per pas en conversions (× des × distància al pivot)
               cop: 0.06,                      // sacsejada d'una ordre instantània o d'arribada (× des)
@@ -1513,6 +1514,8 @@ function updateCo(dt) {
   tickPending(dt);
   updateStamina(dt);
   updateChaos();
+  updateFixeReminder(dt);
+  if (co.state !== 'parat' && co.state !== 'gir') co.frontRef = null;
   // Gir del cap (alineament, CD-03)
   for (const m of co.members) {
     const d = (m.ht || 0) - (m.hd || 0), st = 1.5 * dt;
@@ -1619,15 +1622,28 @@ function enPlaceRepos() {
 }
 
 // À droite / à gauche / demi-tour (FD-04, FD-05): només aturada i en atenció
-function turn(angle) {
+function turn(angle, label) {
   if (co.state !== 'parat' || !co.atencio) return;
-  say(Math.abs(angle) > 2 ? 'Demi-tour à droite!' : angle > 0 ? 'Par le flanc droite!' : 'Par le flanc gauche!');
+  say(label || (Math.abs(angle) > 2 ? 'Demi-tour à droite!' : angle > 0 ? 'Par le flanc droite!' : 'Par le flanc gauche!'));
+  if (!label && Math.abs(angle) < 2 && co.frontRef == null) co.frontRef = co.members[0].h;     // orientació d'abans del primer Par le flanc: la recupera «Front!»
   co.state = 'gir';
   co.giroT = 0;
   for (const m of co.members) {
     m.giroFrom = m.h;
     m.giroTo = m.h + angle;
   }
+}
+
+// Front! (FD-06): els homes giren cap al costat que toca per tornar a l'orientació d'abans del Par le flanc
+// (si han fet Par le flanc droite, giren a l'esquerra, i viceversa). Només mentre la unitat segueix aturada després del flanc.
+function frontDelta() {
+  if (co.frontRef == null) return null;
+  const d = wrapA(co.frontRef - co.members[0].h);
+  return Math.abs(d) < 0.3 ? null : Math.abs(d) > Math.PI - 0.3 ? Math.PI : d;
+}
+function front() {
+  const d = frontDelta(); if (d === null) return;
+  turn(d, 'Front!');
 }
 
 // En avant / Pas ordinaire / Pas accéléré / Pas de charge – marche! (MA-01, MA-04, MA-05, MA-06)
@@ -2155,7 +2171,7 @@ function showMsg(text, ms) {
 // ---------- Tutorial (nivell 1): ordres que es desbloquegen i finestres d'ajuda ----------
 const TUT = { step: 0, reached: 0, dismissed: false, page: 0, pageStep: -1, cued: -1, pending: false, cam: null, g: 0, gStep: -1, gNext: 0, z0: 1 };
 function tutOn() { return !!(level && level.tutorial); }
-function tutHL() { return tutOn() && !TUT.dismissed ? (level.tutorial.steps[TUT.step] || {}).hl || [] : (tutOn() ? (level.tutorial.steps[TUT.step] || {}).hl || [] : []); }
+function tutHL() { const b = tutOn() ? (level.tutorial.steps[TUT.step] || {}).hl || [] : []; return co && co.fixeRemind ? b.concat('fixe') : b; }
 function tutUnlocked(k) {
   if (!tutOn()) return true;
   const st = level.tutorial.steps;
@@ -2495,8 +2511,10 @@ const ORDERS = [
   // Girs
   { id: 'FD-04', des: 0.5, shot: true, fam: 'gir', k: 'gir', fr: 'Par le flanc', full: 'Par le flanc {s} – {s}!', gl: 'quart de volta al lloc; la línia es fa columna', sides: true, icons: ['left', 'right'], cmdsS: { '-1': ['flancG'], '1': ['flancD'] },
     avail: aturat, run: sd => turn(sd * Math.PI / 2) },
-  { id: 'FD-05', des: 0.7, shot: true, fam: 'gir', k: 'gir', fr: 'Demi-tour à droite', full: 'Demi-tour à droite – droite!', gl: 'mitja volta, sempre per la dreta', icon: 'uturn', cmds: ['demi'],
+  { id: 'FD-05', des: 0.7, shot: true, fam: 'gir', k: 'gir', fr: 'Demi-tour à droite', full: 'Demi-tour – à droite!', gl: 'mitja volta, sempre per la dreta', icon: 'uturn', cmds: ['demi'],
     avail: aturat, run: () => turn(Math.PI) },
+  { id: 'FD-06', des: 0.5, shot: true, fam: 'gir', k: 'gir', fr: 'Front', full: 'Front!', gl: 'tornar a l\'orientació d\'abans del Par le flanc', icon: 'attention', cmds: ['front'],
+    avail: () => { const r = aturat(); return r !== true ? r : frontDelta() === null ? 'primer cal un Par le flanc' : true; }, run: () => front() },
   // Conversions
   { id: 'WH-01', des: 2.2, en: 1.5, fam: 'conv', k: 'conv', sec: 'Des d\'aturat', fr: 'Par peloton', full: 'Par peloton à {s} – marche!', gl: 'el pivot gira al lloc; s\'acaba amb Halte', sides: true, icons: ['wheelL', 'wheelR'], cmdsS: { '-1': ['wh01L'], '1': ['wh01R'] },
     avail: aturatLinia, run: sd => startWheel('stand', sd) },
@@ -2505,7 +2523,7 @@ const ORDERS = [
   { id: 'WH-03', des: 2.4, fam: 'conv', k: 'tournez', sec: 'En marxa', fr: 'Tournez', full: 'Tournez à {s} – marche!', gl: 'el primer home gira 90° i la resta corre al seu costat; continua la marxa', sides: true, icons: ['wheelL', 'wheelR'], cmdsS: { '-1': ['wh03L'], '1': ['wh03R'] },
     avail: marxaLinia, run: sd => startWheel('turn', sd) },
   // Formacions
-  { id: 'CD-01', des: 1.5, shot: true, fam: 'form', k: 'parfile', sec: 'Columna en marxa', fr: 'Par file', full: 'Par file à {s} – marche!', gl: 'la columna canvia de rumb pel mateix punt', sides: true, icons: ['snakeL', 'snakeR'], cmdsS: { '-1': ['pfG'], '1': ['pfD'] },
+  { id: 'CD-01', des: 1.5, shot: true, fam: 'gir', k: 'parfile', sec: 'Columna en marxa', fr: 'Par file', full: 'Par file à {s} – marche!', gl: 'la columna canvia de rumb pel mateix punt', sides: true, icons: ['snakeL', 'snakeR'], cmdsS: { '-1': ['pfG'], '1': ['pfD'] },
     avail: marxaColumna, run: sd => parFile(sd) },
   { id: 'CD-05', des: 0, fam: 'form', k: 'bataille', sec: 'Columna en marxa', fr: 'Sur la droite, par file en bataille', full: 'Sur la droite, par file en bataille – marche!', gl: 'de columna a línia, cap a la dreta', icon: 'batR', cmds: ['bat'],
     avail: marxaColumna, run: () => surLaDroite(1) },
@@ -2526,6 +2544,14 @@ const ORDER_BY_ID = Object.fromEntries(ORDERS.map(o => [o.id, o]));
 // Caos (ordre ≈ 0 %): només es poden fer Halte, Garde à vous i Alignement (+ Fixe!) fins que la unitat torna a estar alineada.
 const CHAOS_OK = new Set(['FD-02', 'CD-03', 'CD-03b']), CHAOS_WHY = 'el Louis no et deixa moure fins que alineïs';
 for (const o of ORDERS) if (!CHAOS_OK.has(o.id)) { const a = o.avail; o.avail = function (arg) { return co && co.chaos ? CHAOS_WHY : a.call(this, arg); }; }
+function updateFixeReminder(dt) {              // després d'un Alignement, recorda dir Fixe! si el jugador no ho fa
+  const R = TUNE.recordatori;
+  if (screen !== 'game' || paused || tutOpen()) return;
+  if (co.state === 'parat' && co.hdT !== 0 && !co.fix) {
+    co.fixeT = (co.fixeT || 0) + dt;
+    if (co.fixeT >= R.fixe) { co.fixeT = R.fixe - R.repeteix; co.fixeRemind = true; lastKey = ''; reac('assenyala', 'No oblidis el <b>Fixe!</b>: els homes encara tenen el cap girat.', 4500); }
+  } else { co.fixeT = 0; co.fixeRemind = false; }
+}
 function updateChaos() {
   if (!(level && level.warnDisorder) || screen !== 'game' || paused) return;
   const pct = orderPct(), T = TUNE.ordre;
@@ -3048,7 +3074,7 @@ let autoStepT = 0;
 const VOICE = { on: false, rec: null, running: false, tested: false, seg: {}, interim: '', state: '', failT: 0, lastFail: null,
   learn: { phr: {}, ex: {} }, shared: { phr: {}, ex: {} }, opt: { mode: 'cont', vol: true, log: false, tele: true, engine: '' }, log: [], recentExec: null, ptt: false, db: false, loading: false };
 // Connexió amb Supabase (la mateixa de la web: si el joc s'obre dins la web, agafa window.APP_CONFIG) i fonts del motor local Vosk
-const GAME_VERSION = '1.4.1';
+const GAME_VERSION = '1.4.2';
 const CFG = Object.assign({
   SUPABASE_URL: 'https://ltopullwhasagnkuqaek.supabase.co',
   SUPABASE_ANON_KEY: 'sb_publishable_DhHFUh-UrbBrI0l476Vcnw_tSn-Gmkr',
@@ -3800,7 +3826,7 @@ function buildLevel1() {
       get hl() { return lastPast() ? ['pfG'] : []; },
       cue: () => lastPast() ? 'Ara! Par file à gauche!' : '',
       text: ['Quan s\'acabi el corredor cal tornar cap a l\'est sense aturar-se. <b>Par file à gauche / droite</b> fa que la columna canviï de rumb: la primera filera gira just on has donat l\'ordre i les altres giren pel mateix punt.',
-        'Segueix caminant pel corredor. Quan l\'<b>últim soldat</b> hagi passat l\'<b>última tenda</b> t\'avisaré: llavors, a <b>Formacions</b>, prem <b>Par file → gauche</b>.'],
+        'Segueix caminant pel corredor. Quan l\'<b>últim soldat</b> hagi passat l\'<b>última tenda</b> t\'avisaré: llavors, a <b>Girs</b>, prem <b>Par file → gauche</b>.'],
       done: () => co.state === 'marxa' && !co.pf && Math.abs(wrapA(co.members[0].h)) < 0.1 && maxY() > 29 },
     { title: 'Tornar a formar', hl: ['bat'], unlock: ['bataille'],
       text: 'Ara desplega la columna en línia amb <b>Sur la droite, par file en bataille</b>: cada filera es col·loca a la dreta de la primera i la línia queda mirant cap a la dreta de la columna. Com que la columna va cap a l\'est, quedaràs <b>de cara al sud</b>, dins la placeta.',
@@ -4030,25 +4056,25 @@ function buildLevel5() {
   );
   const inR = z => { const c = unitCentre(); return c.x >= z.x0 && c.x <= z.x1 && c.y >= z.y0 && c.y <= z.y1; };
   const ordPct = orderPct;
-  const ready = z => co.state === 'parat' && formationName() === 'línia' && inR(z) && co.cansament >= 90 && ordPct() >= 85 && co.hdT === 0;
-  const hint = (z, nom, extra) => () => {
+  const ready = (z, rest = true) => co.state === 'parat' && formationName() === 'línia' && inR(z) && (!rest || co.cansament >= 90) && ordPct() >= 85 && co.hdT === 0;
+  const hint = (z, nom, extra, rest = true) => () => {
     const e = Math.round(co.cansament), o = ordPct();
     if (co.chaos) return '<b>Louis:</b> no et mous fins que la unitat estigui <b>alineada</b>: <b>Halte</b>, <b>Garde à vous</b> i <b>Alignement</b>.';
     if (co.state === 'conv' || co.state === 'gir' || co.state === 'auto') return '…';
     if (co.state === 'marxa') return e < 25 ? '<b>Energia baixa (' + e + ' %)!</b> Fes <b>Halte</b> i descansa.' : o < 40 ? '<b>Ordre baix (' + o + ' %)!</b> Atura\'t i alinea.' : extra + ' Energia ' + e + ' %, ordre ' + o + ' %.';
     if (!inR(z)) return extra;
-    if (e < 90) return co.atencio ? 'A la base ' + nom + ': <b>Posició → En place, repos!</b> per recuperar energia (' + e + ' %).' : 'Descansant… energia ' + e + ' % (cal el 90 %).';
-    if (!co.atencio) return 'Ja estan descansats: <b>Garde à vous!</b> i alinea\'ls.';
+    if (rest && e < 90) return co.atencio ? 'A la base ' + nom + ': <b>Posició → En place, repos!</b> per recuperar energia (' + e + ' %).' : 'Descansant… energia ' + e + ' % (cal el 90 %).';
+    if (!co.atencio) return rest ? 'Ja estan descansats: <b>Garde à vous!</b> i alinea\'ls.' : 'Base A: <b>Garde à vous!</b> i alinea la unitat.';
     if (o < 85) return 'Ordre ' + o + ' %: <b>Formacions → Alignement</b> i <b>Fixe!</b>';
     return 'Base ' + nom + ' a punt!';
   };
-  const hintHl = z => {                                  // quin botó assenyalar segons la situació
+  const hintHl = (z, rest = true) => {                                  // quin botó assenyalar segons la situació
     const e = co.cansament, o = ordPct();
     if (co.chaos) return co.state === 'marxa' ? ['halte'] : !co.atencio ? ['garde'] : co.hdT !== 0 ? ['fixe'] : ['align'];
     if (co.state === 'marxa') return e < 25 || o < 40 ? ['halte'] : [];
     if (co.state !== 'parat') return [];
     if (!inR(z)) return ['avant'];
-    if (e < 90) return co.atencio ? ['repos'] : [];
+    if (rest && e < 90) return co.atencio ? ['repos'] : [];
     if (!co.atencio) return ['garde'];
     if (co.hdT !== 0) return ['fixe'];
     return o < 85 ? ['align'] : [];
@@ -4071,23 +4097,23 @@ function buildLevel5() {
         'Fixa\'t: amb aquests moviments també ens hem <b>cansat</b>. La barra <b>Energia</b> es buida <b>caminant</b>, més com més ràpid és el pas (en columna, menys). Quan estem aturats se\'ns recupera una mica (fins al <b>50 %</b>), però si ens deixes quiets massa estona ens tornem a cansar. Per omplir-la de debò: <b>Posició → En place, repos!</b><br>Sota el <b>25 %</b> em sentiràs rondinar; a <b>zero</b>, la unitat s\'atura <b>exhausta</b> i no marxarà fins que descansi.'],
       done() { return !!this.acked; } },
     { title: 'El recorregut', pose: 'assenyala', tag: 'Exercici', hl: [], unlock: [], btn: 'Som-hi', ack: true,
-      text: ['Hi ha <b>tres bases</b>: A, B i C. A cada base cal arribar <b>aturats, en línia, descansats</b> (energia ≥ 90 %) i <b>alineats</b> (ordre en verd). A la C, a més, de cara a l\'est.',
-        'Entre base i base hi ha prou distància perquè t\'hagis de parar a descansar i alinear: planifica-ho. Fes servir els <b>Tournez</b> per girar sense trencar la línia i vigila els arbres.'],
+      text: ['Hi ha <b>tres bases</b>: A, B i C. A la <b>A</b> n\'hi ha prou d\'arribar <b>aturats, en línia</b> i <b>alineats</b> (ordre en verd). A la <b>B</b> i la <b>C</b>, a més, <b>descansats</b> (energia ≥ 90 %). A la C, de cara a l\'est.',
+        'Fins a la base A arribaràs amb forces, però després ja no: <b>planifica on descansar</b>. Fes servir els <b>Tournez</b> per girar sense trencar la línia i vigila els arbres.'],
       done() { return !!this.acked; } },
-    { title: 'Base A', pose: 'assenyala', unlock: [], get hl() { return hintHl(ZA); }, mini: hint(ZA, 'A', 'Orienta\'t cap a l\'est (<b>Tournez à droite</b>) i camina fins a la <b>base A</b>.'), done: () => OBJ.done[0] },
+    { title: 'Base A', pose: 'assenyala', unlock: [], get hl() { return hintHl(ZA, false); }, mini: hint(ZA, 'A', 'Orienta\'t cap a l\'est (<b>Tournez à droite</b>) i camina fins a la <b>base A</b>.', false), done: () => OBJ.done[0] },
     { title: 'Base B', pose: 'assenyala', unlock: [], get hl() { return hintHl(ZB); }, mini: hint(ZB, 'B', 'Cap al nord, a la <b>base B</b>: <b>En avant</b> i <b>Tournez à gauche</b> a l\'alçada de la base A.'), done: () => OBJ.done[1] },
     { title: 'Base C', pose: 'assenyala', unlock: [], get hl() { return hintHl(ZC); }, mini: hint(ZC, 'C', 'Cap a l\'est, a la <b>base C</b>: <b>Tournez à droite</b> i camina. Atura\'t de cara a l\'est.'), done: () => false }
   ];
   return {
     w: W, h: H, start: { x: 6, y: 34 }, obstacles: [], scene: MapKit.scene(sc), zone: ZC, driftScale: 1.1, goalHeading: 0,
-    advanced: true, warnDisorder: true, fatigueScale: 3, exhaust: true, finishOk: () => co.cansament >= 90,
+    advanced: true, warnDisorder: true, fatigueScale: 2.2, exhaust: true, finishOk: () => co.cansament >= 90,
     tutorial: { steps, figs: [], startAtencio: true, resetStep: () => 5 },
     objectives: [
-      { t: 'Base A: aturats, en línia, descansats i alineats', ok: () => ready(ZA) },
+      { t: 'Base A: aturats, en línia i alineats', ok: () => ready(ZA, false) },
       { t: 'Base B: aturats, en línia, descansats i alineats', ok: () => OBJ.done[0] && ready(ZB) },
       { t: 'Base C: de cara a l\'est, descansats i alineats', ok: () => OBJ.complete }
     ],
-    goalText: 'Arriba a les tres bases aturat, en línia, descansat i alineat; vigila l\'energia i l\'ordre.',
+    goalText: 'Arriba a les tres bases aturat, en línia i alineat (descansat a la B i la C); vigila l\'energia i l\'ordre.',
     endText: 'Molt bé, chasseur: has dut la unitat de base en base sabent quan parar-la a descansar i a alinear. El Louis i el Lefon estan (gairebé) satisfets.'
   };
 }
