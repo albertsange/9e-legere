@@ -319,7 +319,7 @@
       '<ol class="extra"><li><a href="#regulacions" data-sec="regulacions"><span class="n">§</span><span>' + esc(L((S.site.regs || {}).title) || t('regs_page')) + '</span></a></li>' +
       '<li><a href="#decisions" data-sec="decisions"><span class="n">·</span><span>' + esc(L((S.site.decisions || {}).title) || t('decisions')) + '</span></a></li>' +
       '<li><a href="#fonts" data-sec="fonts"><span class="n">·</span><span>' + esc(L((S.site.fonts || {}).title) || t('sources')) + '</span></a></li>' +
-      '<li><a href="#simulator" data-sec="simulator"><span class="n">▶</span><span>' + esc(L((S.site.simulator || {}).title) || t('sim_title')) + '</span></a></li>' +
+      (isMember() ? '<li><a href="#simulator" data-sec="simulator"><span class="n">▶</span><span>' + esc(L((S.site.simulator || {}).title) || t('sim_title')) + '</span></a></li>' : '') +
       (isAdmin() ? '<li><a href="#nova" data-sec="nova"><span class="n">+</span><span>' + esc(t('new_page')) + '</span></a></li>' : '') + '</ol>';
 
     var acct = document.getElementById('acct'), dark = isDark();
@@ -469,7 +469,7 @@
     if (id === 'home') html = homeView();
     else if (id === 'decisions' || id === 'fonts') html = blockView(id);
     else if (id === 'regulacions') html = regsAllView();
-    else if (id === 'simulator') html = simulatorView();
+    else if (id === 'simulator' && isMember()) html = simulatorView();
     else if (id === 'registre') { html = homeView(); setTimeout(function () { history.replaceState(null, '', location.pathname); openRegister(); }, 0); }
     else if (id === 'compte') html = accountView();
     else if (id === 'gestio') html = adminView();
