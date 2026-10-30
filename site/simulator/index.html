@@ -2535,7 +2535,7 @@ let autoStepT = 0;
 const VOICE = { on: false, rec: null, running: false, tested: false, seg: {}, interim: '', state: '', failT: 0, lastFail: null,
   learn: { phr: {}, ex: {} }, shared: { phr: {}, ex: {} }, opt: { mode: 'cont', vol: true, log: false, tele: true, engine: '' }, log: [], recentExec: null, ptt: false, db: false, loading: false };
 // Connexió amb Supabase (la mateixa de la web: si el joc s'obre dins la web, agafa window.APP_CONFIG) i fonts del motor local Vosk
-const GAME_VERSION = '1.0.3';
+const GAME_VERSION = '1.0.4';
 const CFG = Object.assign({
   SUPABASE_URL: 'https://ltopullwhasagnkuqaek.supabase.co',
   SUPABASE_ANON_KEY: 'sb_publishable_DhHFUh-UrbBrI0l476Vcnw_tSn-Gmkr',
@@ -2633,7 +2633,9 @@ function vRank(alts) {
     const H = vToks(al.t), nh = vNorm(al.t);
     for (const c of cands) {
       const m = vMatch(c.P, H);
-      let s = m.s * (0.8 + 0.2 * Math.min(1, m.cnt / Math.max(1, H.length))) * (0.85 + 0.15 * (al.c || 0.7));   // premia la frase que explica més del que s'ha sentit
+      const ek = vKey(c.E[c.E.length - 1]); let tw = 0, ew = 0;                    // cobertura: quina part (ponderada) de les paraules sentides explica l'ordre
+      for (const h of H) { const w = VSTOP[h] || 1, hk = vKey(h); tw += w; if (c.P.some(p => vSim(vKey(p), hk) >= 0.6) || vSim(ek, hk) >= 0.6) ew += w; }
+      let s = m.s * (0.45 + 0.55 * (tw ? ew / tw : 1)) * (0.85 + 0.15 * (al.c || 0.7));   // «oblique à droite» no s'ha de confondre amb «à droite»
       const lk = vLearnedPhr(nh); if (lk && lk.key === c.key) s = Math.max(s, lk.w || 0.95);
       s *= vPrior(c);
       if (c.o.avail(c.arg) !== true) s *= 0.85;
@@ -3177,7 +3179,7 @@ function calListen() {
     let res = 'ok', note;
     if (it.kind === 'phr') {
       const rank = vRank(alts), top = rank[0];
-      if (top && top.c.key === it.c.key && top.s >= 0.85) note = 'Entès a la primera: <i>«' + vEsc(heard) + '»</i> ✓';
+      if (top && top.c.key === it.c.key && top.s >= 0.7) note = 'Entès a la primera: <i>«' + vEsc(heard) + '»</i> ✓';
       else if (top && top.c.key !== it.c.key && top.s >= 0.6) { res = 'dubte'; note = 'He sentit <i>«' + vEsc(heard) + '»</i>, que sembla una altra ordre («' + vEsc(top.c.prev || top.c.exec) + '»). No ho aprenc: torna-ho a provar o salta-la.'; CAL.i--; }
       else { voiceTeachPhr(vNorm(heard), it.c.key, 'calibratge'); res = 'apres'; note = 'He sentit <i>«' + vEsc(heard) + '»</i>: ara ja sé que vol dir «' + vEsc(it.say) + '».'; }
     } else {
