@@ -1515,7 +1515,7 @@ function updateCo(dt) {
   updateStamina(dt);
   updateChaos();
   updateFixeReminder(dt);
-  if (co.state !== 'parat' && co.state !== 'gir') co.frontRef = null;
+  if (formationName() === 'línia') co.lineH = co.members[0].h;           // darrera orientació en línia: «Front!» hi torna
   // Gir del cap (alineament, CD-03)
   for (const m of co.members) {
     const d = (m.ht || 0) - (m.hd || 0), st = 1.5 * dt;
@@ -1625,7 +1625,6 @@ function enPlaceRepos() {
 function turn(angle, label) {
   if (co.state !== 'parat' || !co.atencio) return;
   say(label || (Math.abs(angle) > 2 ? 'Demi-tour à droite!' : angle > 0 ? 'Par le flanc droite!' : 'Par le flanc gauche!'));
-  if (!label && Math.abs(angle) < 2 && co.frontRef == null) co.frontRef = co.members[0].h;     // orientació d'abans del primer Par le flanc: la recupera «Front!»
   co.state = 'gir';
   co.giroT = 0;
   for (const m of co.members) {
@@ -1634,17 +1633,14 @@ function turn(angle, label) {
   }
 }
 
-// Front! (FD-06): els homes giren cap al costat que toca per tornar a l'orientació d'abans del Par le flanc
-// (si han fet Par le flanc droite, giren a l'esquerra, i viceversa). Només mentre la unitat segueix aturada després del flanc.
-function frontDelta() {
-  if (co.frontRef == null) return null;
-  const d = wrapA(co.frontRef - co.members[0].h);
-  return Math.abs(d) < 0.3 ? null : Math.abs(d) > Math.PI - 0.3 ? Math.PI : d;
+// Front! (FD-06): de columna a línia. Els homes giren 90° cap al costat que els deixa més a prop de l'última orientació en línia
+// (si han fet Par le flanc droite giren a l'esquerra, i viceversa); sense referència, a l'esquerra. Sempre acaba en línia.
+function frontTurn() {
+  if (formationName() !== 'columna') return null;
+  const h = co.members[0].h, ref = co.lineH == null ? h : co.lineH;
+  return Math.abs(wrapA(ref - (h + Math.PI / 2))) < Math.abs(wrapA(ref - (h - Math.PI / 2))) - 1e-6 ? Math.PI / 2 : -Math.PI / 2;
 }
-function front() {
-  const d = frontDelta(); if (d === null) return;
-  turn(d, 'Front!');
-}
+function front() { const a = frontTurn(); if (a !== null) turn(a, 'Front!'); }
 
 // En avant / Pas ordinaire / Pas accéléré / Pas de charge – marche! (MA-01, MA-04, MA-05, MA-06)
 // Aturada i en atenció: comença la marxa al pas indicat. En marxa: canvia el pas.
@@ -2511,10 +2507,10 @@ const ORDERS = [
   // Girs
   { id: 'FD-04', des: 0.5, shot: true, fam: 'gir', k: 'gir', fr: 'Par le flanc', full: 'Par le flanc {s} – {s}!', gl: 'quart de volta al lloc; la línia es fa columna', sides: true, icons: ['left', 'right'], cmdsS: { '-1': ['flancG'], '1': ['flancD'] },
     avail: aturat, run: sd => turn(sd * Math.PI / 2) },
+  { id: 'FD-06', des: 0.5, shot: true, fam: 'gir', k: 'gir', fr: 'Front', full: 'Front!', gl: 'de columna a línia: gira cap al costat que toca', icon: 'attention', cmds: ['front'],
+    avail: () => { const r = aturat(); return r !== true ? r : formationName() === 'línia' ? 'ja estan en línia' : formationName() !== 'columna' ? 'cal estar en columna' : true; }, run: () => front() },
   { id: 'FD-05', des: 0.7, shot: true, fam: 'gir', k: 'gir', fr: 'Demi-tour à droite', full: 'Demi-tour – à droite!', gl: 'mitja volta, sempre per la dreta', icon: 'uturn', cmds: ['demi'],
     avail: aturat, run: () => turn(Math.PI) },
-  { id: 'FD-06', des: 0.5, shot: true, fam: 'gir', k: 'gir', fr: 'Front', full: 'Front!', gl: 'tornar a l\'orientació d\'abans del Par le flanc', icon: 'attention', cmds: ['front'],
-    avail: () => { const r = aturat(); return r !== true ? r : frontDelta() === null ? 'primer cal un Par le flanc' : true; }, run: () => front() },
   // Conversions
   { id: 'WH-01', des: 2.2, en: 1.5, fam: 'conv', k: 'conv', sec: 'Des d\'aturat', fr: 'Par peloton', full: 'Par peloton à {s} – marche!', gl: 'el pivot gira al lloc; s\'acaba amb Halte', sides: true, icons: ['wheelL', 'wheelR'], cmdsS: { '-1': ['wh01L'], '1': ['wh01R'] },
     avail: aturatLinia, run: sd => startWheel('stand', sd) },
@@ -3074,7 +3070,7 @@ let autoStepT = 0;
 const VOICE = { on: false, rec: null, running: false, tested: false, seg: {}, interim: '', state: '', failT: 0, lastFail: null,
   learn: { phr: {}, ex: {} }, shared: { phr: {}, ex: {} }, opt: { mode: 'cont', vol: true, log: false, tele: true, engine: '' }, log: [], recentExec: null, ptt: false, db: false, loading: false };
 // Connexió amb Supabase (la mateixa de la web: si el joc s'obre dins la web, agafa window.APP_CONFIG) i fonts del motor local Vosk
-const GAME_VERSION = '1.4.2';
+const GAME_VERSION = '1.4.3';
 const CFG = Object.assign({
   SUPABASE_URL: 'https://ltopullwhasagnkuqaek.supabase.co',
   SUPABASE_ANON_KEY: 'sb_publishable_DhHFUh-UrbBrI0l476Vcnw_tSn-Gmkr',
