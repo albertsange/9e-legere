@@ -642,3 +642,7 @@ table.sq-att td.sq-chk{min-width:6.5rem}
 .sq-sel summary::-webkit-details-marker{display:none}
 .sq-sel .sq-pop{position:absolute;right:0;z-index:30;min-width:15rem;padding:.6rem .8rem;display:flex;flex-direction:column;gap:.4rem}
 .sq-sel .sq-pop label{display:flex;gap:.5rem;align-items:center;font-family:var(--label)}
+
+.sim-box{position:relative}
+.sim-tools{display:flex;justify-content:flex-end;margin-bottom:.35rem}
+.sim-fs{display:inline-flex;align-items:center;padding:.3rem .5rem}

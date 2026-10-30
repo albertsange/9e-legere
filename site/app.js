@@ -647,8 +647,8 @@
     return '<section class="view" data-view="simulator"><p class="crumb"><a href="#">' + esc(t('home')) + '</a> <span aria-hidden="true">/</span> ' + esc(plain(L(b.title)) || t('sim_title')) + '</p>' +
       '<div class="piece-head">' + F('site.simulator.title.' + S.lang, title, 'h2', 'page-title', { raw: 1, single: 1, attr: ' tabindex="-1"' }) + penBtn() + '</div>' +
       '<p class="muted">' + esc(t('sim_intro')) + '</p>' +
-      '<div class="table-wrap"><iframe src="simulator/index.html" title="' + esc(t('sim_title')) + '" allow="microphone; fullscreen" style="width:100%;height:78vh;min-height:520px;border:1px solid var(--line,#ccc);border-radius:6px;background:#fff"></iframe></div>' +
-      '<p class="about-link"><a class="tlink" href="simulator/index.html" target="_blank" rel="noopener">' + esc(t('sim_open')) + '</a> <a class="tlink" href="simulator/HANDOFF.md" target="_blank" rel="noopener">' + esc(t('sim_handoff')) + '</a></p>' +
+      '<div class="sim-box" id="sim-box"><div class="sim-tools"><button type="button" class="btn-ghost sim-fs" data-act="sim-fs" aria-label="' + esc(t('sim_fs')) + '" title="' + esc(t('sim_fs')) + '"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg></button></div>' +
+      '<iframe id="sim-frame" src="simulator/index.html" title="' + esc(t('sim_title')) + '" allow="microphone; fullscreen" style="display:block;width:100%;height:78vh;min-height:520px;border:1px solid var(--line,#ccc);border-radius:6px;background:#fff"></iframe></div>' +
       '<div class="table-wrap block-simulator">' + F('site.simulator.html.' + S.lang, body, 'div', 'block-html', { raw: 1 }) + '</div></section>';
   }
 
@@ -1919,6 +1919,7 @@
       if (act === 'register') { e.preventDefault(); openRegister(); return; }
       if (act === 'rg-back') { var rf = document.getElementById('f-register'); if (rf) regCollect(rf); S.rg.step = Math.max(0, S.rg.step - 1); drawReg(); return; }
       if (act === 'close-dlg') { S.rg = null; closeLogin(); return; }
+      if (act === 'sim-fs') { var fr = document.getElementById('sim-frame'); if (fr && fr.requestFullscreen) fr.requestFullscreen().catch(function () {}); return; }
       if (act === 'theme') {
         e.preventDefault();
         var nt = isDark() ? 'light' : 'dark', open = !!el.closest('.acct-menu[open]');

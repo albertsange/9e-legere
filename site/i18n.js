@@ -341,8 +341,7 @@ window.I18N = (function () {
     // my squad
     sim_title: U("9e Simulator", "9e Simulator", "9e Simulator", "9e Simulator", "9e Simulator"),
     sim_intro: U("Joc d'exercici per practicar les ordres de l'ordre serré. El mode de veu necessita HTTPS, Chrome o Edge i permís de micròfon.", "Drill game to practise the close-order commands. Voice mode needs HTTPS, Chrome or Edge, and microphone permission.", "Gioco di addestramento per praticare i comandi dell'ordine chiuso. La modalità vocale richiede HTTPS, Chrome o Edge e il permesso del microfono.", "Jeu d'exercice pour s'entraîner aux commandements de l'école du soldat. Le mode vocal exige HTTPS, Chrome ou Edge et l'autorisation du microphone.", "Übungsspiel zum Training der Exerzierkommandos. Der Sprachmodus erfordert HTTPS, Chrome oder Edge und die Mikrofonfreigabe."),
-    sim_open: U("Obre el joc a pantalla completa", "Open the game full screen", "Apri il gioco a schermo intero", "Ouvrir le jeu en plein écran", "Spiel im Vollbild öffnen"),
-    sim_handoff: U("Notes de traspàs del simulador (HANDOFF.md)", "Simulator handoff notes (HANDOFF.md)", "Note di consegna del simulatore (HANDOFF.md)", "Notes de passation du simulateur (HANDOFF.md)", "Übergabenotizen des Simulators (HANDOFF.md)"),
+    sim_fs: U("Pantalla completa", "Full screen", "Schermo intero", "Plein écran", "Vollbild"),
     sq_my: U("La meva esquadra", "My squad", "La mia squadra", "Mon escouade", "Mein Trupp"),
     sq_attend: U("Assistència", "Attendance", "Presenze", "Présences", "Anwesenheit"),
     sq_events: U("Esdeveniments", "Events", "Eventi", "Événements", "Veranstaltungen"),
