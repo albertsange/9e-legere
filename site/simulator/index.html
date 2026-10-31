@@ -2877,9 +2877,9 @@ const FG = (() => {
           fig(unit(60, 52, 0, Math.PI / 2) + arrow(60, 34, 60, 8), 'En arrière: mitjos passos') +
           fig(unit(60, 26, 0, Math.PI / 2) + `<line x1="38" y1="50" x2="82" y2="50" stroke="${R}" stroke-width="3" stroke-linecap="round"/>`, 'Halte: s\'atura'),
     () => ico('pace1', 'Pas ordinaire: 76/min') + ico('pace2', 'Pas accéléré: 100/min') + ico('pace3', 'Pas de charge: 120/min'),
-    () => fig(colPairs(44, 5, 6, Math.PI / 2, 7.5) + `<line x1="26" y1="52" x2="62" y2="52" stroke="${R}" stroke-width="1.4" stroke-dasharray="3 2.5"/>` + arrow(44, 56, 44, 74), 'Columna en marxa') +
+    () => fig(colPairs(44, 5, 6, Math.PI / 2, 7.5) + `<line x1="26" y1="52" x2="62" y2="52" stroke="${R}" stroke-width="1.4" stroke-dasharray="3 2.5"/>` + arrow(44, 56, 44, 74), 'Fila en marxa') +
           fig((() => { let o = ''; for (let i = 0; i < 5; i++) o += pair(30, 5 + i * 7.5, Math.PI / 2); for (let i = 0; i < 6; i++) o += pair(37 + i * 7.5, 42, 0); return o; })() + arrow(86, 42, 114, 42), 'Par file à gauche'),
-    () => fig(rowPairs(26, 8, 7, 0, 7.5) + arrow(60, 44, 96, 44), 'Columna cap a l\'est') +
+    () => fig(rowPairs(26, 8, 7, 0, 7.5) + arrow(60, 44, 96, 44), 'Fila cap a l\'est') +
           fig(unit(60, 30, Math.PI / 2, Math.PI / 2) + arrow(60, 46, 60, 72), 'Sur la droite, par file en bataille'),
     () => fig(unit(60, 36, Math.PI / 2, Math.PI / 2, 5, { jit: (r, f) => [[1.6, -2.2, 1.0, -1.4, 2.0][f] + (r ? .8 : 0), [2.4, -1.8, 1.2, -2.6, .6][f] + (r ? -1.4 : 1.2)] }), 'Desalineats') +
           fig(unit(60, 36, Math.PI / 2, Math.PI / 2, 5, { head: (r, f) => (!r && f > 0) ? Math.PI / 2 + 0.7 : Math.PI / 2 }) + arrow(78, 18, 78, 30, R), 'À droite – alignement') +
@@ -3163,7 +3163,7 @@ const aturat = () => pre() || (co.state !== 'parat' ? 'cal estar aturat' : busy(
 const aturatLinia = () => { const r = aturat(); return r !== true ? r : formationName() !== 'línia' ? 'cal estar en línia' : true; };
 const marxaRecta = () => pre() || (co.state !== 'marxa' ? 'cal estar en marxa' : co.mode !== 'direct' ? 'cal marxar recte (no en oblic ni reculant)' : busy() ? 'espera que acabi el par file' : true);
 const marxaLinia = () => { const r = marxaRecta(); return r !== true ? r : formationName() !== 'línia' ? 'cal estar en línia' : true; };
-const marxaColumna = () => { const r = marxaRecta(); return r !== true ? r : formationName() !== 'columna' ? 'cal estar en columna' : true; };
+const marxaColumna = () => { const r = marxaRecta(); return r !== true ? r : formationName() !== 'columna' ? 'cal estar en fila' : true; };
 const SIDE_FR = { '-1': 'gauche', '1': 'droite' };
 const ORDERS = [
   // Posició
@@ -3186,10 +3186,10 @@ const ORDERS = [
     avail: p => pre() || (co.state !== 'marxa' ? 'cal estar en marxa' : co.mode === 'enrere' ? 'no es pot reculant' : busy() ? 'espera que acabi el par file' : co.pace === p ? 'és el pas actual' : true),
     selected: p => co.state === 'marxa' && co.pace === p, run: p => setPace(p) },
   // Girs
-  { id: 'FD-04', des: 0.5, shot: true, fam: 'gir', k: 'gir', fr: 'Par le flanc', full: 'Par le flanc {s} – {s}!', gl: 'quart de volta al lloc; la línia es fa columna', sides: true, icons: ['left', 'right'], cmdsS: { '-1': ['flancG'], '1': ['flancD'] },
+  { id: 'FD-04', des: 0.5, shot: true, fam: 'gir', k: 'gir', fr: 'Par le flanc', full: 'Par le flanc {s} – {s}!', gl: 'quart de volta al lloc; la línia es fa fila', sides: true, icons: ['left', 'right'], cmdsS: { '-1': ['flancG'], '1': ['flancD'] },
     avail: aturat, run: sd => turn(sd * Math.PI / 2) },
-  { id: 'FD-06', des: 0.5, shot: true, fam: 'gir', k: 'gir', fr: 'Front', full: 'Front!', gl: 'de columna a línia: gira cap al costat que toca', icon: 'attention', cmds: ['front'],
-    avail: () => { const r = aturat(); return r !== true ? r : formationName() === 'línia' ? 'ja estan en línia' : formationName() !== 'columna' ? 'cal estar en columna' : true; }, run: () => front() },
+  { id: 'FD-06', des: 0.5, shot: true, fam: 'gir', k: 'gir', fr: 'Front', full: 'Front!', gl: 'de fila a línia: gira cap al costat que toca', icon: 'attention', cmds: ['front'],
+    avail: () => { const r = aturat(); return r !== true ? r : formationName() === 'línia' ? 'ja estan en línia' : formationName() !== 'columna' ? 'cal estar en fila' : true; }, run: () => front() },
   { id: 'FD-05', des: 0.7, shot: true, fam: 'gir', k: 'gir', fr: 'Demi-tour à droite', full: 'Demi-tour – à droite!', gl: 'mitja volta, sempre per la dreta', icon: 'uturn', cmds: ['demi'],
     avail: aturat, run: () => turn(Math.PI) },
   // Conversions
@@ -3200,11 +3200,11 @@ const ORDERS = [
   { id: 'WH-03', des: 2.4, fam: 'conv', k: 'tournez', sec: 'En marxa', fr: 'Tournez', full: 'Tournez à {s} – marche!', gl: 'el primer home gira 90° i la resta corre al seu costat; continua la marxa', sides: true, icons: ['wheelL', 'wheelR'], cmdsS: { '-1': ['wh03L'], '1': ['wh03R'] },
     avail: marxaLinia, run: sd => startWheel('turn', sd) },
   // Formacions
-  { id: 'CD-01', des: 1.5, shot: true, fam: 'gir', k: 'parfile', sec: 'Columna en marxa', fr: 'Par file', full: 'Par file à {s} – marche!', gl: 'la columna canvia de rumb pel mateix punt', sides: true, icons: ['snakeL', 'snakeR'], cmdsS: { '-1': ['pfG'], '1': ['pfD'] },
+  { id: 'CD-01', des: 1.5, shot: true, fam: 'gir', k: 'parfile', sec: 'Fila en marxa', fr: 'Par file', full: 'Par file à {s} – marche!', gl: 'la fila canvia de rumb pel mateix punt', sides: true, icons: ['snakeL', 'snakeR'], cmdsS: { '-1': ['pfG'], '1': ['pfD'] },
     avail: marxaColumna, run: sd => parFile(sd) },
-  { id: 'CD-05', des: 0, fam: 'form', k: 'bataille', sec: 'Columna en marxa', fr: 'Sur la droite, par file en bataille', full: 'Sur la droite, par file en bataille – marche!', gl: 'de columna a línia, cap a la dreta', icon: 'batR', cmds: ['bat'],
+  { id: 'CD-05', des: 0, fam: 'form', k: 'bataille', sec: 'Fila en marxa', fr: 'Sur la droite, par file en bataille', full: 'Sur la droite, par file en bataille – marche!', gl: 'de fila a línia, cap a la dreta', icon: 'batR', cmds: ['bat'],
     avail: marxaColumna, run: () => surLaDroite(1) },
-  { id: 'WH-04', des: 0, fam: 'form', k: 'ligne', sec: 'Columna en marxa', fr: 'Par peloton en ligne', full: 'Par peloton en ligne – marche!', gl: 'de columna a línia sense aturar-se', icon: 'ligne', cmds: ['ligne'],
+  { id: 'WH-04', des: 0, fam: 'form', k: 'ligne', sec: 'Fila en marxa', fr: 'Par peloton en ligne', full: 'Par peloton en ligne – marche!', gl: 'de fila a línia sense aturar-se', icon: 'ligne', cmds: ['ligne'],
     avail: marxaColumna, run: () => parPelotonEnLigne() },
   { id: 'CD-03', des: 0, fam: 'form', k: 'align', sec: 'Línia aturada', fr: 'Alignement', full: 'À {s} – alignement!', gl: 'el guia surt mig pas i els altres s\'hi alineen', sides: true, icons: ['left', 'right'], cmdsS: { '-1': ['alignG', 'align'], '1': ['alignD', 'align'] },
     avail: aturatLinia, run: sd => alignement(sd) },
@@ -3521,7 +3521,7 @@ function updateInfo() {
   const $ = id => document.getElementById(id);
   if (!$('ucForm')) return;
   if (co.members.length !== co._nShown) { co._nShown = co.members.length; $('ucTitle').textContent = 'Unitat · ' + co.members.length + ' homes'; }
-  $('ucForm').textContent = formationName();
+  $('ucForm').textContent = formationName() === 'columna' ? 'fila' : formationName();
   $('ucPos').textContent = co.atencio ? 'atenció' : 'repòs';
   $('ucEst').textContent = estatText();
   if (!(armMode() && co.state === 'parat')) $('ucPas').textContent = co.state === 'marxa' ? (co.mode === 'enrere' ? 'mitjos passos' : PACES[co.pace].nom.replace('Pas ', '') + ' · ' + curCadence() + '/min') : '—';
@@ -4616,15 +4616,15 @@ function buildLevel1() {
       text: ['Mentre camina pots canviar la <b>cadència</b>. L\'<b>École du soldat</b> en té tres: <b>pas ordinaire</b> (76 passos per minut), <b>pas accéléré</b> (100) i <b>pas de charge</b> (120). Amb més passos per minut, la unitat cobreix més terreny.',
         'A la palanca del <b>Pas</b>, al costat de Halte, prem <b>Accéléré</b>. Compte: com més corre la unitat, menys temps tens per donar l\'ordre següent.'],
       done: () => co.state === 'marxa' && co.pace !== 'ordinari' },
-    { title: 'Girar la columna en marxa', unlock: ['parfile'],
+    { title: 'Girar la fila en marxa', unlock: ['parfile'],
       when: () => maxY() > 25.2,      // el diàleg surt quan el davanter és a l'alçada de la tenda del mig
       get hl() { return lastPast() ? ['pfG'] : []; },
       cue: () => lastPast() ? 'Ara! Par file à gauche!' : '',
-      text: ['Quan s\'acabi el corredor cal tornar cap a l\'est sense aturar-se. <b>Par file à gauche / droite</b> fa que la columna canviï de rumb: la primera filera gira just on has donat l\'ordre i les altres giren pel mateix punt.',
+      text: ['Quan s\'acabi el corredor cal tornar cap a l\'est sense aturar-se. <b>Par file à gauche / droite</b> fa que la fila canviï de rumb: la primera filera gira just on has donat l\'ordre i les altres giren pel mateix punt.',
         'Segueix caminant pel corredor. Quan l\'<b>últim soldat</b> hagi passat l\'<b>última tenda</b> t\'avisaré: llavors, a <b>Girs</b>, prem <b>Par file → gauche</b>.'],
       done: () => co.state === 'marxa' && !co.pf && Math.abs(wrapA(co.members[0].h)) < 0.1 && maxY() > 29 },
     { title: 'Tornar a formar', hl: ['bat'], unlock: ['bataille'],
-      text: 'Ara desplega la columna en línia amb <b>Sur la droite, par file en bataille</b>: cada filera es col·loca a la dreta de la primera i la línia queda mirant cap a la dreta de la columna. Com que la columna va cap a l\'est, quedaràs <b>de cara al sud</b>, dins la placeta.',
+      text: 'Ara desplega la fila en línia amb <b>Sur la droite, par file en bataille</b>: cada filera es col·loca a la dreta de la primera i la línia queda mirant cap a la dreta de la fila. Com que la fila va cap a l\'est, quedaràs <b>de cara al sud</b>, dins la placeta.',
       done: () => co.state === 'parat' && formationName() === 'línia' && Math.abs(wrapA(co.members[0].h - Math.PI / 2)) < 0.35 },
     { title: 'Alinear la línia', hl: ['align', 'alignD', 'fixe'], unlock: ['align'],
       enter: () => { if (disorderRms() < 0.05) for (const m of co.members) { const ax = (Math.random() - .5) * 0.16, ay = (Math.random() - .5) * 0.16; m.x += ax; m.y += ay; m.dx += ax; m.dy += ay; } },
@@ -4681,7 +4681,7 @@ function buildLevel2() {
     { title: 'Tournez en marxa', pose: 'mapa', unlock: ['tournez'],
       get hl() { return corner1() ? ['wh03R'] : []; },
       cue: () => corner1() ? 'Ara! Tournez à droite!' : '',
-      text: ['Més endavant el camí gira cap al sud. Un <b>Par le flanc</b> convertiria la línia en columna; el <b>Tournez</b> la manté en línia: l\'home de la dreta (el pivot, marcat amb un cercle vermell) fa un quart de volta al lloc i tots els altres <b>corren</b> a col·locar-se al seu costat. La unitat no s\'atura: continua caminant.',
+      text: ['Més endavant el camí gira cap al sud. Un <b>Par le flanc</b> convertiria la línia en fila; el <b>Tournez</b> la manté en línia: l\'home de la dreta (el pivot, marcat amb un cercle vermell) fa un quart de volta al lloc i tots els altres <b>corren</b> a col·locar-se al seu costat. La unitat no s\'atura: continua caminant.',
         'Segueix caminant pel camí. Quan el pivot arribi a l\'entrada del camí cap al sud t\'avisaré: llavors, a <b>Conversions</b>, prem <b>Tournez → droite</b>. No hi ha res més a fer: no cal cap ordre per continuar.'],
       done: () => co.state === 'marxa' && Math.abs(wrapA(head() - Math.PI / 2)) < 0.1 && maxY() > 25 },
     { title: 'Conversió des d\'aturat', pose: 'pensa', unlock: ['conv'],
@@ -4751,7 +4751,7 @@ function buildLevel3() {
   const steps = [
     { title: 'Exercici de síntesi', pose: 'serios', hl: [], unlock: ['gir', 'mov', 'pace', 'parfile', 'bataille', 'align', 'obl', 'conv', 'tournez'], tag: 'Benvinguda', intro: true, btn: 'A les teves ordres',
       text: ['<b>Chasseur</b>, avui no hi ha guia pas a pas: ho has de fer tu sol amb tot el que has après. Passa la <b>porta</b> de la tanca, el <b>camí estret</b> i arriba a la <b>zona vermella</b>.',
-        'Recorda: el camí estret només admet una <b>columna</b>. A la zona cal arribar en <b>línia</b>, aturat, <b>alineat</b> i mirant a l\'<b>est</b>. Els homes es desalinearan: el desordre és cosa teva.'],
+        'Recorda: el camí estret només admet una <b>fila</b>. A la zona cal arribar en <b>línia</b>, aturat, <b>alineat</b> i mirant a l\'<b>est</b>. Els homes es desalinearan: el desordre és cosa teva.'],
       done: () => TUT.intro }
   ];
   return {
@@ -4760,11 +4760,11 @@ function buildLevel3() {
     tutorial: { steps, figs: [], startAtencio: true, resetStep: () => 1 },
     objectives: [
       { t: 'Passar la porta de la tanca', ok: () => co.members.every(m => m.x > FX + 1.3) },
-      { t: 'Travessar el camí estret en columna', ok: () => co.members.every(m => m.y > PY1 + 0.5) },
+      { t: 'Travessar el camí estret en fila', ok: () => co.members.every(m => m.y > PY1 + 0.5) },
       { t: 'Fer front a l\'est dins la zona marcada', ok: () => co.state === 'parat' && formationName() === 'línia' && inLevelZone() && Math.abs(wrapA(co.members[0].h)) < 0.35 },
       { t: 'Alinear la línia, de cara a l\'est', ok: () => OBJ.complete }
     ],
-    goalText: 'Passa per la porta, travessa el camí estret en columna i fes front a l\'est, en línia alineada, dins la zona marcada.',
+    goalText: 'Passa per la porta, travessa el camí estret en fila i fes front a l\'est, en línia alineada, dins la zona marcada.',
     endText: 'Molt bé, chasseur: porta, camí estret i formació final. Ja domines la instrucció bàsica del 9e Léger.'
   };
 }
@@ -4793,7 +4793,7 @@ function buildLevel4() {
   const ligneWin = () => co.state === 'marxa' && Math.abs(wrapA(head())) < 0.1 && formationName() === 'columna' && maxX() >= 44 && maxX() < 56;
   const steps = [
     { title: 'Camí estret i clariana', pose: 'serios', hl: [], unlock: ['gir', 'mov', 'pace', 'parfile', 'bataille', 'align', 'obl', 'conv', 'tournez'], tag: 'Benvinguda', intro: true, btn: 'Comencem',
-      text: ['<b>Chasseur</b>, avui la unitat ha de baixar per un <b>camí estret</b> fins a una clariana. Al camí només hi cap una columna; a la clariana cal tornar a formar de pressa, <b>sense aturar-se</b>, amb <b>Par peloton en ligne</b>.',
+      text: ['<b>Chasseur</b>, avui la unitat ha de baixar per un <b>camí estret</b> fins a una clariana. Al camí només hi cap una fila; a la clariana cal tornar a formar de pressa, <b>sense aturar-se</b>, amb <b>Par peloton en ligne</b>.',
         'Quan l\'enemic ataqui per darrere, la unitat haurà de girar mitja volta sencera amb la <b>Contremarche</b>. Faràs servir també el que ja has après: <b>Par le flanc</b>, <b>En avant</b>, <b>Halte</b> i <b>Par file</b>.'],
       done: () => TUT.intro },
     { title: 'Fins a l\'entrada del camí', pose: 'assenyala', unlock: [],
@@ -4801,10 +4801,10 @@ function buildLevel4() {
       cue: () => co.state === 'marxa' && cx() >= 14.9 && cx() < 16.6 ? 'Ara! Halte!' : '',
       mini: '<b>En avant</b> fins a l\'entrada del camí (la marca) i <b>Halte</b> quan t\'avisi.',
       done: () => co.state === 'parat' && Math.abs(cx() - CX) < 1.0 && formationName() === 'línia' && Math.abs(wrapA(head())) < 0.1 && maxY() < 14 },
-    { title: 'Posar-se en columna', pose: 'pensa', hl: ['flancD'], unlock: [],
-      mini: '<b>Par le flanc droite</b>: columna cap al sud.',
+    { title: 'Posar-se en fila', pose: 'pensa', hl: ['flancD'], unlock: [],
+      mini: '<b>Par le flanc droite</b>: fila cap al sud.',
       done: () => co.state === 'parat' && formationName() === 'columna' && Math.abs(wrapA(head() - Math.PI / 2)) < 0.1 },
-    { title: 'El camí en columna', pose: 'mapa', unlock: [],
+    { title: 'El camí en fila', pose: 'mapa', unlock: [],
       get hl() { if (co.state === 'parat') return ['avant']; return cornerWin() ? ['pfG'] : []; },
       cue: () => cornerWin() ? 'Ara! Par file à gauche!' : '',
       mini: '<b>En avant</b> pel camí; al revolt, <b>Par file à gauche</b> quan t\'avisi. No toquis els murs.',
@@ -4813,13 +4813,13 @@ function buildLevel4() {
       when: () => maxX() > 41,
       get hl() { return ligneWin() ? ['ligne'] : []; },
       cue: () => ligneWin() ? 'Ara! Par peloton en ligne!' : '',
-      text: ['Quan tota la columna sigui a la clariana cal tornar a formar sense aturar-se. A <b>Formacions</b> hi ha <b>Par peloton en ligne – marche!</b>: el primer home segueix caminant i cada filera accelera per col·locar-se al seu costat, a l\'esquerra, fins formar la línia.',
+      text: ['Quan tota la fila sigui a la clariana cal tornar a formar sense aturar-se. A <b>Formacions</b> hi ha <b>Par peloton en ligne – marche!</b>: el primer home segueix caminant i cada filera accelera per col·locar-se al seu costat, a l\'esquerra, fins formar la línia.',
         'Continua caminant cap a l\'est. T\'avisaré quan sigui el moment: si ho fas massa aviat, les fileres de darrere toparien amb els murs del camí.'],
       done: () => co.state === 'marxa' && formationName() === 'línia' && Math.abs(wrapA(head())) < 0.1 },
     { title: 'Halte i contremarche', pose: 'alerta', unlock: ['form'],
       get hl() { if (co.state === 'marxa') return ['halte']; return co.state === 'parat' && formationName() === 'línia' ? ['counter'] : []; },
       text: ['<b>Alerta!</b> L\'enemic ataca per darrere, des de l\'oest. Atura la unitat amb <b>Halte</b> dins la zona vermella.',
-        'Després, a <b>Formacions</b> (línia aturada), digues <b>Contremarche</b>. És una sola ordre i la unitat fa tota la seqüència sola: tothom gira a la dreta menys l\'home d\'ala esquerra, que fa mitja volta i es queda quiet; la columna fa dos <b>Par file à gauche</b> seguits i torna caminant pel costat; <b>Halte</b>, <b>Front</b>, <b>À droite – alignement</b> sobre aquest home i, per acabar, <b>Fixe</b>: ell se\'n va a l\'altre extrem de la línia. Quan acabi, la unitat mirarà a l\'oest.'],
+        'Després, a <b>Formacions</b> (línia aturada), digues <b>Contremarche</b>. És una sola ordre i la unitat fa tota la seqüència sola: tothom gira a la dreta menys l\'home d\'ala esquerra, que fa mitja volta i es queda quiet; la fila fa dos <b>Par file à gauche</b> seguits i torna caminant pel costat; <b>Halte</b>, <b>Front</b>, <b>À droite – alignement</b> sobre aquest home i, per acabar, <b>Fixe</b>: ell se\'n va a l\'altre extrem de la línia. Quan acabi, la unitat mirarà a l\'oest.'],
       done: () => false }
   ];
   return {
@@ -4827,15 +4827,15 @@ function buildLevel4() {
     zone: { x0: 42, y0: 22, x1: 61, y1: 38 }, driftScale: 0.8, goalHeading: Math.PI,
     tutorial: { steps, figs: [], startAtencio: true, resetStep: () => 1 },
     objectives: [
-      { t: 'Posar la línia sobre l\'entrada del camí i fer columna', ok: () => co.state === 'parat' && formationName() === 'columna' && Math.abs(cx() - CX) < 1.1 },
-      { t: 'Baixar pel camí en columna', ok: () => maxY() > 30.2 },
+      { t: 'Posar la línia sobre l\'entrada del camí i fer fila', ok: () => co.state === 'parat' && formationName() === 'columna' && Math.abs(cx() - CX) < 1.1 },
+      { t: 'Baixar pel camí en fila', ok: () => maxY() > 30.2 },
       { t: 'Girar cap a l\'est amb el Par file', ok: () => co.state === 'marxa' && !co.pf && Math.abs(wrapA(head())) < 0.1 && maxY() > 29 && minX() > 14 },
       { t: 'Formar la línia a la clariana amb Par peloton en ligne', ok: () => formationName() === 'línia' && Math.abs(wrapA(head())) < 0.1 && minX() > EX + 0.5 },
       { t: 'Aturar la línia dins la zona marcada', ok: () => co.state === 'parat' && formationName() === 'línia' && inLevelZone() },
       { t: 'Contremarche: línia alineada i de cara a l\'oest', ok: () => OBJ.complete }
     ],
-    goalText: 'Baixa pel camí estret en columna, forma la línia a la clariana sense aturar-te i fes contremarche dins la zona marcada.',
-    endText: 'Molt bé, chasseur: has baixat pel camí en columna, has format la línia en marxa i has girat tota la unitat amb la contremarche.'
+    goalText: 'Baixa pel camí estret en fila, forma la línia a la clariana sense aturar-te i fes contremarche dins la zona marcada.',
+    endText: 'Molt bé, chasseur: has baixat pel camí en fila, has format la línia en marxa i has girat tota la unitat amb la contremarche.'
   };
 }
 
@@ -4883,7 +4883,7 @@ function buildLevel5() {
       done: () => TUT.intro },
     { title: 'El sergent-major Louis', pose: 'louis', tag: 'Ordre', hl: [], unlock: [], btn: 'Entesos', ack: true,
       text: ['Sóc el <b>sergent-major Louis</b> i m\'encarrego que la formació mantingui l\'ordre. No t\'ho penso repetir més d\'una vegada: <b>no suporto el desordre</b>. Si la tropa es desordena em veuràs <b>aparèixer a la pantalla</b>, i com no hi posis una mica d\'ordre, <b>t\'ordenaré a òsties</b>.',
-        'La barra <b>Ordre</b> de la unitat diu com d\'alineada és la línia: <b>verda</b>, bé; <b>groga</b>, s\'està desordenant; <b>vermella</b>, desordre. Caminar desordena, però <b>no tot per igual</b>:<br>• Desordenen <b>poc</b>: estar aturat, la marxa en <b>columna</b> i el pas <b>ordinaire</b>.<br>• Desordenen <b>més</b>: el pas <b>accéléré</b> i <b>de charge</b>, la marxa <b>oblíqua</b>, el <b>Par file</b>, les <b>conversions</b> i el <b>Tournez</b>.<br>Per corregir-ho: atura\'t, <b>Garde à vous</b> i, a <b>Formacions</b>, <b>Alignement</b> i <b>Fixe!</b>'],
+        'La barra <b>Ordre</b> de la unitat diu com d\'alineada és la línia: <b>verda</b>, bé; <b>groga</b>, s\'està desordenant; <b>vermella</b>, desordre. Caminar desordena, però <b>no tot per igual</b>:<br>• Desordenen <b>poc</b>: estar aturat, la marxa en <b>fila</b> i el pas <b>ordinaire</b>.<br>• Desordenen <b>més</b>: el pas <b>accéléré</b> i <b>de charge</b>, la marxa <b>oblíqua</b>, el <b>Par file</b>, les <b>conversions</b> i el <b>Tournez</b>.<br>Per corregir-ho: atura\'t, <b>Garde à vous</b> i, a <b>Formacions</b>, <b>Alignement</b> i <b>Fixe!</b>'],
       done() { return !!this.acked; } },
     { title: 'Prova el desordre', pose: 'louis', unlock: [], mini: 'Fes <b>En avant</b> i, caminant, un <b>Tournez à gauche</b> (<b>Conversions</b>). Mira com baixa la barra <b>Ordre</b>.',
       get hl() { return co.state === 'parat' ? ['avant'] : co.state === 'marxa' && !co.conv ? ['wh03L'] : []; },
@@ -4891,7 +4891,7 @@ function buildLevel5() {
       done: () => co.state === 'marxa' && !co.conv && Math.abs(wrapA(co.members[0].h)) > 1.2 },
     { title: 'El chasseur Lefon', pose: 'lefon', tag: 'Energia', hl: [], unlock: [], btn: 'Entesos', ack: true,
       text: ['<i>(rondina)</i> Sí, sóc el <b>Lefon</b>, què vols, pesat? Porto <b>tres hores caminant</b>, i les cames em diuen que això es fa llarg. Jo <b>rondino</b> sempre, específicament quan la tropa està <b>cansada</b>: fes-me cas.',
-        'Fixa\'t: amb aquests moviments també ens hem <b>cansat</b>. La barra <b>Energia</b> es buida <b>caminant</b>, més com més ràpid és el pas (en columna, menys). Quan estem aturats se\'ns recupera una mica (fins al <b>50 %</b>), però si ens deixes quiets massa estona ens tornem a cansar. Per omplir-la de debò: <b>Posició → En place, repos!</b><br>Sota el <b>25 %</b> em sentiràs rondinar; a <b>zero</b>, la unitat s\'atura <b>exhausta</b> i no marxarà fins que descansi.'],
+        'Fixa\'t: amb aquests moviments també ens hem <b>cansat</b>. La barra <b>Energia</b> es buida <b>caminant</b>, més com més ràpid és el pas (en fila, menys). Quan estem aturats se\'ns recupera una mica (fins al <b>50 %</b>), però si ens deixes quiets massa estona ens tornem a cansar. Per omplir-la de debò: <b>Posició → En place, repos!</b><br>Sota el <b>25 %</b> em sentiràs rondinar; a <b>zero</b>, la unitat s\'atura <b>exhausta</b> i no marxarà fins que descansi.'],
       done() { return !!this.acked; } },
     { title: 'El recorregut', pose: 'assenyala', tag: 'Exercici', hl: [], unlock: [], btn: 'Som-hi', ack: true,
       text: ['Hi ha <b>tres bases</b>: A, B i C. A la <b>A</b> n\'hi ha prou d\'arribar <b>aturats, en línia</b> i <b>alineats</b> (ordre en verd). A la <b>B</b> i la <b>C</b>, a més, <b>descansats</b> (energia ≥ 90 %). A la C, de cara a l\'est.',
@@ -5097,9 +5097,9 @@ function buildLevel8() {
     A.wood([[2, 4], [24, 3], [26, 18], [4, 20]], { kind: 'mixed', spacing: 3.2, seed: 91 }),
     A.wood([[4, 44], [26, 43], [28, 57], [6, 58]], { kind: 'broad', spacing: 3.2, seed: 92 }),
     A.fence([[30, 8], [30, 18]]), A.fence([[30, 40], [30, 50]]),
-    A.label('Files franceses', 10, 24, { kind: 'place', scale: 0.5 }), A.label('Cresta austríaca', 92, 10, { kind: 'town', scale: 0.5 })
+    A.label('Columna francesa', 10, 24, { kind: 'place', scale: 0.5 }), A.label('Cresta austríaca', 92, 10, { kind: 'town', scale: 0.5 })
   );
-  const col = { name: 'Files', cx: 4, cy: 30, h: 0, rows: 8, cols: 6 };
+  const col = { name: 'Columna', cx: 4, cy: 30, h: 0, rows: 8, cols: 6 };
   const st = { spawned: false, pre: false };
   const ex = () => ENEMY[0], rf = () => ENEMY[1];
   const ux = () => unitCentre().x, inZone = () => { const c = unitCentre(); return c.x >= ZONE.x0 && c.x <= ZONE.x1 && c.y >= ZONE.y0 && c.y <= ZONE.y1; };
@@ -5109,8 +5109,8 @@ function buildLevel8() {
   const stepsHint = () => !co.sk ? 'Tiradors → <b>Feu en avançant</b>' : '';
   const steps = [
     { title: 'Els tiradors', pose: 'serios', hl: [], unlock: ALL, tag: 'Benvinguda', intro: true, btn: 'Som-hi',
-      text: ['<b>Chasseur</b>, avui som els <b>tiradors</b> de les files. Davant nostre hi ha una <b>bateria</b> i un regiment austríac a la cresta. Les files ens segueixen, però no s\'atreveixen a avançar si l\'enemic té temps d\'apuntar.',
-        'La nostra feina: <b>obrir les files</b> per travessar la plana (una bala de canó fa molt menys mal a un rang obert), <b>cobrir l\'avanç</b> de les files amb el <b>foc en avançant</b> i, quan arribi el reforç austríac, <b>protegir-ne la retirada</b> amb el <b>foc en reculant</b>.'],
+      text: ['<b>Chasseur</b>, avui som els <b>tiradors</b> de la columna. Davant nostre hi ha una <b>bateria</b> i un regiment austríac a la cresta. La columna ens segueix, però no s\'atreveix a avançar si l\'enemic té temps d\'apuntar.',
+        'La nostra feina: <b>obrir les files</b> per travessar la plana (una bala de canó fa molt menys mal a un rang obert), <b>cobrir l\'avanç</b> de la columna amb el <b>foc en avançant</b> i, quan arribi el reforç austríac, <b>protegir-ne la retirada</b> amb el <b>foc en reculant</b>.'],
       done: () => TUT.intro },
     { title: 'Carregar', pose: 'assenyala', unlock: ['musket'], mini: 'Dóna <b>Mosquet → Chargez</b> i espera que tots els rellotges es posin en verd.',
       get hl() { return co.loaded ? [] : ['chargez']; }, cue: () => co.loaded || co.arm === 'charge' ? '' : 'Mosquet → Chargez!', done: () => co.loaded },
@@ -5123,21 +5123,21 @@ function buildLevel8() {
     { title: 'Sota els canons', pose: 'assenyala', unlock: ['skirm'], hl: [], tag: 'Artilleria',
       mini: () => inZone() ? (co.state === 'marxa' ? 'Ja hi ets: <b>Halte!</b>' : 'A la línia de foc.') : 'Avança en <b>En avant</b> fins a la <b>línia de foc</b> (franja vermella) i fes <b>Halte</b>. Els canons ens dispararan: en rang obert cauran menys homes.',
       resetStep: () => 1, done: () => co.state === 'parat' && inZone() },
-    { title: 'Les files avancen', pose: 'serios', tag: 'Foc en avançant', hl: [], unlock: ['skirm'], btn: 'Endavant', ack: true,
-      text: ['Aquí tens el truc: les <b>files només avancen mentre l\'enemic està arraulit</b>, i el que l\'arrauleix és el nostre foc.',
+    { title: 'La columna avança', pose: 'serios', tag: 'Foc en avançant', hl: [], unlock: ['skirm'], btn: 'Endavant', ack: true,
+      text: ['Aquí tens el truc: la <b>columna només avança mentre l\'enemic està arraulit</b>, i el que l\'arrauleix és el nostre foc.',
         'Dóna <b>Tiradors → Feu en avançant</b> (triaràs els passos de cada salt: <b>10 o més</b> t\'estalvien pulsacions). Cada cop que premis <b>Avancez!</b> (o espai), un rengle salta endavant els passos triats, passant per l\'esquerra de l\'altre, i dispara. Si es queden sense carregar, esperen. Més passos = més terreny; menys passos = foc més continu.'],
       done() { return !!this.acked; } },
     { title: 'Cobreix l\'avanç', pose: 'assenyala', unlock: ['skirm'], hl: [],
-      mini: () => !co.sk ? 'Tiradors → <b>Feu en avançant</b>, i prem <b>Avancez!</b> per fer saltar els rengles.' : supp(ex()) ? 'L\'enemic està arraulit: <b>les files avancen</b>. Continua amb <b>Avancez!</b>.' : 'Les files esperen: fes més foc perquè l\'enemic s\'arrauleixi.',
+      mini: () => !co.sk ? 'Tiradors → <b>Feu en avançant</b>, i prem <b>Avancez!</b> per fer saltar els rengles.' : supp(ex()) ? 'L\'enemic està arraulit: <b>la columna avança</b>. Continua amb <b>Avancez!</b>.' : 'La columna espera: fes més foc perquè l\'enemic s\'arrauleixi.',
       resetStep: () => 1, done: () => advDone() },
     { title: 'Reforç austríac', pose: 'serios', tag: 'Foc en reculant', hl: [], unlock: ['skirm'], btn: 'Entesos', ack: true,
-      text: ['<b>Atenció!</b> Les files han arribat, però ens ha sortit un <b>nou regiment austríac</b> pel davant. Ordre de <b>retirada</b>: les files reculen mentre l\'enemic estigui arraulit.',
-        'Acaba amb <b>Roulement</b> si cal, i dóna <b>Tiradors → Feu en reculant</b>. Amb <b>Reculez!</b> el rengle de davant dispara i es retira per darrere de l\'altre. Porta els tiradors fins a la <b>línia de retirada</b> i les files fins al seu punt de partida. Mentre l\'enemic estigui a tret, <b>pots seguir disparant-li</b>.'],
+      text: ['<b>Atenció!</b> La columna ha arribat, però ens ha sortit un <b>nou regiment austríac</b> pel davant. Ordre de <b>retirada</b>: la columna recula mentre l\'enemic estigui arraulit.',
+        'Acaba amb <b>Roulement</b> si cal, i dóna <b>Tiradors → Feu en reculant</b>. Amb <b>Reculez!</b> el rengle de davant dispara i es retira per darrere de l\'altre. Porta els tiradors fins a la <b>línia de retirada</b> i la columna fins al seu punt de partida. Mentre l\'enemic estigui a tret, <b>pots seguir disparant-li</b>.'],
       done() { return !!this.acked; } },
     { title: 'Cobreix la retirada', pose: 'assenyala', unlock: ['skirm'], hl: [], tag: 'Retirada',
-      mini: () => !co.sk ? 'Tiradors → <b>Feu en reculant</b>, i prem <b>Reculez!</b>.' : supp(rf()) ? 'L\'enemic està arraulit: <b>les files es retiren</b>. Continua amb <b>Reculez!</b>.' : 'Les files esperen: fes més foc al nou regiment.',
+      mini: () => !co.sk ? 'Tiradors → <b>Feu en reculant</b>, i prem <b>Reculez!</b>.' : supp(rf()) ? 'L\'enemic està arraulit: <b>la columna es retira</b>. Continua amb <b>Reculez!</b>.' : 'La columna espera: fes més foc al nou regiment.',
       resetStep: () => 1, done: () => retDone() },
-    { title: 'Retirada ben coberta', pose: 'aprova', unlock: ['skirm'], hl: [], mini: 'Les files són a salvo, chasseur!', done: () => false }
+    { title: 'Retirada ben coberta', pose: 'aprova', unlock: ['skirm'], hl: [], mini: 'La columna és a salvo, chasseur!', done: () => false }
   ];
   const build = {
     w: W, h: H, start: { x: 10, y: 30 }, obstacles: [], scene: MapKit.scene(sc), get zone() { return TUT.step === 4 ? ZONE : TUT.step === 8 ? { x0: 34, y0: 20, x1: 46, y1: 40, label: 'LÍNIA DE RETIRADA' } : null; }, musket: true, skirm: true, driftScale: 0.5, goalHeading: 0, minMen: 6, cover: [],
@@ -5159,20 +5159,20 @@ function buildLevel8() {
     objectives: [
       { t: 'Carregar els mosquets', ok: () => co.loaded || TUT.step >= 3 },
       { t: 'Obrir les files en tiradors', ok: () => TUT.step >= 5 },
-      { t: 'Cobrir l\'avanç de les files', ok: () => TUT.step >= 7 },
+      { t: 'Cobrir l\'avanç de la columna', ok: () => TUT.step >= 7 },
       { t: 'Cobrir-ne la retirada', ok: () => retDone() },
       { t: 'Aguantar amb almenys 6 homes', ok: () => co.members.length >= 6 && retDone() }
     ],
-    goalText: 'Obre files, cobreix l\'avanç de les files amb el foc en avançant i la seva retirada amb el foc en reculant; no baixis de 6 homes.',
-    endText: 'Molt bé, chasseur: has travessat la plana en rang obert, has cobert l\'avanç de les files i n\'has protegit la retirada.'
+    goalText: 'Obre files, cobreix l\'avanç de la columna amb el foc en avançant i la seva retirada amb el foc en reculant; no baixis de 6 homes.',
+    endText: 'Molt bé, chasseur: has travessat la plana en rang obert, has cobert l\'avanç de la columna i n\'has protegit la retirada.'
   };
   return build;
 }
 
 const LEVELS = [{ n: 1, title: 'Sortir de la plaça', desc: 'Tutorial: surt d\'una plaça tancada, passa un corredor de tendes i torna a formar.', build: buildLevel1 },
   { n: 2, title: 'La porta i la cantonada', desc: 'Oblics, Tournez i Par peloton: passa una porta en diagonal, gira una cantonada sense trencar la línia i fes front des d\'aturat.', build: buildLevel2 }];
-LEVELS.push({ n: 3, title: 'Exercici de síntesi', desc: 'Practica el que has après: porta en oblic, camí estret en columna i formació final alineada, sense ajuda.', build: buildLevel3 });
-LEVELS.push({ n: 4, title: 'La clariana', desc: 'Par peloton en ligne i contremarche: baixa per un camí estret en columna, forma la línia en marxa i gira tota la unitat.', build: buildLevel4 });
+LEVELS.push({ n: 3, title: 'Exercici de síntesi', desc: 'Practica el que has après: porta en oblic, camí estret en fila i formació final alineada, sense ajuda.', build: buildLevel3 });
+LEVELS.push({ n: 4, title: 'La clariana', desc: 'Par peloton en ligne i contremarche: baixa per un camí estret en fila, forma la línia en marxa i gira tota la unitat.', build: buildLevel4 });
 LEVELS.push({ n: 5, title: 'Cansament i desordre', desc: 'Coneix el sergent-major Louis i el chasseur Lefon: recorre tres bases parant a descansar i a alinear la unitat.', build: buildLevel5 });
 LEVELS.push({ n: 6, title: 'La guerra comença', desc: 'Carrega el mosquet, avança cap a una unitat austríaca i dispara-li.', build: buildLevel6 });
 LEVELS.push({ n: 7, title: 'Foc recte i foc oblic', desc: 'Dos regiments austríacs es giraran i et dispararan: dispara primer, en oblic i de cara, i cobreix-te amb els arbres.', build: buildLevel7 });
