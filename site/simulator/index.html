@@ -1966,7 +1966,7 @@ function skRespace(anchor, gap) {                // anchor: 'first' (filera de l
     list.push({ m, tasks: [{ rot: F.h + Math.sign(d) * Math.PI / 2 }, { path: [{ x: m.x + F.rx * d, y: m.y + F.ry * d }], i: 0, keep: true }, { rot: F.h }] });
   }
   co.open = gap > FRONT + 0.01 ? gap : null;
-  if (list.length) startAuto([{ list }], false, ORD_SPEED, true);
+  if (list.length) startAuto([{ list }], false, gap <= FRONT + 0.01 ? STEP * PACES.carrega.cad / 60 : ORD_SPEED, true);       // «Serrez les files» es fa al pas de charge
 }
 function skAvail() {
   return armOrder(() => !co.open ? 'cal estar en tiradors (files obertes)' : !co.loaded ? 'primer cal carregar (Chargez)' : co.arm !== 'portez' ? 'cal tenir l\'arma a l\'espatlla' : true);
@@ -3252,9 +3252,9 @@ const ORDERS = [
     avail: () => { const r = aturatLinia(); return r !== true ? r : true; }, run: sd => skRespace(sd > 0 ? 'last' : 'first', SKCFG.open * STEP) },
   { id: 'SK-02', ctrOf: true, pk: 'open', des: 0.3, fam: 'tir', k: 'skirm', lvl: 'skirm', sec: 'Formació', fr: 'En tirailleurs (centre)', full: 'Déployez en tirailleurs, sur le centre – marche!', gl: 'obrir les files (tries els passos) a banda i banda del centre', icon: 'fan', cmds: ['skC'],
     avail: () => { const r = aturatLinia(); return r !== true ? r : true; }, run: () => skRespace('centre', SKCFG.open * STEP) },
-  { id: 'SK-04', ctr: 'SK-05', des: 0.3, fam: 'tir', k: 'skirm', lvl: 'skirm', sec: 'Formació', fr: 'Serrez les files', full: 'Par le flanc {s}, serrez les files – marche!', gl: 'tornar a ajuntar les files cap a la filera d\'un flanc', sides: true, icons: ['left', 'right'], cmdsS: { '-1': ['serG'], '1': ['serD'] },
+  { id: 'SK-04', ctr: 'SK-05', des: 0.3, fam: 'tir', k: 'skirm', lvl: 'skirm', sec: 'Formació', fr: 'Serrez les files', full: 'Par le flanc {s}, serrez les files – marche!', gl: 'tornar a ajuntar les files cap a la filera d\'un flanc, al pas de charge', sides: true, icons: ['left', 'right'], cmdsS: { '-1': ['serG'], '1': ['serD'] },
     avail: () => { const r = aturat(); return r !== true ? r : !co.open ? 'no estan en tiradors' : true; }, run: sd => skRespace(sd > 0 ? 'first' : 'last', FRONT) },
-  { id: 'SK-05', ctrOf: true, des: 0.3, fam: 'tir', k: 'skirm', lvl: 'skirm', sec: 'Formació', fr: 'Serrez (centre)', full: 'Sur le centre, serrez les files – marche!', gl: 'tornar a ajuntar les files cap al centre', icon: 'align', cmds: ['serC'],
+  { id: 'SK-05', ctrOf: true, des: 0.3, fam: 'tir', k: 'skirm', lvl: 'skirm', sec: 'Formació', fr: 'Serrez (centre)', full: 'Sur le centre, serrez les files – marche!', gl: 'tornar a ajuntar les files cap al centre, al pas de charge', icon: 'align', cmds: ['serC'],
     avail: () => { const r = aturat(); return r !== true ? r : !co.open ? 'no estan en tiradors' : true; }, run: () => skRespace('centre', FRONT) },
   { id: 'SK-06', des: 0, fam: 'tir', k: 'skirm', lvl: 'skirm', sec: 'Foc', fr: 'Feu à volonté', full: 'Commencez – le feu!', gl: 'foc al lloc: cada home carrega i dispara pel seu compte', icon: 'aim', cmds: ['commencez'],
     avail: () => skAvail(), run: () => skStart('place') },
@@ -3892,7 +3892,7 @@ let autoStepT = 0;
 const VOICE = { on: false, rec: null, running: false, tested: false, seg: {}, interim: '', state: '', failT: 0, lastFail: null,
   learn: { phr: {}, ex: {} }, shared: { phr: {}, ex: {} }, opt: { mode: 'cont', vol: true, log: false, tele: true, engine: '' }, log: [], recentExec: null, ptt: false, db: false, loading: false };
 // Connexió amb Supabase (la mateixa de la web: si el joc s'obre dins la web, agafa window.APP_CONFIG) i fonts del motor local Vosk
-const GAME_VERSION = '1.4.22';
+const GAME_VERSION = '1.4.23';
 const CFG = Object.assign({
   SUPABASE_URL: 'https://ltopullwhasagnkuqaek.supabase.co',
   SUPABASE_ANON_KEY: 'sb_publishable_DhHFUh-UrbBrI0l476Vcnw_tSn-Gmkr',
