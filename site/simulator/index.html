@@ -1823,11 +1823,6 @@ function drawColumn() {                          // columna amiga (nivell 8): bl
   ctx.fillStyle = '#1f3a78'; ctx.font = '600 ' + Math.max(10, 0.9 * M) + 'px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
   const pr = k.goal ? Math.max(0, Math.min(100, Math.round(100 * (k.cx - k.home) / (k.goal - k.home)))) : 0;
   ctx.fillText(k.label ? k.label() : k.name, (k.cx - (k.rows * 0.6) / 2) * M, (k.cy - k.cols * FRONT / 2 - 0.5) * M);
-  if (k.goal) {                                // línies de la columna: objectiu (dalt) i punt de partida
-    ctx.save(); ctx.setLineDash([0.8 * M, 0.5 * M]); ctx.lineWidth = Math.max(2, 0.14 * M); ctx.strokeStyle = '#1f3a78'; ctx.fillStyle = '#1f3a78'; ctx.textBaseline = 'bottom';
-    for (const [x, t] of [[k.goal, 'COLUMNA A TIR'], [k.home + 4, 'PUNT DE PARTIDA']]) { ctx.beginPath(); ctx.moveTo(x * M, (k.cy - 7) * M); ctx.lineTo(x * M, (k.cy + 7) * M); ctx.stroke(); ctx.setLineDash([]); ctx.fillText(t, x * M, (k.cy - 7.3) * M); ctx.setLineDash([0.8 * M, 0.5 * M]); }
-    ctx.restore();
-  }
 }
 function drawEnemies() {
   const rS = Math.max(1.8, 0.2 * M);
@@ -3918,7 +3913,7 @@ let autoStepT = 0;
 const VOICE = { on: false, rec: null, running: false, tested: false, seg: {}, interim: '', state: '', failT: 0, lastFail: null,
   learn: { phr: {}, ex: {} }, shared: { phr: {}, ex: {} }, opt: { mode: 'cont', vol: true, log: false, tele: true, engine: '' }, log: [], recentExec: null, ptt: false, db: false, loading: false };
 // Connexió amb Supabase (la mateixa de la web: si el joc s'obre dins la web, agafa window.APP_CONFIG) i fonts del motor local Vosk
-const GAME_VERSION = '1.4.30';
+const GAME_VERSION = '1.4.31';
 const CFG = Object.assign({
   SUPABASE_URL: 'https://ltopullwhasagnkuqaek.supabase.co',
   SUPABASE_ANON_KEY: 'sb_publishable_DhHFUh-UrbBrI0l476Vcnw_tSn-Gmkr',
@@ -5147,14 +5142,15 @@ function buildLevel8() {
     A.wood([[2, 4], [24, 3], [26, 18], [4, 20]], { kind: 'mixed', spacing: 3.2, seed: 91 }),
     A.wood([[4, 44], [26, 43], [28, 57], [6, 58]], { kind: 'broad', spacing: 3.2, seed: 92 }),
     A.fence([[30, 8], [30, 18]]), A.fence([[30, 40], [30, 50]]),
-    A.label('Columna francesa', 10, 24, { kind: 'place', scale: 0.5 }), A.label('Cresta austríaca', 92, 10, { kind: 'town', scale: 0.5 })
+    A.building({ x: 5, y: 22.5, w: 8, h: 5 }), A.building({ x: 11, y: 24, w: 6, h: 3.5, rot: 0.1 }), A.building({ x: 6, y: 37.5, w: 9, h: 4 }), A.building({ x: 13, y: 36, w: 5, h: 3.5, rot: -0.1 }), A.fence([[0, 33], [16, 33]]),
+    A.label('Les cases', 9, 41, { kind: 'place', scale: 0.5 }), A.label('Cresta austríaca', 92, 10, { kind: 'town', scale: 0.5 })
   );
   const col = { name: 'Columna', cx: 8, cy: 30, h: 0, rows: 8, cols: 6, goal: 35, home: 8 };
   const st = { cvol: false, gun: false, t: 0 };
   const ex = () => ENEMY[0];
   const ux = () => unitCentre().x;
   const moveEnemy = (e, dx) => { for (const v of e.men) v.x += dx; e.cx += dx; };
-  const advDone = () => col.cx >= col.goal - 0.01, retDone = () => st.gun && col.cx <= col.home + 4 && ux() <= 36;
+  const advDone = () => col.cx >= col.goal - 0.01, retDone = () => st.gun && col.cx <= col.home + 1 && ux() <= 36;
   const enDist = () => { const e = ex(); const xs = e ? e.men.filter(v => v.alive).map(v => v.x) : []; return xs.length ? Math.round(Math.min(...xs) - col.cx - 1) : 0; };
   col.label = () => 'Columna' + (TUT.step >= 5 && TUT.step < 9 ? ' · a ' + enDist() + ' m dels austríacs' : '');
   const clear = () => co.members.every(m => Math.abs(m.y - col.cy) >= 3);
@@ -5198,7 +5194,7 @@ function buildLevel8() {
       mini: () => co.state !== 'parat' || busy() ? 'Espera que acabin de moure\'s…' : 'Tiradors → <b>En tirailleurs</b> a <b>gauche</b> o <b>droite</b>, i <b>Executar</b>.',
       resetStep: () => 1, done: () => !!co.open && co.state === 'parat' && !busy() },
     { title: 'Cobreix la retirada', pose: 'assenyala', unlock: ['skirm'], hl: [], tag: 'Retirada',
-      mini: () => !co.sk ? 'Tiradors → <b>Feu en reculant</b>, i prem <b>Reculez!</b>.' : 'Dispara amb <b>Reculez!</b> perquè els canons callin: la columna es retira mentre tu cobreixes.',
+      mini: () => !co.sk ? 'Tiradors → <b>Feu en reculant</b>, i prem <b>Reculez!</b>.' : 'Dispara amb <b>Reculez!</b> perquè els canons callin: la columna es retira fins a les cases mentre tu cobreixes.',
       resetStep: () => 1, done: () => retDone() },
     { title: 'Retirada ben coberta', pose: 'aprova', unlock: ['skirm'], hl: [], mini: 'La columna és a salvo, chasseur!', done: () => false }
   ];
@@ -5208,7 +5204,7 @@ function buildLevel8() {
     enemies: [{ name: 'Regiment austríac', flag: 'aut', cx: 80, cy: 30, h: Math.PI, shoots: true, alert: true, nFiles: 20 }],
     guns: [],
     tutorial: { steps, figs: [], startAtencio: true, resetStep: () => 1 },
-    onReset() { col.cx = 8; st.cvol = false; st.gun = false; st.t = 0; if (ex()) { ex().supp = 0.6; } },
+    onReset() { col.cx = 8; st.cvol = false; st.gun = false; st.an = null; st.t = 0; if (ex()) { ex().supp = 0.6; } },
     tick(dt) {
       if (screen !== 'game' || paused || tutOpen() || co.lost) return;
       const e = ex(), recent = performance.now() - (co.lastShot || 0) < 12000;
@@ -5223,10 +5219,31 @@ function buildLevel8() {
       }
       if (TUT.step >= 9 && st.cvol && !st.gun && e) {
         st.t += dt;
-        if (st.t > 2 && e.cx < 100) moveEnemy(e, 2.5 * dt);                                                                     // es retiren fins a l'extrem del camp
-        if (e.cx >= 100) { st.gun = true; GUNS.push({ x: 92, y: 30, h: Math.PI, name: 'Bateria austríaca', rt: 16, reload: 3, aimT: 0 }); FX.push({ k: 'shot', x: 90, y: 30, a: Math.PI, t: -0.001, big: true }); SFX.cannon(); }
+        if (st.t > 2.2 && !st.an) {                                                                                           // es retiren en ordre: par le flanc, en avant, par file, i tornen a formar la línia
+          const nf = 20, X0 = e.cx, Y0 = e.cy, XE = 100, YE = 30, FR = 0.6;
+          const lineAt = (k, cx, cy) => { const f = k % nf, r = Math.floor(k / nf), a = -r * RANK_GAP, l = (nf / 2 - 0.5 - f) * FRONT; return [cx + Math.cos(Math.PI) * a - Math.sin(Math.PI) * l, cy + Math.sin(Math.PI) * a + Math.cos(Math.PI) * l]; };
+          const colAt = (k, fx, fy, hh) => { const f = k % nf, r = Math.floor(k / nf), dx = Math.cos(hh), dy = Math.sin(hh); return [fx - dx * f * FR - dy * 0.55 * r, fy - dy * f * FR + dx * 0.55 * r]; };
+          const F1 = [X0, Y0 - 9.75], F2 = [X0, Y0 - 16], F3 = [X0 + 5, Y0 - 16], F4 = [XE - 5, Y0 - 16];
+          const legs = [{ d: 1.4, h: -Math.PI / 2, at: k => colAt(k, F1[0], F1[1], -Math.PI / 2) }, { d: 1.6, h: -Math.PI / 2, at: k => colAt(k, F2[0], F2[1], -Math.PI / 2) },
+            { d: 1.6, h: 0, at: k => colAt(k, F3[0], F3[1], 0) }, { d: Math.max(1, (F4[0] - F3[0]) / 2.5), h: 0, at: k => colAt(k, F4[0], F4[1], 0) }, { d: 2.2, h: Math.PI, at: k => lineAt(k, XE, YE) }];
+          const men = []; e.men.forEach((v, k) => { if (v.alive) men.push({ v, k, p0: [v.x, v.y] }); });
+          st.an = { t: 0, men, legs, h0: e.h, X0, XE };
+        }
+        const an = st.an;
+        if (an) {
+          an.t += dt; let t = an.t, i = 0, prev = null, hPrev = an.h0;
+          while (i < an.legs.length && t > an.legs[i].d) { t -= an.legs[i].d; hPrev = an.legs[i].h; i++; }
+          const done = i >= an.legs.length, L = done ? an.legs[an.legs.length - 1] : an.legs[i], u = done ? 1 : t / L.d, ease = u * u * (3 - 2 * u);
+          for (const m of an.men) {
+            const from = i === 0 ? m.p0 : an.legs[i - 1].at(m.k), to = L.at(m.k);
+            m.v.x = from[0] + (to[0] - from[0]) * (done ? 1 : ease); m.v.y = from[1] + (to[1] - from[1]) * (done ? 1 : ease);
+          }
+          e.h = hPrev + wrapA(L.h - hPrev) * (done ? 1 : ease);
+          if (an.men.length) { e.cx = an.men.reduce((q, m) => q + m.v.x, 0) / an.men.length; e.cy = an.men.reduce((q, m) => q + m.v.y, 0) / an.men.length; }
+          if (done) { e.h = Math.PI; e.cx = an.XE; e.cy = 30; st.gun = true; GUNS.push({ x: 92, y: 30, h: Math.PI, name: 'Bateria austríaca', rt: 16, reload: 3, aimT: 0 }); FX.push({ k: 'shot', x: 90, y: 30, a: Math.PI, t: -0.001, big: true }); SFX.cannon(); }
+        }
       }
-      if (TUT.step >= 12 && co.sk && co.sk.mode === 'arriere' && recent && col.cx > col.home + 4) col.cx = Math.max(col.home + 4, col.cx - 0.8 * dt);   // la columna es retira mentre els canons callen
+      if (TUT.step >= 12 && co.sk && co.sk.mode === 'arriere' && recent && col.cx > col.home + 1) col.cx = Math.max(col.home + 1, col.cx - 0.8 * dt);   // la columna es retira mentre els canons callen
     },
     win: () => TUT.step >= 12 && retDone(),
     objectives: [
@@ -5234,7 +5251,7 @@ function buildLevel8() {
       { t: 'Obrir les files en tiradors', ok: () => TUT.step >= 4 },
       { t: 'Avançar disparant fins que la columna sigui a tir', ok: () => TUT.step >= 6 },
       { t: 'Deixar pas a la columna', ok: () => TUT.step >= 9 },
-      { t: 'Cobrir-ne la retirada', ok: () => retDone() },
+      { t: 'Cobrir la retirada de la columna fins a les cases', ok: () => retDone() },
       { t: 'Aguantar amb almenys 6 homes', ok: () => co.members.length >= 6 && retDone() }
     ],
     goalText: 'Avança disparant fins que la columna sigui a tir, deixa pas a la columna i cobreix-ne la retirada amb els canons enemics davant.',
