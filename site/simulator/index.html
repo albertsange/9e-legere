@@ -1788,14 +1788,17 @@ canvas.addEventListener('pointermove', e => {
   HOVER = u ? (u.own ? { own: true } : { en: u.en }) : null;
 });
 canvas.addEventListener('pointerleave', () => { HOVER = null; });
-const tipEl = document.createElement('div'); tipEl.id = 'unitTip'; tipEl.innerHTML = '<img alt=""><div><b class="nm"></b><div class="st"></div></div>'; document.body.appendChild(tipEl);
+const tipEl = document.createElement('div'); tipEl.id = 'unitTip'; tipEl.innerHTML = '<img alt=""><div><b class="nm"></b><div class="st"></div><div class="ps st"></div></div>'; document.body.appendChild(tipEl);
 function updateTip() {
   const u = HOVER && screen === 'game' && !paused ? hoverUnits().find(x => HOVER.own ? x.own : x.en === HOVER.en) : null;
   if (!u || !u.n) { tipEl.style.display = 'none'; return; }
-  const k = u.info.name + '|' + u.n + '|' + (u.own ? 1 : 0);
+  const e = u.own ? null : ENEMY[u.en], sp = e && e.shoots && !e.routed ? (e.supp || 0) : null;
+  const pl = sp === null ? '' : sp >= TUNE.mosquet.supMax ? 'clavats a terra: no disparen' : sp >= 0.2 ? 'sota pressió' : sp >= 0.05 ? 'pressió lleu' : 'sense pressió';
+  const k = u.info.name + '|' + u.n + '|' + (u.own ? 1 : 0) + '|' + pl;
   if (tipEl._k !== k) {
     tipEl._k = k; tipEl.querySelector('img').src = FLAGS[u.info.flag]; tipEl.querySelector('.nm').textContent = u.info.name;
     tipEl.querySelector('.st').innerHTML = (u.own ? 'La teva unitat' : 'Unitat enemiga') + ' · <span>Força</span> <b>' + u.n + '</b> <span>homes</span>';
+    const ps = tipEl.querySelector('.ps'); ps.style.display = pl ? '' : 'none'; ps.innerHTML = pl ? '<span>Pressió del foc</span> <b>' + pl + '</b>' : '';
     tipEl.style.borderColor = u.col; tipEl.classList.toggle('en', !u.own);
   }
   const cs = unitRect(u.pts, u.h, 0.5).map(p => toScreen(p.x * M, p.y * M)), rc = canvas.getBoundingClientRect();
@@ -1808,9 +1811,13 @@ function updateTip() {
 function drawHover() {                          // contorn de ressaltat de la unitat sota el ratolí
   if (!HOVER) return;
   const u = hoverUnits().find(x => HOVER.own ? x.own : x.en === HOVER.en); if (!u || !u.n) return;
-  const r = unitRect(u.pts, u.h, 0.55);
-  ctx.save(); ctx.lineJoin = 'round'; ctx.beginPath(); r.forEach((p, i) => i ? ctx.lineTo(p.x * M, p.y * M) : ctx.moveTo(p.x * M, p.y * M)); ctx.closePath();
-  ctx.fillStyle = u.col + '22'; ctx.fill(); ctx.strokeStyle = u.col; ctx.lineWidth = Math.max(2, 0.12 * M); ctx.stroke(); ctx.restore();
+  const R = Math.max(4, 0.5 * M);                // aura de neó que surt dels soldats
+  ctx.save(); ctx.globalCompositeOperation = 'multiply';
+  for (const [blur, a] of [[1.4 * M, '55'], [0.5 * M, '66']]) {
+    ctx.shadowColor = u.col; ctx.shadowBlur = Math.max(6, blur); ctx.fillStyle = u.col + a;
+    ctx.beginPath(); for (const m of u.pts) { ctx.moveTo(m.x * M + R, m.y * M); ctx.arc(m.x * M, m.y * M, R, 0, Math.PI * 2); } ctx.fill();
+  }
+  ctx.restore();
 }
 function drawColumn() {                          // columna amiga (nivell 8): blocs de soldats blaus que avancen o es retiren
   const k = level && level.column; if (!k) return;
@@ -1833,19 +1840,8 @@ function drawEnemies() {
       ctx.globalAlpha = m.fl ? Math.max(0, Math.min(1, 1 - (m.fl.t - 2.5) / 1.5)) : 1;
       ctx.fillStyle = '#f7f5ee'; ctx.strokeStyle = '#6c6a63'; ctx.lineWidth = Math.max(1, 0.05 * M);
       ctx.beginPath(); ctx.arc(px, py, rS, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-      ctx.strokeStyle = '#8a877e'; ctx.lineWidth = Math.max(1, 0.06 * M); ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(px + Math.cos(e.h) * 0.32 * M, py + Math.sin(e.h) * 0.32 * M); ctx.stroke(); ctx.globalAlpha = 1;
+      ctx.strokeStyle = '#8a877e'; ctx.lineWidth = Math.max(1, 0.06 * M); ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(px + Math.cos(m.h ?? e.h) * 0.32 * M, py + Math.sin(m.h ?? e.h) * 0.32 * M); ctx.stroke(); ctx.globalAlpha = 1;
     }
-  }  for (const e of ENEMY) {                        // barra de pressió del foc sobre cada regiment que dispara
-    if (!e.shoots || e.routed) continue;
-    const live = e.men.filter(v => v.alive); if (!live.length) continue;
-    let cx = 0, y0 = Infinity; for (const v of live) { cx += v.x; y0 = Math.min(y0, v.y); } cx /= live.length;
-    const T = TUNE.mosquet, w = 7 * M, h = Math.max(5, 0.45 * M), x = cx * M - w / 2, y = (y0 - 1.6) * M - h, p = e.supp || 0;
-    ctx.fillStyle = 'rgba(255,253,246,.92)'; ctx.fillRect(x, y, w, h);
-    ctx.fillStyle = p >= T.supMax ? '#2e7d32' : p >= 0.2 ? '#c9a227' : '#9b968a'; ctx.fillRect(x, y, w * p, h);
-    ctx.strokeStyle = '#3a3630'; ctx.lineWidth = 1; ctx.strokeRect(x, y, w, h);
-    for (const k of [0.2, T.supMax]) { ctx.beginPath(); ctx.moveTo(x + w * k, y - 2); ctx.lineTo(x + w * k, y + h + 2); ctx.stroke(); }
-    ctx.fillStyle = '#3a3630'; ctx.font = '600 ' + Math.max(10, 0.8 * M) + 'px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
-    ctx.fillText(p >= T.supMax ? 'Sota pressió · no disparen' : p >= 0.2 ? 'Sota pressió' : 'Pressió del foc', cx * M, y - 3);
   }
 }
 
@@ -3913,7 +3909,7 @@ let autoStepT = 0;
 const VOICE = { on: false, rec: null, running: false, tested: false, seg: {}, interim: '', state: '', failT: 0, lastFail: null,
   learn: { phr: {}, ex: {} }, shared: { phr: {}, ex: {} }, opt: { mode: 'cont', vol: true, log: false, tele: true, engine: '' }, log: [], recentExec: null, ptt: false, db: false, loading: false };
 // Connexió amb Supabase (la mateixa de la web: si el joc s'obre dins la web, agafa window.APP_CONFIG) i fonts del motor local Vosk
-const GAME_VERSION = '1.4.31';
+const GAME_VERSION = '1.4.32';
 const CFG = Object.assign({
   SUPABASE_URL: 'https://ltopullwhasagnkuqaek.supabase.co',
   SUPABASE_ANON_KEY: 'sb_publishable_DhHFUh-UrbBrI0l476Vcnw_tSn-Gmkr',
@@ -5219,28 +5215,26 @@ function buildLevel8() {
       }
       if (TUT.step >= 9 && st.cvol && !st.gun && e) {
         st.t += dt;
-        if (st.t > 2.2 && !st.an) {                                                                                           // es retiren en ordre: par le flanc, en avant, par file, i tornen a formar la línia
-          const nf = 20, X0 = e.cx, Y0 = e.cy, XE = 100, YE = 30, FR = 0.6;
-          const lineAt = (k, cx, cy) => { const f = k % nf, r = Math.floor(k / nf), a = -r * RANK_GAP, l = (nf / 2 - 0.5 - f) * FRONT; return [cx + Math.cos(Math.PI) * a - Math.sin(Math.PI) * l, cy + Math.sin(Math.PI) * a + Math.cos(Math.PI) * l]; };
-          const colAt = (k, fx, fy, hh) => { const f = k % nf, r = Math.floor(k / nf), dx = Math.cos(hh), dy = Math.sin(hh); return [fx - dx * f * FR - dy * 0.55 * r, fy - dy * f * FR + dx * 0.55 * r]; };
-          const F1 = [X0, Y0 - 9.75], F2 = [X0, Y0 - 16], F3 = [X0 + 5, Y0 - 16], F4 = [XE - 5, Y0 - 16];
-          const legs = [{ d: 1.4, h: -Math.PI / 2, at: k => colAt(k, F1[0], F1[1], -Math.PI / 2) }, { d: 1.6, h: -Math.PI / 2, at: k => colAt(k, F2[0], F2[1], -Math.PI / 2) },
-            { d: 1.6, h: 0, at: k => colAt(k, F3[0], F3[1], 0) }, { d: Math.max(1, (F4[0] - F3[0]) / 2.5), h: 0, at: k => colAt(k, F4[0], F4[1], 0) }, { d: 2.2, h: Math.PI, at: k => lineAt(k, XE, YE) }];
-          const men = []; e.men.forEach((v, k) => { if (v.alive) men.push({ v, k, p0: [v.x, v.y] }); });
-          st.an = { t: 0, men, legs, h0: e.h, X0, XE };
+        if (st.t > 2.2 && !st.an) {                                                                                           // es retiren com nosaltres: par le flanc droit, en avant, par file à droite (×2), halte i front
+          const nf = 20, X0 = e.cx, Y0 = e.cy, XE = 96, L0 = { x: X0, y: Y0 - (nf / 2 - 0.5) * FRONT };
+          const P = [L0, { x: X0, y: L0.y - 4 }, { x: XE, y: L0.y - 4 }, { x: XE, y: 30 + (nf / 2 - 0.5) * FRONT }];
+          const seg = []; let tot = 0; for (let q = 1; q < P.length; q++) { const l = Math.hypot(P[q].x - P[q - 1].x, P[q].y - P[q - 1].y); seg.push({ a: P[q - 1], b: P[q], l, s0: tot }); tot += l; }
+          const men = []; e.men.forEach((v, k) => { if (v.alive) men.push({ v, o: (k % nf) * FRONT, q: Math.floor(k / nf) * RANK_GAP }); });
+          st.an = { t: 0, men, seg, tot, v: ORD_SPEED, turn: 0.6, XE };
         }
         const an = st.an;
         if (an) {
-          an.t += dt; let t = an.t, i = 0, prev = null, hPrev = an.h0;
-          while (i < an.legs.length && t > an.legs[i].d) { t -= an.legs[i].d; hPrev = an.legs[i].h; i++; }
-          const done = i >= an.legs.length, L = done ? an.legs[an.legs.length - 1] : an.legs[i], u = done ? 1 : t / L.d, ease = u * u * (3 - 2 * u);
+          an.t += dt;
+          const ptAt = a => { if (a <= 0) return { x: an.seg[0].a.x, y: an.seg[0].a.y - a }; for (const g of an.seg) if (a <= g.s0 + g.l) { const u = (a - g.s0) / g.l; return { x: g.a.x + (g.b.x - g.a.x) * u, y: g.a.y + (g.b.y - g.a.y) * u }; } const g = an.seg[an.seg.length - 1]; return { x: g.b.x, y: g.b.y }; };
+          const tanAt = a => { const p = ptAt(a - 0.5), q = ptAt(a + 0.5), d = Math.hypot(q.x - p.x, q.y - p.y) || 1; return { x: (q.x - p.x) / d, y: (q.y - p.y) / d }; };
+          const T1 = an.turn, T2 = T1 + an.tot / an.v, T3 = T2 + an.turn;
           for (const m of an.men) {
-            const from = i === 0 ? m.p0 : an.legs[i - 1].at(m.k), to = L.at(m.k);
-            m.v.x = from[0] + (to[0] - from[0]) * (done ? 1 : ease); m.v.y = from[1] + (to[1] - from[1]) * (done ? 1 : ease);
+            const lead = Math.min(an.tot, Math.max(0, an.t - T1) * an.v), a = lead - m.o, p = ptAt(a), d = tanAt(a);
+            m.v.x = p.x - d.y * m.q; m.v.y = p.y + d.x * m.q;
+            m.v.h = an.t < T1 ? Math.PI + (Math.PI / 2) * (an.t / T1) : an.t < T2 ? Math.atan2(d.y, d.x) : Math.PI / 2 + (Math.PI / 2) * Math.min(1, (an.t - T2) / an.turn);
           }
-          e.h = hPrev + wrapA(L.h - hPrev) * (done ? 1 : ease);
           if (an.men.length) { e.cx = an.men.reduce((q, m) => q + m.v.x, 0) / an.men.length; e.cy = an.men.reduce((q, m) => q + m.v.y, 0) / an.men.length; }
-          if (done) { e.h = Math.PI; e.cx = an.XE; e.cy = 30; st.gun = true; GUNS.push({ x: 92, y: 30, h: Math.PI, name: 'Bateria austríaca', rt: 16, reload: 3, aimT: 0 }); FX.push({ k: 'shot', x: 90, y: 30, a: Math.PI, t: -0.001, big: true }); SFX.cannon(); }
+          if (an.t >= T3) { for (const m of an.men) m.v.h = undefined; e.h = Math.PI; st.gun = true; GUNS.push({ x: an.XE - 8, y: 30, h: Math.PI, name: 'Bateria austríaca', rt: 16, reload: 3, aimT: 0 }); FX.push({ k: 'shot', x: an.XE - 10, y: 30, a: Math.PI, t: -0.001, big: true }); SFX.cannon(); }
         }
       }
       if (TUT.step >= 12 && co.sk && co.sk.mode === 'arriere' && recent && col.cx > col.home + 1) col.cx = Math.max(col.home + 1, col.cx - 0.8 * dt);   // la columna es retira mentre els canons callen
