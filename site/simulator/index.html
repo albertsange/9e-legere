@@ -5170,7 +5170,7 @@ function buildLevel8() {
     { title: 'En tirailleurs', pose: 'assenyala', unlock: ['skirm'], hl: [], mini: () => co.state !== 'parat' || busy() ? 'Espera que acabin de moure\'s…' : 'Tiradors → <b>En tirailleurs → centre</b>, amb 3 passos o més, i <b>Executar</b>.',
       done: () => !!co.open && co.open >= 3 * STEP - 0.01 && co.state === 'parat' && !busy() },
     { title: 'Avançar disparant', pose: 'serios', tag: 'Foc en avançant', hl: [], unlock: ['skirm'], btn: 'Endavant', ack: true,
-      text: ['Dóna <b>Tiradors → Feu en avançant</b> (tria <b>4 o 5 passos</b> per salt). Cada cop que premis <b>Avancez!</b> (o espai) un rengle salta endavant i dispara. Els austríacs reben el foc i <b>no gosen disparar</b>, però <b>no es mouen</b>: cada salt n'abat uns quants.',
+      text: ['Dóna <b>Tiradors → Feu en avançant</b> (tria <b>4 o 5 passos</b> per salt). Cada cop que premis <b>Avancez!</b> (o espai) un rengle salta endavant i dispara. Els austríacs reben el foc i <b>no gosen disparar</b>, però <b>no es mouen</b>: cada salt n\'abat uns quants.',
         'La columna et seguirà per darrere, al pas normal. <b>Objectiu:</b> arribar amb ella a la línia <b>MIG DEL CAMP</b>.'],
       done() { return !!this.acked; } },
     { title: 'Cobreix l\'avanç', pose: 'assenyala', unlock: ['skirm'], hl: [],
