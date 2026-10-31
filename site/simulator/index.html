@@ -270,14 +270,14 @@
   #skPick{position:absolute;bottom:calc(100% + 14px);right:370px;display:none;align-items:center;gap:10px;z-index:91;padding:8px 8px 8px 16px;background:var(--sheet);border:1px solid var(--line);border-radius:18px;box-shadow:0 6px 22px rgba(0,0,0,.22);}
   #skPick.open{display:flex;}
   #controls.menuOpen #skPick{display:none !important;}
-  #skPick .t{font-size:13px;color:var(--bleu);max-width:190px;line-height:1.2;}
+  #skPick .t{font-size:13px;white-space:nowrap;max-width:none;color:var(--bleu);max-width:190px;line-height:1.2;}
   #skPick .r{display:flex;align-items:center;gap:6px;}
-  #skPick output{min-width:70px;text-align:center;font-weight:700;font-size:16px;color:var(--bleu);font-variant-numeric:tabular-nums;}
+  #skPick output{min-width:78px;text-align:center;font-weight:700;font-size:16px;white-space:nowrap;color:var(--bleu);font-variant-numeric:tabular-nums;}
   #skPick button{font-family:inherit;cursor:pointer;}
-  #skPick .m,#skPick .pl{width:34px;height:34px;border-radius:50%;border:1px solid var(--line);background:var(--sheet);color:var(--bleu);font-size:20px;line-height:1;padding:0;}
+  #skPick .m,#skPick .pl{width:36px;height:36px;border-radius:50%;border:1px solid var(--line);background:var(--sheet);color:var(--bleu);font:700 22px/1 system-ui,Arial,sans-serif;padding:0 0 3px;display:flex;align-items:center;justify-content:center;}
   #skPick .m:hover:not(:disabled),#skPick .pl:hover:not(:disabled){background:var(--bleu);color:#fff;}
   #skPick .ok{height:40px;padding:0 18px;border-radius:999px;border:none;background:var(--bleu);color:#fff;font-weight:700;font-size:14px;}
-  #skPick .x{width:28px;height:28px;border:none;background:transparent;color:var(--muted);font-size:20px;}
+  #skPick .x{width:28px;height:28px;border:none;background:transparent;color:var(--muted);font:400 22px/1 system-ui,Arial,sans-serif;padding:0 0 3px;display:flex;align-items:center;justify-content:center;}
   @media (max-width:1350px){#skBox,#skPick{right:330px;}}
   #unitTip{position:fixed;z-index:80;display:none;align-items:center;gap:10px;pointer-events:none;transform:translateX(-50%);width:max-content;max-width:340px;padding:8px 12px 8px 8px;
     background:var(--sheet);border:2px solid var(--bleu);border-radius:10px;box-shadow:0 6px 18px rgba(0,0,0,.28);}
@@ -1932,8 +1932,9 @@ function fillHole(r, f, x, y) {
 function killOwn(m) {
   const i = co.members.indexOf(m); if (i < 0 || co.members.length <= 1) return;
   addCorpse(m.x, m.y, m.h, true, m.rank);
+  if (co.open || co.sk) skRanks();                 // en tiradors el buit es queda (compta com un home imaginari)
   co.members.splice(i, 1);
-  fillHole(m.rank, m.file, m.x, m.y);
+  if (!co.open && !co.sk) fillHole(m.rank, m.file, m.x, m.y);
 }
 function updateGlide(dt) {                       // els qui cobreixen un buit hi caminen (el desplaçament és relatiu: no depèn de si la unitat es mou)
   for (const m of co.members) if (m.gd) {
@@ -1969,6 +1970,7 @@ function skAvail() {
 }
 const loadDur = () => { const T = TUNE.mosquet; return T.carrega * (1 - T.varia / 2 + Math.random() * T.varia) * (1 + T.cansats * (1 - co.cansament / 100)); };
 function skStart(mode) {
+  co.vp = {};
   for (const m of co.members) { m.sh = true; m.rl = false; m.wt = 0.3 + Math.random() * 2.5; }
   co.loaded = false; co.arm = 'sk'; co.fireDir = null; co.sk = { mode, step: 0, end: false, stage: 'fire', wait: 0.6 };
 }
@@ -1990,9 +1992,11 @@ function manShot(m, delay) {                      // un tret apuntat d'un tirado
 }
 function skRanks() {                              // els rengles, amb la posició mitjana cap endavant
   const F = skFrame();
-  return [0, 1].map(r => { const ms = co.members.filter(m => m.rank === r); return { r, ms, p: ms.length ? ms.reduce((s, m) => s + m.x * F.fx + m.y * F.fy, 0) / ms.length : null }; }).filter(o => o.ms.length);
+  co.vp = co.vp || {};                                                      // posició virtual d'un rengle sense homes: l'hem de superar igualment
+  return [0, 1].map(r => { const ms = co.members.filter(m => m.rank === r), p = ms.length ? ms.reduce((s, m) => s + m.x * F.fx + m.y * F.fy, 0) / ms.length : co.vp[r]; if (ms.length) co.vp[r] = p; return { r, ms, p }; }).filter(o => o.p !== undefined);
 }
 function skBound(R, dist) {                       // salt d'un rengle (endavant o enrere), passant per l'esquerra de l'altre, sempre de cara a l'enemic
+  if (!R.ms.length) { co.vp[R.r] += dist; co.sk.moving = true; return; }       // rengle sense homes: només es mou el seu lloc imaginari
   const F = skFrame(), lx = -F.rx * TUNE.tirailleurs.pas, ly = -F.ry * TUNE.tirailleurs.pas, k = dist > 0 ? 1 : -1;
   const list = R.ms.map(m => ({ m, tasks: [{ path: [{ x: m.x + lx + F.fx * 0.5 * k, y: m.y + ly + F.fy * 0.5 * k }, { x: m.x + lx + F.fx * (dist - 0.5 * k), y: m.y + ly + F.fy * (dist - 0.5 * k) }, { x: m.x + F.fx * dist, y: m.y + F.fy * dist }], i: 0, keep: true }] }));
   co.sk.moving = true; startAuto([{ list }], false, ORD_SPEED, true);
@@ -2018,11 +2022,16 @@ function updateSkirm(dt) {
     if (!sk.closed) {
       sk.closed = true;
       const Rs = skRanks().sort((p, q) => q.p - p.p);
-      if (Rs.length > 1 && Rs[0].r === 1) for (const m of co.members) m.rank = 1 - m.rank;     // el rengle de davant passa a ser el primer
+      if (Rs.length > 1 && Rs[0].r === 1) { for (const m of co.members) m.rank = 1 - m.rank; co.vp = { 0: Rs[0].p, 1: Rs[1].p }; }     // el rengle de davant passa a ser el primer
       const F = skFrame(), list = [];
+      const R0 = skRanks().find(o => o.r === 0), p0 = R0 ? R0.p : null;                // posició (virtual si cal) del primer rengle
       for (const m of co.members.filter(q => q.rank === 1)) {
-        const f = co.members.find(q => q.rank === 0 && q.file === m.file); if (!f) continue;
-        const tx = f.x - F.fx * RANK_GAP, ty = f.y - F.fy * RANK_GAP; if (Math.hypot(tx - m.x, ty - m.y) < 0.05) continue;
+        const f = co.members.find(q => q.rank === 0 && q.file === m.file);
+        let tx, ty;
+        if (f) { tx = f.x - F.fx * RANK_GAP; ty = f.y - F.fy * RANK_GAP; }
+        else if (p0 !== null) { const d = p0 - RANK_GAP - (m.x * F.fx + m.y * F.fy); tx = m.x + F.fx * d; ty = m.y + F.fy * d; }      // el del davant ha mort: el seu lloc és imaginari, es queda al seu lloc
+        else continue;
+        if (Math.hypot(tx - m.x, ty - m.y) < 0.05) continue;
         list.push({ m, tasks: [{ path: [{ x: tx, y: ty }], i: 0, keep: true }] });
       }
       if (list.length) { startAuto([{ list }], false, ORD_SPEED, true); return; }
@@ -2076,7 +2085,7 @@ function updateGuns(dt) {
     const tx = g.x + ux * along - uy * lat, ty = g.y + uy * along + ux * lat, L = Math.hypot(tx - g.x, ty - g.y);
     BALLS.push({ ox: g.x, oy: g.y, dx: (tx - g.x) / L, dy: (ty - g.y) / L, s: 1.2, v: A.vel, graze: L - 8, end: L + A.rebot, kills: 0 });
     FX.push({ k: 'shot', x: g.x + Math.cos(g.h) * 1.9, y: g.y + Math.sin(g.h) * 1.9, a: g.h, t: -0.001, big: true });
-    SFX.cannon(); g.reload = A.recarrega; g.aimT = 0;
+    SFX.cannon(); g.reload = g.rt || A.recarrega; g.aimT = 0;
   }
 }
 function drawGuns() {
@@ -3859,7 +3868,7 @@ let autoStepT = 0;
 const VOICE = { on: false, rec: null, running: false, tested: false, seg: {}, interim: '', state: '', failT: 0, lastFail: null,
   learn: { phr: {}, ex: {} }, shared: { phr: {}, ex: {} }, opt: { mode: 'cont', vol: true, log: false, tele: true, engine: '' }, log: [], recentExec: null, ptt: false, db: false, loading: false };
 // Connexió amb Supabase (la mateixa de la web: si el joc s'obre dins la web, agafa window.APP_CONFIG) i fonts del motor local Vosk
-const GAME_VERSION = '1.4.19';
+const GAME_VERSION = '1.4.20';
 const CFG = Object.assign({
   SUPABASE_URL: 'https://ltopullwhasagnkuqaek.supabase.co',
   SUPABASE_ANON_KEY: 'sb_publishable_DhHFUh-UrbBrI0l476Vcnw_tSn-Gmkr',
@@ -5080,22 +5089,22 @@ function buildLevel7() {
 }
 
 function buildLevel8() {
-  const A = MapKit.A, sc = [], W = 130, H = 70, STEP_M = STEP;
-  const ZONE = { x0: 60, y0: 28, x1: 67, y1: 48, label: 'LÍNIA DE FOC' };
+  const A = MapKit.A, sc = [], W = 110, H = 60, STEP_M = STEP;
+  const ZONE = { x0: 40, y0: 20, x1: 47, y1: 40, label: 'LÍNIA DE FOC' };
   sc.push(
     A.field([[0, 0], [W, 0], [W, H], [0, H]], { kind: 'meadow' }),
-    A.road([[0, 38], [50, 38], [90, 36], [W, 36]], { kind: 'track' }),
+    A.road([[0, 30], [40, 30], [75, 28], [W, 28]], { kind: 'track' }),
     A.wood([[2, 4], [24, 3], [26, 18], [4, 20]], { kind: 'mixed', spacing: 3.2, seed: 91 }),
-    A.wood([[4, 54], [26, 53], [28, 67], [6, 68]], { kind: 'broad', spacing: 3.2, seed: 92 }),
-    A.fence([[40, 20], [40, 30]]), A.fence([[40, 46], [40, 56]]),
-    A.label('Columna francesa', 10, 33, { kind: 'place', scale: 0.5 }), A.label('Cresta austríaca', 112, 14, { kind: 'town', scale: 0.5 })
+    A.wood([[4, 44], [26, 43], [28, 57], [6, 58]], { kind: 'broad', spacing: 3.2, seed: 92 }),
+    A.fence([[30, 8], [30, 18]]), A.fence([[30, 40], [30, 50]]),
+    A.label('Columna francesa', 10, 24, { kind: 'place', scale: 0.5 }), A.label('Cresta austríaca', 92, 10, { kind: 'town', scale: 0.5 })
   );
-  const col = { name: 'Columna', cx: 4, cy: 38, h: 0, rows: 8, cols: 6 };
+  const col = { name: 'Columna', cx: 4, cy: 30, h: 0, rows: 8, cols: 6 };
   const st = { spawned: false, pre: false };
   const ex = () => ENEMY[0], rf = () => ENEMY[1];
   const ux = () => unitCentre().x, inZone = () => { const c = unitCentre(); return c.x >= ZONE.x0 && c.x <= ZONE.x1 && c.y >= ZONE.y0 && c.y <= ZONE.y1; };
   const supp = e => e && !e.routed && (e.supp || 0) >= 0.2;
-  const advDone = () => col.cx >= 74, retDone = () => st.spawned && col.cx <= 22 && ux() <= 60;
+  const advDone = () => col.cx >= 58, retDone = () => st.spawned && col.cx <= 12 && ux() <= 46;
   const ALL = ['gir', 'mov', 'pace', 'parfile', 'bataille', 'align', 'obl', 'conv', 'tournez', 'ligne', 'form', 'repos'];
   const stepsHint = () => !co.sk ? 'Tiradors → <b>Feu en avançant</b>' : '';
   const steps = [
@@ -5116,14 +5125,14 @@ function buildLevel8() {
       resetStep: () => 1, done: () => co.state === 'parat' && inZone() },
     { title: 'La columna avança', pose: 'serios', tag: 'Foc en avançant', hl: [], unlock: ['skirm'], btn: 'Endavant', ack: true,
       text: ['Aquí tens el truc: la <b>columna només avança mentre l\'enemic està arraulit</b>, i el que l\'arrauleix és el nostre foc.',
-        'Dóna <b>Tiradors → Feu en avançant</b> (triaràs els passos de cada salt). Cada cop que premis <b>Avancez!</b> (o espai), un rengle salta endavant els passos triats, passant per l\'esquerra de l\'altre, i dispara. Si es queden sense carregar, esperen. Més passos = més terreny; menys passos = foc més continu.'],
+        'Dóna <b>Tiradors → Feu en avançant</b> (triaràs els passos de cada salt: <b>10 o més</b> t\'estalvien pulsacions). Cada cop que premis <b>Avancez!</b> (o espai), un rengle salta endavant els passos triats, passant per l\'esquerra de l\'altre, i dispara. Si es queden sense carregar, esperen. Més passos = més terreny; menys passos = foc més continu.'],
       done() { return !!this.acked; } },
     { title: 'Cobreix l\'avanç', pose: 'assenyala', unlock: ['skirm'], hl: [],
       mini: () => !co.sk ? 'Tiradors → <b>Feu en avançant</b>, i prem <b>Avancez!</b> per fer saltar els rengles.' : supp(ex()) ? 'L\'enemic està arraulit: <b>la columna avança</b>. Continua amb <b>Avancez!</b>.' : 'La columna espera: fes més foc perquè l\'enemic s\'arrauleixi.',
       resetStep: () => 1, done: () => advDone() },
     { title: 'Reforç austríac', pose: 'serios', tag: 'Foc en reculant', hl: [], unlock: ['skirm'], btn: 'Entesos', ack: true,
       text: ['<b>Atenció!</b> La columna ha arribat, però ens ha sortit un <b>nou regiment austríac</b> pel davant. Ordre de <b>retirada</b>: la columna recula mentre l\'enemic estigui arraulit.',
-        'Acaba amb <b>Roulement</b> si cal, i dóna <b>Tiradors → Feu en reculant</b>. Amb <b>Reculez!</b> el rengle de davant dispara i es retira per darrere de l\'altre. Porta els tiradors <b>fora de l\'abast</b> (cap a la línia vermella) i la columna fins a la sortida.'],
+        'Acaba amb <b>Roulement</b> si cal, i dóna <b>Tiradors → Feu en reculant</b>. Amb <b>Reculez!</b> el rengle de davant dispara i es retira per darrere de l\'altre. Porta els tiradors fins a la <b>línia de retirada</b> i la columna fins al seu punt de partida. Mentre l\'enemic estigui a tret, <b>pots seguir disparant-li</b>.'],
       done() { return !!this.acked; } },
     { title: 'Cobreix la retirada', pose: 'assenyala', unlock: ['skirm'], hl: [], tag: 'Retirada',
       mini: () => !co.sk ? 'Tiradors → <b>Feu en reculant</b>, i prem <b>Reculez!</b>.' : supp(rf()) ? 'L\'enemic està arraulit: <b>la columna es retira</b>. Continua amb <b>Reculez!</b>.' : 'La columna espera: fes més foc al nou regiment.',
@@ -5131,20 +5140,20 @@ function buildLevel8() {
     { title: 'Retirada ben coberta', pose: 'aprova', unlock: ['skirm'], hl: [], mini: 'La columna és a salvo, chasseur!', done: () => false }
   ];
   const build = {
-    w: W, h: H, start: { x: 10, y: 38 }, obstacles: [], scene: MapKit.scene(sc), get zone() { return TUT.step === 4 ? ZONE : null; }, musket: true, skirm: true, driftScale: 0.5, goalHeading: 0, minMen: 8, cover: [],
+    w: W, h: H, start: { x: 10, y: 30 }, obstacles: [], scene: MapKit.scene(sc), get zone() { return TUT.step === 4 ? ZONE : TUT.step === 8 ? { x0: 34, y0: 20, x1: 46, y1: 40, label: 'LÍNIA DE RETIRADA' } : null; }, musket: true, skirm: true, driftScale: 0.5, goalHeading: 0, minMen: 6, cover: [],
     column: col,
-    enemies: [{ name: 'Regiment austríac', flag: 'aut', cx: 112, cy: 38, h: Math.PI, shoots: true, alert: true }],
-    guns: [{ x: 117, y: 30, h: Math.PI, name: 'Bateria austríaca' }],
+    enemies: [{ name: 'Regiment austríac', flag: 'aut', cx: 92, cy: 30, h: Math.PI, shoots: true, alert: true }],
+    guns: [{ x: 97, y: 30, h: Math.PI, name: 'Bateria austríaca', rt: 22, reload: 10 }],
     tutorial: { steps, figs: [], startAtencio: true, resetStep: () => 1 },
     onReset() { col.cx = 4; st.spawned = false; if (ENEMY[1]) ENEMY.length = 1; },
     tick(dt) {
       if (screen !== 'game' || paused || tutOpen() || co.lost) return;
-      if (TUT.step >= 6 && TUT.step < 7 && supp(ex()) && col.cx < ux() - 10 && col.cx < 74) col.cx += 1.5 * dt;           // la columna avança si l'enemic està arraulit
+      if (TUT.step >= 6 && TUT.step < 7 && supp(ex()) && col.cx < ux() - 10 && col.cx < 58) col.cx += 3 * dt;           // la columna avança si l'enemic està arraulit
       if (TUT.step >= 7 && !st.spawned) {                                                                                     // el reforç austríac
         st.spawned = true; if (ENEMY[0] && !ENEMY[0].routed) { routEnemy(ENEMY[0]); }
-        const d = buildEnemy({ name: 'Reforç austríac', flag: 'aut', cx: 108, cy: 40, h: Math.PI, shoots: true, alert: true }); d.reload = 3; ENEMY.push(d);
+        const d = buildEnemy({ name: 'Reforç austríac', flag: 'aut', cx: 88, cy: 34, h: Math.PI, shoots: true, alert: true }); d.reload = 3; ENEMY.push(d);
       }
-      if (TUT.step >= 8 && supp(rf()) && col.cx > 22) col.cx -= 1.5 * dt;                                                     // la columna es retira
+      if (TUT.step >= 8 && supp(rf()) && col.cx > 12) col.cx -= 3 * dt;                                                     // la columna es retira
     },
     win: () => TUT.step >= 8 && retDone(),
     objectives: [
@@ -5152,9 +5161,9 @@ function buildLevel8() {
       { t: 'Obrir les files en tiradors', ok: () => TUT.step >= 5 },
       { t: 'Cobrir l\'avanç de la columna', ok: () => TUT.step >= 7 },
       { t: 'Cobrir-ne la retirada', ok: () => retDone() },
-      { t: 'Aguantar amb almenys 8 homes', ok: () => co.members.length >= 8 && retDone() }
+      { t: 'Aguantar amb almenys 6 homes', ok: () => co.members.length >= 6 && retDone() }
     ],
-    goalText: 'Obre files, cobreix l\'avanç de la columna amb el foc en avançant i la seva retirada amb el foc en reculant; no baixis de 8 homes.',
+    goalText: 'Obre files, cobreix l\'avanç de la columna amb el foc en avançant i la seva retirada amb el foc en reculant; no baixis de 6 homes.',
     endText: 'Molt bé, chasseur: has travessat la plana en rang obert, has cobert l\'avanç de la columna i n\'has protegit la retirada.'
   };
   return build;
