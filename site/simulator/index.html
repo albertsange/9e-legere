@@ -2012,7 +2012,7 @@ function manShot(m, delay, wide) {                // un tret apuntat d'un tirado
   if (!best) return null;
   best.e.supp = Math.min(1, (best.e.supp || 0) + T.supTret);
   const acc = (T.punteria[0] + (T.punteria[1] - T.punteria[0]) * best.u / T.abast) * (wide ? T.apuntat : 1);
-  if (Math.random() < acc * (best.v.rank ? 0.6 : 1)) setTimeout(() => { if (best.v.alive) killEnemy(best.v, best.e); }, delay * 1000 + 60);
+  if (Math.random() < acc * (best.v.rank ? 0.6 : 1) && !(level && level.keepMin && best.e === ENEMY[0] && enAlive(best.e) <= level.keepMin)) setTimeout(() => { if (best.v.alive) killEnemy(best.v, best.e); }, delay * 1000 + 60);
   return best.e;
 }
 function skRanks() {                              // els rengles, amb la posició mitjana cap endavant
@@ -2040,7 +2040,7 @@ function skPickOpen(o, arg) {                     // l'ordre no s'executa fins q
   const pk = document.getElementById('skPick'); pk.querySelector('.t').textContent = SKPICK_T[o.pk]; SKPICK.upd(); pk.classList.add('open');
 }
 function skGo() { const sk = co.sk; if (sk && (sk.mode === 'avant' || sk.mode === 'arriere') && !sk.end && !sk.go && co.state !== 'auto' && !tutLocked()) { sk.go = true; return true; } return false; }
-function skVolley(R) { let i = 0; for (const m of R.ms) if (m.sh && manShot(m, i * 0.05 + Math.random() * 0.35, true)) i++; if (i) SFX.rumble(0.05, 1.2); }   // cadascú apunta al seu enemic; qui no en té cap a l'abast, no dispara
+function skVolley(R) { co.lastShot = performance.now(); for (const g of GUNS) g.mute = 7; let i = 0; for (const m of R.ms) if (m.sh && manShot(m, i * 0.05 + Math.random() * 0.35, true)) i++; if (i) SFX.rumble(0.05, 1.2); }   // cadascú apunta al seu enemic; qui no en té cap a l'abast, no dispara
 function updateSkirm(dt) {
   if (!co.sk) return;
   const sk = co.sk;
@@ -3918,7 +3918,7 @@ let autoStepT = 0;
 const VOICE = { on: false, rec: null, running: false, tested: false, seg: {}, interim: '', state: '', failT: 0, lastFail: null,
   learn: { phr: {}, ex: {} }, shared: { phr: {}, ex: {} }, opt: { mode: 'cont', vol: true, log: false, tele: true, engine: '' }, log: [], recentExec: null, ptt: false, db: false, loading: false };
 // Connexió amb Supabase (la mateixa de la web: si el joc s'obre dins la web, agafa window.APP_CONFIG) i fonts del motor local Vosk
-const GAME_VERSION = '1.4.28';
+const GAME_VERSION = '1.4.29';
 const CFG = Object.assign({
   SUPABASE_URL: 'https://ltopullwhasagnkuqaek.supabase.co',
   SUPABASE_ANON_KEY: 'sb_publishable_DhHFUh-UrbBrI0l476Vcnw_tSn-Gmkr',
@@ -5200,7 +5200,7 @@ function buildLevel8() {
     { title: 'Retirada ben coberta', pose: 'aprova', unlock: ['skirm'], hl: [], mini: 'La columna és a salvo, chasseur!', done: () => false }
   ];
   const build = {
-    w: W, h: H, start: { x: 18, y: 30 }, obstacles: [], scene: MapKit.scene(sc), get zone() { return TUT.step === 12 ? { x0: 20, y0: 20, x1: 36, y1: 40, label: 'LÍNIA DE RETIRADA' } : null; }, musket: true, skirm: true, driftScale: 0.5, goalHeading: 0, minMen: 6, cover: [],
+    w: W, h: H, start: { x: 18, y: 30 }, obstacles: [], scene: MapKit.scene(sc), get zone() { return TUT.step === 12 ? { x0: 20, y0: 20, x1: 36, y1: 40, label: 'LÍNIA DE RETIRADA' } : null; }, musket: true, skirm: true, driftScale: 0.5, goalHeading: 0, minMen: 6, cover: [], keepMin: 24,
     column: col,
     enemies: [{ name: 'Regiment austríac', flag: 'aut', cx: 66, cy: 30, h: Math.PI, shoots: true, alert: true, nFiles: 20 }],
     guns: [],
