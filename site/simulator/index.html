@@ -3918,7 +3918,7 @@ let autoStepT = 0;
 const VOICE = { on: false, rec: null, running: false, tested: false, seg: {}, interim: '', state: '', failT: 0, lastFail: null,
   learn: { phr: {}, ex: {} }, shared: { phr: {}, ex: {} }, opt: { mode: 'cont', vol: true, log: false, tele: true, engine: '' }, log: [], recentExec: null, ptt: false, db: false, loading: false };
 // Connexió amb Supabase (la mateixa de la web: si el joc s'obre dins la web, agafa window.APP_CONFIG) i fonts del motor local Vosk
-const GAME_VERSION = '1.4.27';
+const GAME_VERSION = '1.4.28';
 const CFG = Object.assign({
   SUPABASE_URL: 'https://ltopullwhasagnkuqaek.supabase.co',
   SUPABASE_ANON_KEY: 'sb_publishable_DhHFUh-UrbBrI0l476Vcnw_tSn-Gmkr',
@@ -5160,7 +5160,7 @@ function buildLevel8() {
   const steps = [
     { title: 'Els tiradors', pose: 'serios', hl: [], unlock: ALL, tag: 'Benvinguda', intro: true, btn: 'Som-hi',
       text: ['<b>Chasseur</b>, avui som els <b>tiradors</b> de la columna. Al mig del camp hi ha un <b>regiment austríac</b> de 40 homes. La columna ens segueix per darrere.',
-        'El pla: <b>obrim files</b>, avancem <b>disparant</b> perquè els austríacs abaixin el cap i no puguin disparar, i la columna ens segueix. Quan siguem al mig del camp farem lloc perquè la columna els dispari. Després vindran els canons.'],
+        'El pla: <b>obrim files</b>, avancem <b>disparant</b> per anar abatent austríacs, que no gosaran disparar-nos, i la columna ens segueix. La línia austríaca es queda quieta; només es retirarà quan la columna els faci una descàrrega. Quan sigui a tret, farem lloc perquè dispari. Després vindran els canons.'],
       done: () => TUT.intro },
     { title: 'Carregar', pose: 'assenyala', unlock: ['musket'], mini: 'Dóna <b>Mosquet → Chargez</b> i espera que tots els rellotges es posin en verd.',
       get hl() { return co.loaded ? [] : ['chargez']; }, cue: () => co.loaded || co.arm === 'charge' ? '' : 'Mosquet → Chargez!', done: () => co.loaded },
@@ -5170,11 +5170,11 @@ function buildLevel8() {
     { title: 'En tirailleurs', pose: 'assenyala', unlock: ['skirm'], hl: [], mini: () => co.state !== 'parat' || busy() ? 'Espera que acabin de moure\'s…' : 'Tiradors → <b>En tirailleurs → centre</b>, amb 3 passos o més, i <b>Executar</b>.',
       done: () => !!co.open && co.open >= 3 * STEP - 0.01 && co.state === 'parat' && !busy() },
     { title: 'Avançar disparant', pose: 'serios', tag: 'Foc en avançant', hl: [], unlock: ['skirm'], btn: 'Endavant', ack: true,
-      text: ['Dóna <b>Tiradors → Feu en avançant</b> (tria <b>10 passos</b> o més per salt). Cada cop que premis <b>Avancez!</b> (o espai) un rengle salta endavant i dispara. Si els austríacs reben prou foc, <b>ja no gosen disparar</b> i van reculant poc a poc.',
+      text: ['Dóna <b>Tiradors → Feu en avançant</b> (tria <b>4 o 5 passos</b> per salt). Cada cop que premis <b>Avancez!</b> (o espai) un rengle salta endavant i dispara. Els austríacs reben el foc i <b>no gosen disparar</b>, però <b>no es mouen</b>: cada salt n'abat uns quants.',
         'La columna et seguirà per darrere, al pas normal. <b>Objectiu:</b> arribar amb ella a la línia <b>MIG DEL CAMP</b>.'],
       done() { return !!this.acked; } },
     { title: 'Cobreix l\'avanç', pose: 'assenyala', unlock: ['skirm'], hl: [],
-      mini: () => !co.sk ? 'Tiradors → <b>Feu en avançant</b>, i prem <b>Avancez!</b> per fer saltar els rengles.' : 'Continua amb <b>Avancez!</b>. La columna et segueix: ' + Math.round(100 * (col.cx - col.home) / (col.goal - col.home)) + ' % del camí.',
+      mini: () => !co.sk ? 'Tiradors → <b>Feu en avançant</b>, i prem <b>Avancez!</b> per fer saltar els rengles.' : 'Continua amb <b>Avancez!</b> (austríacs: ' + enAlive(ex()) + '). La columna et segueix: ' + Math.round(100 * (col.cx - col.home) / (col.goal - col.home)) + ' % del camí.',
       resetStep: () => 1, done: () => advDone() },
     { title: 'Deixa pas a la columna', pose: 'serios', tag: 'Serrez les files', hl: [], unlock: ['skirm'], btn: 'Entesos', ack: true,
       text: ['Som al mig del camp. Ara la columna ha de poder <b>disparar als austríacs</b>, i nosaltres som al mig.',
@@ -5210,7 +5210,6 @@ function buildLevel8() {
       if (screen !== 'game' || paused || tutOpen() || co.lost) return;
       const e = ex(), recent = performance.now() - (co.lastShot || 0) < 12000;
       if (e && !e.routed) e.supp = Math.max(e.supp || 0, 0.6);                                                               // el regiment és immobilitzat pel foc: no dispara
-      if (TUT.step >= 5 && TUT.step < 8 && e && e.cx < 92 && (recent || TUT.step === 5)) moveEnemy(e, 0.5 * dt);              // reculen poc a poc mentre els disparem
       if (TUT.step >= 5 && TUT.step < 8 && col.cx < Math.min(col.goal, ux() - 10)) col.cx = Math.min(col.goal, Math.min(ux() - 10, col.cx + 0.8 * dt));   // la columna segueix la línia, al pas normal
       if (TUT.step >= 9 && !st.cvol) {                                                                                           // la columna dispara
         st.cvol = true; st.t = 0;
