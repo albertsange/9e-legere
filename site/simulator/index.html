@@ -1821,7 +1821,13 @@ function drawColumn() {                          // columna amiga (nivell 8): bl
     ctx.beginPath(); ctx.arc(x, y, rS, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
   }
   ctx.fillStyle = '#1f3a78'; ctx.font = '600 ' + Math.max(10, 0.9 * M) + 'px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
-  ctx.fillText(k.name, (k.cx - (k.rows * 0.6) / 2) * M, (k.cy - k.cols * FRONT / 2 - 0.5) * M);
+  const pr = k.goal ? Math.max(0, Math.min(100, Math.round(100 * (k.cx - k.home) / (k.goal - k.home)))) : 0;
+  ctx.fillText(k.name + (k.goal ? ' · ' + pr + ' %' : ''), (k.cx - (k.rows * 0.6) / 2) * M, (k.cy - k.cols * FRONT / 2 - 0.5) * M);
+  if (k.goal) {                                // línies de la columna: objectiu (dalt) i punt de partida
+    ctx.save(); ctx.setLineDash([0.8 * M, 0.5 * M]); ctx.lineWidth = Math.max(2, 0.14 * M); ctx.strokeStyle = '#1f3a78'; ctx.fillStyle = '#1f3a78'; ctx.textBaseline = 'bottom';
+    for (const [x, t] of [[k.goal, 'OBJECTIU DE LA COLUMNA'], [k.home + 6, 'PUNT DE PARTIDA']]) { ctx.beginPath(); ctx.moveTo(x * M, (k.cy - 7) * M); ctx.lineTo(x * M, (k.cy + 7) * M); ctx.stroke(); ctx.setLineDash([]); ctx.fillText(t, x * M, (k.cy - 7.3) * M); ctx.setLineDash([0.8 * M, 0.5 * M]); }
+    ctx.restore();
+  }
 }
 function drawEnemies() {
   const rS = Math.max(1.8, 0.2 * M);
@@ -2074,7 +2080,6 @@ function updateSkirm(dt) {
     if (mover.ms.some(m => !m.sh)) return;                                                         // espera que el rengle estigui carregat
     sk.go = false;
     const target = (sk.step === 0 || Rs.length === 1 ? mover.p : Rs[0].p) + D;
-    if (skTooClose(mover, target - mover.p)) { const fr = Rs[0]; if (fr.ms.length && !fr.ms.some(m => !m.sh)) skVolley(fr); reac('assenyala', '<b>Louis:</b> Prou, chasseur! Els tiradors no s\'acosten a menys de <b>' + TUNE.tirailleurs.minDist + ' m</b> d\'una línia formada: ens carregarien a la baioneta. Ens quedem aquí i <b>Avancez!</b> només fa disparar el rengle de davant.', 5000); return; }
     sk.lastR = mover.r; skBound(mover, target - mover.p);
   } else {                                                                                         // reculant: dispara el de davant i es retira
     const front = Rs[0];
@@ -3911,7 +3916,7 @@ let autoStepT = 0;
 const VOICE = { on: false, rec: null, running: false, tested: false, seg: {}, interim: '', state: '', failT: 0, lastFail: null,
   learn: { phr: {}, ex: {} }, shared: { phr: {}, ex: {} }, opt: { mode: 'cont', vol: true, log: false, tele: true, engine: '' }, log: [], recentExec: null, ptt: false, db: false, loading: false };
 // Connexió amb Supabase (la mateixa de la web: si el joc s'obre dins la web, agafa window.APP_CONFIG) i fonts del motor local Vosk
-const GAME_VERSION = '1.4.25';
+const GAME_VERSION = '1.4.26';
 const CFG = Object.assign({
   SUPABASE_URL: 'https://ltopullwhasagnkuqaek.supabase.co',
   SUPABASE_ANON_KEY: 'sb_publishable_DhHFUh-UrbBrI0l476Vcnw_tSn-Gmkr',
@@ -5142,12 +5147,12 @@ function buildLevel8() {
     A.fence([[30, 8], [30, 18]]), A.fence([[30, 40], [30, 50]]),
     A.label('Columna francesa', 10, 24, { kind: 'place', scale: 0.5 }), A.label('Cresta austríaca', 92, 10, { kind: 'town', scale: 0.5 })
   );
-  const col = { name: 'Columna', cx: 4, cy: 30, h: 0, rows: 8, cols: 6 };
+  const col = { name: 'Columna', cx: 4, cy: 30, h: 0, rows: 8, cols: 6, goal: 50, home: 4 };
   const st = { spawned: false, pre: false };
   const ex = () => ENEMY[0], rf = () => ENEMY[1];
   const ux = () => unitCentre().x, inZone = () => { const c = unitCentre(); return c.x >= ZONE.x0 && c.x <= ZONE.x1 && c.y >= ZONE.y0 && c.y <= ZONE.y1; };
   const supp = e => e && !e.routed && (e.supp || 0) >= 0.2;
-  const advDone = () => col.cx >= 50, retDone = () => st.spawned && col.cx <= 12 && ux() <= 46;
+  const advDone = () => col.cx >= col.goal, retDone = () => st.spawned && col.cx <= 12 && ux() <= 46;
   const ALL = ['gir', 'mov', 'pace', 'parfile', 'bataille', 'align', 'obl', 'conv', 'tournez', 'ligne', 'form', 'repos'];
   const stepsHint = () => !co.sk ? 'Tiradors → <b>Feu en avançant</b>' : '';
   const steps = [
@@ -5168,10 +5173,10 @@ function buildLevel8() {
       resetStep: () => 1, done: () => co.state === 'parat' && inZone() },
     { title: 'La columna avança', pose: 'serios', tag: 'Foc en avançant', hl: [], unlock: ['skirm'], btn: 'Endavant', ack: true,
       text: ['Aquí tens el truc: la <b>columna només avança mentre l\'enemic està sota pressió</b>. Cada bala nostra que li passa a prop li fa abaixar el cap i li puja la <b>barra de pressió</b> que veuràs sobre el regiment; si no hi disparem, baixa sola. Passada la <b>primera marca</b>, la columna avança; passada la <b>segona</b>, l\'enemic ja no gosa disparar.',
-        'Dóna <b>Tiradors → Feu en avançant</b> (triaràs els passos de cada salt: <b>10 o més</b> t\'estalvien pulsacions). Cada cop que premis <b>Avancez!</b> (o espai), un rengle salta endavant els passos triats, passant per l\'esquerra de l\'altre, i dispara. Si es queden sense carregar, esperen. Més passos = més terreny; menys passos = foc més continu.'],
+        'Dóna <b>Tiradors → Feu en avançant</b> (triaràs els passos de cada salt: <b>10 o més</b> t\'estalvien pulsacions). Cada cop que premis <b>Avancez!</b> (o espai), un rengle salta endavant els passos triats, passant per l\'esquerra de l\'altre, i dispara. <b>Objectiu:</b> que la columna arribi a la línia blava <b>OBJECTIU DE LA COLUMNA</b>. Si es queden sense carregar, esperen. Més passos = més terreny; menys passos = foc més continu.'],
       done() { return !!this.acked; } },
     { title: 'Cobreix l\'avanç', pose: 'assenyala', unlock: ['skirm'], hl: [],
-      mini: () => !co.sk ? 'Tiradors → <b>Feu en avançant</b>, i prem <b>Avancez!</b> per fer saltar els rengles.' : supp(ex()) && col.cx >= ux() - 6 ? 'La columna s\'atura darrere els tiradors: fes-los avançar més amb <b>Avancez!</b>.' : supp(ex()) ? 'L\'enemic està sota pressió: <b>la columna avança</b>. Continua amb <b>Avancez!</b>.' : 'La columna espera: la pressió sobre l\'enemic és massa baixa. Fes-li més foc (mira la barra de sobre el regiment).',
+      mini: () => !co.sk ? 'Tiradors → <b>Feu en avançant</b>, i prem <b>Avancez!</b> per fer saltar els rengles.' : supp(ex()) ? 'L\'enemic està sota pressió: <b>la columna avança</b>. Continua amb <b>Avancez!</b>.' : 'La columna espera: la pressió sobre l\'enemic és massa baixa. Fes-li més foc (mira la barra de sobre el regiment).',
       resetStep: () => 1, done: () => advDone() },
     { title: 'Reforç austríac', pose: 'serios', tag: 'Foc en reculant', hl: [], unlock: ['skirm'], btn: 'Entesos', ack: true,
       text: ['<b>Atenció!</b> La columna ha arribat, però ens ha sortit un <b>nou regiment austríac</b> pel davant. Ordre de <b>retirada</b>: la columna recula mentre l\'enemic estigui sota pressió.',
@@ -5191,7 +5196,7 @@ function buildLevel8() {
     onReset() { col.cx = 4; st.spawned = false; if (ENEMY[1]) ENEMY.length = 1; },
     tick(dt) {
       if (screen !== 'game' || paused || tutOpen() || co.lost) return;
-      if (TUT.step >= 6 && TUT.step < 7 && supp(ex()) && col.cx < ux() - 6 && col.cx < 50) col.cx += 3 * dt;           // la columna avança si l'enemic està arraulit
+      if (TUT.step >= 6 && TUT.step < 7 && supp(ex()) && col.cx < col.goal) col.cx += 3 * dt;           // la columna avança si l'enemic està arraulit
       if (TUT.step >= 7 && !st.spawned) {                                                                                     // el reforç austríac
         st.spawned = true; if (ENEMY[0] && !ENEMY[0].routed) { routEnemy(ENEMY[0]); }
         const d = buildEnemy({ name: 'Reforç austríac', flag: 'aut', cx: 88, cy: 34, h: Math.PI, shoots: true, alert: true }); d.reload = 3; ENEMY.push(d);
