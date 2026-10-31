@@ -1127,8 +1127,8 @@ const TUNE = {
               rengle1: 1.4, rengle2: 0.4,     // multiplicador de la probabilitat de caure: el primer rengle rep molt més que el segon
               oblic: Math.PI / 4,             // angle del foc oblic (TF-02)
               enOberta: 0.14,                 // semiobertura de la franja d'un regiment enemic (±8°)
-              enAvis: 2.5,                    // segons que triga un regiment a disparar-nos un cop som davant seu
-              enRecarrega: 20,                // segons entre les seves descàrregues
+              enAvis: 5,                    // segons que triga un regiment a disparar-nos un cop som davant seu
+              enRecarrega: 32,                // segons entre les seves descàrregues
               enPunteria: 0.45,               // la punteria dels austríacs, respecte a la nostra
               enAlerta: 30,                   // a aquesta distància (si ens veuen) es giren cap a nosaltres
               enGir: 0.17 }                   // velocitat de gir d'un regiment enemic (rad/s, ~10°/s)
@@ -3473,7 +3473,7 @@ function drawLevel(ctx, M, mini) {
   ctx.strokeRect(z.x0 * M, z.y0 * M, (z.x1 - z.x0) * M, (z.y1 - z.y0) * M);
   ctx.setLineDash([]);
   ctx.fillStyle = T.ecarlate; ctx.font = '700 14px "Alegreya Sans SC", sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'bottom';
-  if (!mini) ctx.fillText('ZONA DE FORMACIÓ', z.x0 * M + 4, z.y0 * M - 4);
+  if (!mini) ctx.fillText(z.label || 'ZONA DE FORMACIÓ', z.x0 * M + 4, z.y0 * M - 4);
   }
   const e = level.enemy;
   if (e) for (let k = 0; k < 2; k++) for (let i = 0; i < e.files; i++) {
@@ -3585,7 +3585,7 @@ let autoStepT = 0;
 const VOICE = { on: false, rec: null, running: false, tested: false, seg: {}, interim: '', state: '', failT: 0, lastFail: null,
   learn: { phr: {}, ex: {} }, shared: { phr: {}, ex: {} }, opt: { mode: 'cont', vol: true, log: false, tele: true, engine: '' }, log: [], recentExec: null, ptt: false, db: false, loading: false };
 // Connexió amb Supabase (la mateixa de la web: si el joc s'obre dins la web, agafa window.APP_CONFIG) i fonts del motor local Vosk
-const GAME_VERSION = '1.4.15';
+const GAME_VERSION = '1.4.16';
 const CFG = Object.assign({
   SUPABASE_URL: 'https://ltopullwhasagnkuqaek.supabase.co',
   SUPABASE_ANON_KEY: 'sb_publishable_DhHFUh-UrbBrI0l476Vcnw_tSn-Gmkr',
@@ -4718,19 +4718,21 @@ function buildLevel7() {
   const A = MapKit.A, sc = [], obs = [];
   const W = 84, H = 56, R = TUNE.mosquet.abast, OB = TUNE.mosquet.oblic;
   const RA = { x: 34, y: 24 }, RB = { x: 72, y: 40 };                       // 1r regiment (nord, en oblic) i 2n (al final del camí, de cara)
-  const bosquet = A.wood([[38, 25], [50, 24], [52, 33], [40, 36]], { kind: 'broad', spacing: 2.6, seed: 74 });
+  const bosquet = A.wood([[36, 29], [46, 28], [48, 40], [37, 41]], { kind: 'broad', spacing: 1.9, seed: 74 });
+  const bosc4 = A.wood([[52, 44], [62, 43], [63, 53], [53, 54]], { kind: 'broad', spacing: 1.9, seed: 77 });
+  const ZONE = { x0: 41, y0: 49, x1: 51, y1: 54.5, label: 'ZONA SEGURA' };
   const bosc2 = A.wood([[2, 4], [20, 3], [22, 16], [4, 18]], { kind: 'mixed', spacing: 3.2, seed: 75 });
   const bosc3 = A.wood([[50, 50], [80, 49], [82, 55], [52, 55]], { kind: 'broad', spacing: 3.4, seed: 76 });
   const arbres = [[14, 37, 1.3], [11, 33, 1.1], [17, 31, 1.2], [56, 30, 1.2], [60, 34, 1.0], [10, 50, 1.2], [18, 52, 1.1]];   // arbres que tapen la vista del 1r regiment des de l'inici
   sc.push(
     A.field([[0, 0], [W, 0], [W, H], [0, H]], { kind: 'meadow' }),
-    A.road([[0, 44], [64, 44], [70, 42]], { kind: 'track' }),
-    bosquet, bosc2, bosc3, ...arbres.map(([x, y, r], i) => A.tree(x, y, { r, seed: 80 + i })),
-    A.fence([[36, 39], [62, 39]]),
-    A.label('Els austríacs', 64, 10, { kind: 'town', scale: 0.5 }), A.label('Le Bosquet', 45, 21, { kind: 'place', scale: 0.5 })
+    A.road([[0, 44], [40, 44], [52, 37], [66, 40]], { kind: 'track' }),
+    bosquet, bosc2, bosc3, bosc4, ...arbres.map(([x, y, r], i) => A.tree(x, y, { r, seed: 80 + i })),
+    A.fence([[22, 38], [32, 38]]),
+    A.label('Els austríacs', 64, 10, { kind: 'town', scale: 0.5 }), A.label('Bosc nord', 41, 26, { kind: 'place', scale: 0.5 }), A.label('Bosc sud', 57, 56, { kind: 'place', scale: 0.5 })
   );
-  obs.push({ x0: 36, y0: 38.6, x1: 62, y1: 39.4, msg: 'Has tocat la tanca: torna-ho a provar' });
-  const cover = [...bosquet.trees, ...bosc2.trees, ...bosc3.trees, ...arbres.map(([x, y, r]) => ({ x, y, r }))];
+  obs.push({ x0: 22, y0: 37.6, x1: 32, y1: 38.4, msg: 'Has tocat la tanca: torna-ho a provar' });
+  const cover = [...bosquet.trees, ...bosc2.trees, ...bosc3.trees, ...bosc4.trees, ...arbres.map(([x, y, r]) => ({ x, y, r }))];
   const cen = i => ({ x: ENEMY[i].cx, y: ENEMY[i].cy });
   const mode = i => (i === 0 ? -1 : 0);                                     // al 1r, oblic a l'esquerra; al 2n, foc recte
   const strip = i => { const h = co.members[0].h, S = fireStrip(); S.a = h + mode(i) * OB; return S; };
@@ -4738,6 +4740,7 @@ function buildLevel7() {
   const rel = i => { const c = unitCentre(), t = cen(i); return Math.abs(wrapA(Math.atan2(t.y - c.y, t.x - c.x) - co.members[0].h)); };
   const dist = i => { const c = unitCentre(), t = cen(i); return Math.round(Math.hypot(t.x - c.x, t.y - c.y)); };
   const shot = i => ENEMY[i] && ENEMY[i].volleys > 0;
+  const inZone = () => { const c = unitCentre(); return c.x >= ZONE.x0 && c.x <= ZONE.x1 && c.y >= ZONE.y0 && c.y <= ZONE.y1; };
   const placeHint = i => {
     const d = dist(i);
     if (i === 0) {
@@ -4769,15 +4772,21 @@ function buildLevel7() {
         'El <b>primer regiment</b> és al nord: avança pel camí fins que quedi a <b>45° a l\'esquerra</b> i fes-li foc en <b>oblique à gauche</b>. Com més a prop, més en cauran; i el primer rengle en rep molt més que el segon.'],
       done() { return !!this.acked; } },
     { title: 'El 1r regiment', pose: 'assenyala', unlock: [], get hl() { return hlFire(0); }, mini: () => fireHint(0), resetStep: () => 3, done: () => shot(0) },
+    { title: 'Zona segura', pose: 'serios', tag: 'Cobertura', hl: [], unlock: [], btn: 'Entesos', ack: true,
+      text: ['<b>Bona descàrrega!</b> Ara el primer regiment es girarà i ens contestarà. No et quedis a camp obert: <b>fuig cap a la zona segura</b>, marcada en vermell al mapa, entre el <b>bosc nord</b> i el <b>bosc sud</b>.',
+        'Allà, els arbres ens tapen: <b>cap dels dos regiments ens pot veure ni disparar</b>. Corre, però vigila: fins que hi arribis, a camp obert et poden tocar.'],
+      done() { return !!this.acked; } },
+    { title: 'Cap a la zona segura', pose: 'assenyala', unlock: [], get hl() { return co.state === 'marxa' ? (inZone() ? ['halte'] : []) : inZone() ? [] : ['avant']; },
+      mini: () => inZone() ? (co.state === 'marxa' ? 'Ja hi ets: <b>Halte!</b>' : 'A cobert!') : 'Entra a la <b>zona segura</b> (marcada en vermell, entre els dos boscos) i fes <b>Halte</b>.', resetStep: () => 3, done: () => co.state === 'parat' && inZone() },
     { title: 'El 2n regiment', pose: 'serios', tag: 'Foc recte', hl: [], unlock: [], btn: 'Endavant', ack: true,
-      text: ['<b>Bona descàrrega!</b> Ara s\'ho pensaran, però no badis: es giraran i et contestaran. <b>Recarrega</b> i fica\'t darrere el <b>bosquet</b>, que et taparà.',
-        'El <b>segon regiment</b> és al final del camí, <b>de cara</b>: avança, atura\'t a tret i fes-li <b>foc recte</b> (<b>Joue → En avant</b>). Quan el rebi, els dos <b>perdran el coratge</b>.'],
+      text: ['Aquí no ens veuen. <b>Recarrega</b> tranquil·lament i, quan estiguis a punt, surt a camp obert: el <b>segon regiment</b> és al final del camí, <b>de cara</b>.',
+        'Avança fins a tenir-lo a tret, atura\'t de cara a ell i fes-li <b>foc recte</b> (<b>Joue → En avant</b>). Quan el rebi, els dos <b>perdran el coratge</b>. Atenció: dispara abans que ells no ho facin!'],
       done() { return !!this.acked; } },
     { title: 'Foc recte', pose: 'assenyala', unlock: [], get hl() { return hlFire(1); }, mini: () => fireHint(1), resetStep: () => 3, done: () => shot(1) },
     { title: 'Fugen!', pose: 'aprova', unlock: [], hl: [], mini: 'Els austríacs fugen corrents!', done: () => false }
   ];
   return {
-    w: W, h: H, start: { x: 6, y: 44 }, obstacles: obs, scene: MapKit.scene(sc), zone: null, musket: true, driftScale: 0.5, goalHeading: 0, minMen: 8, cover,
+    w: W, h: H, start: { x: 6, y: 44 }, obstacles: obs, scene: MapKit.scene(sc), get zone() { return TUT.step === 5 ? ZONE : null; }, musket: true, driftScale: 0.5, goalHeading: 0, minMen: 8, cover,
     enemies: [{ name: '1r Regiment austríac', flag: 'aut', cx: RA.x, cy: RA.y, h: Math.PI / 2, shoots: true }, { name: '2n Regiment austríac', flag: 'aut', cx: RB.x, cy: RB.y, h: Math.PI, shoots: true }],
     tutorial: { steps, figs: [], startAtencio: true, resetStep: () => 3 },
     onVolley() { if (ENEMY.every(e => e.volleys > 0) && !ENEMY.some(e => e.routed)) setTimeout(() => { for (const e of ENEMY) routEnemy(e); SFX.cry(8, 0.08); reac('aprova', 'Els dos regiments han perdut el coratge i <b>fugen corrents</b>!', 4500); }, 1400); },
@@ -4785,10 +4794,11 @@ function buildLevel7() {
     objectives: [
       { t: 'Carregar els mosquets', ok: () => co.loaded || shot(0) || shot(1) || OBJ.done[0] },
       { t: 'Foc oblic contra el 1r regiment', ok: () => shot(0) },
+      { t: 'Anar a la zona segura', ok: () => shot(1) || TUT.step >= 6 },
       { t: 'Foc recte contra el 2n regiment', ok: () => shot(1) },
       { t: 'Aguantar amb almenys 8 homes', ok: () => co.members.length >= 8 && ENEMY.every(e => e.routed) }
     ],
-    goalText: 'Dispara en oblic al 1r regiment i de cara al 2n; cobreix-te amb els arbres i no baixis de 8 homes.',
+    goalText: 'Dispara en oblic al 1r regiment, amaga\'t a la zona segura i dispara de cara al 2n; no baixis de 8 homes.',
     endText: 'Molt bé, chasseur: has disparat primer, en oblic i de cara, i has fet servir el bosquet. Els dos regiments austríacs han fugit.'
   };
 }
