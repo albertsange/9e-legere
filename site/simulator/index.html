@@ -5159,8 +5159,8 @@ function buildLevel8() {
   const ALL = ['gir', 'mov', 'pace', 'parfile', 'bataille', 'align', 'obl', 'conv', 'tournez', 'ligne', 'form', 'repos'];
   const steps = [
     { title: 'Els tiradors', pose: 'serios', hl: [], unlock: ALL, tag: 'Benvinguda', intro: true, btn: 'Som-hi',
-      text: ['<b>Chasseur</b>, avui som els <b>tiradors</b> de la columna. Al mig del camp hi ha un <b>regiment austríac</b> de 40 homes. La columna ens segueix per darrere.',
-        'El pla: <b>obrim files</b>, avancem <b>disparant</b> per anar abatent austríacs, que no gosaran disparar-nos, i la columna ens segueix. La línia austríaca es queda quieta; només es retirarà quan la columna els faci una descàrrega. Quan sigui a tret, farem lloc perquè dispari. Després vindran els canons.'],
+      text: ['<b>Chasseur</b>, avui som els <b>tiradors</b> de la columna. Al mig del camp hi ha un <b>regiment austríac</b> de 40 homes.',
+        'El pla: <b>obrim files</b>, avancem <b>disparant</b> i la columna ens segueix.'],
       done: () => TUT.intro },
     { title: 'Carregar', pose: 'assenyala', unlock: ['musket'], mini: 'Dóna <b>Mosquet → Chargez</b> i espera que tots els rellotges es posin en verd.',
       get hl() { return co.loaded ? [] : ['chargez']; }, cue: () => co.loaded || co.arm === 'charge' ? '' : 'Mosquet → Chargez!', done: () => co.loaded },
