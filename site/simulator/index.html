@@ -221,6 +221,7 @@
   .mrow{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:5px 0;}
   .mrow .lbl{display:flex;flex-direction:column;min-width:0;flex:1 1 170px;}
   .mrow.stack{flex-direction:column;align-items:stretch;gap:4px;}
+  .mrow.tri{display:block;} .mrow.tri>b{display:block;margin-bottom:5px;} .mrow.tri .acts{display:flex;gap:6px;} .mrow.tri .acts .act{flex:1 1 0;justify-content:center;white-space:nowrap;min-width:0;}
   .mrow.pair{display:block;} .mrow.pair .acts{display:flex;gap:6px;} .mrow.pair .acts .act{flex:1 1 0;justify-content:center;}
   .mrow.stack .acts{justify-content:flex-start;}
   .mrow.stack .lbl{flex:none;}
@@ -1160,7 +1161,9 @@ const TUNE = {
               enPunteria: 0.45,               // la punteria dels austríacs, respecte a la nostra
               enAlerta: 30,                   // a aquesta distància (si ens veuen) es giren cap a nosaltres
               enGir: 0.17,                    // velocitat de gir d'un regiment enemic (rad/s, ~10°/s)
-              supTret: 0.12,                  // supressió que afegeix cada tret de tirador que passa a prop d'un regiment
+              supTret: 0.12,                  // (vegeu també apuntat)
+              apuntat: 1.3,                   // en tiradors, «Feu!»: cada home tria el seu enemic i apunta millor (multiplica la punteria)
+                               // supressió que afegeix cada tret de tirador que passa a prop d'un regiment
               supDescarrega: 0.5,             // supressió que afegeix una descàrrega que l'encerta
               supDecau: 0.06,                 // la supressió baixa tant per segon
               supMax: 0.5 },                  // per sobre d'aquesta supressió, el regiment no gosa disparar
@@ -1974,21 +1977,24 @@ function skStart(mode) {
   for (const m of co.members) { m.sh = true; m.rl = false; m.wt = 0.3 + Math.random() * 2.5; }
   co.loaded = false; co.arm = 'sk'; co.fireDir = null; co.sk = { mode, step: 0, end: false, stage: 'fire', wait: 0.6 };
 }
-function manShot(m, delay) {                      // un tret apuntat d'un tirador
-  const T = TUNE.mosquet, a = m.h;
-  FX.push({ k: 'shot', x: m.x + Math.cos(a) * 1.25, y: m.y + Math.sin(a) * 1.25, a, t: -delay }); SFX.shot(delay);
-  m.sh = false; m.rl = true; m.ld = 0; m.ldDur = loadDur(); m.okT = 0;
+function manShot(m, delay, wide) {                // un tret apuntat d'un tirador. «wide»: tria ell mateix l'enemic més proper (±50°); si no en té, no dispara
+  const T = TUNE.mosquet, cone = wide ? 0.9 : 0.17;
   let best = null;
   for (const e of ENEMY) for (const v of e.men) {
     if (!v.alive) continue;
-    const dx = v.x - m.x, dy = v.y - m.y, u = dx * Math.cos(a) + dy * Math.sin(a); if (u <= 0 || u > T.abast) continue;
-    if (Math.abs(wrapA(Math.atan2(dy, dx) - a)) > 0.17 || losBlocked(m.x, m.y, v.x, v.y)) continue;
-    if (!best || u < best.u) best = { e, v, u };
+    const dx = v.x - m.x, dy = v.y - m.y, d = Math.hypot(dx, dy), u = dx * Math.cos(m.h) + dy * Math.sin(m.h); if (u <= 0 || d > T.abast) continue;
+    if (Math.abs(wrapA(Math.atan2(dy, dx) - m.h)) > cone || losBlocked(m.x, m.y, v.x, v.y)) continue;
+    if (!best || d < best.d) best = { e, v, u: d, d };
   }
-  if (!best) return;
+  if (wide && !best) return null;
+  const a = wide ? Math.atan2(best.v.y - m.y, best.v.x - m.x) : m.h;
+  FX.push({ k: 'shot', x: m.x + Math.cos(a) * 1.25, y: m.y + Math.sin(a) * 1.25, a, t: -delay }); SFX.shot(delay);
+  m.sh = false; m.rl = true; m.ld = 0; m.ldDur = loadDur(); m.okT = 0;
+  if (!best) return null;
   best.e.supp = Math.min(1, (best.e.supp || 0) + T.supTret);
-  const acc = T.punteria[0] + (T.punteria[1] - T.punteria[0]) * best.u / T.abast;
+  const acc = (T.punteria[0] + (T.punteria[1] - T.punteria[0]) * best.u / T.abast) * (wide ? T.apuntat : 1);
   if (Math.random() < acc * (best.v.rank ? 0.6 : 1)) setTimeout(() => { if (best.v.alive) killEnemy(best.v, best.e); }, delay * 1000 + 60);
+  return best.e;
 }
 function skRanks() {                              // els rengles, amb la posició mitjana cap endavant
   const F = skFrame();
@@ -2114,6 +2120,17 @@ function drawFireStrip() {
   for (const r of [25, S.R]) { const w = S.hw + r * S.tg; ctx.lineWidth = Math.max(1, 0.1 * M); ctx.strokeStyle = 'rgba(214,60,40,.7)'; ctx.beginPath(); ctx.moveTo(r * M, -w * M); ctx.lineTo(r * M, w * M); ctx.stroke(); ctx.fillText(r + ' m', r * M - 1.6 * M, -w * M - 0.4 * M); }
   ctx.restore();
 }
+function feuTiradors() {                          // en tiradors cada home tria l'enemic més proper i hi apunta: els trets no surten alhora, però no es perden a l'aire
+  const T = TUNE.mosquet, hit = new Set(); let n = 0, tMax = 0;
+  for (const m of co.members) {
+    const d = Math.random() * T.escalf * (Math.random() < 0.12 ? 1.6 : 1), e = manShot(m, d, true);
+    if (e) { hit.add(e); n++; tMax = Math.max(tMax, d); }
+  }
+  for (const e of hit) { e.volleys++; }
+  if (n) SFX.rumble(0.08, tMax + 1.2);
+  if (!n) reac('assenyala', 'Cap tirador té un enemic a tret al davant: <b>apropa\'t</b> o <b>gira la unitat</b>.', 5000);
+  else if (level && level.onVolley) level.onVolley();
+}
 function feu() {
   say('Feu!'); co.loaded = false; lastKey = '';
   const T = TUNE.mosquet; let tMax = 0;
@@ -2126,6 +2143,7 @@ function feu() {
   }
   SFX.rumble(0.08, tMax + 1.2);
   const S = fireStrip(), nSh = co.members.length / 20; co.fireDir = null;
+  if (co.open && ENEMY.length) { feuTiradors(); return; }
   if (ENEMY.length) {                                                       // efecte sobre els homes enemics dins la franja
     const c = unitCentre(); let near = Infinity, ok = false, hits = 0, exp = 0, tot = 0, exposed = [];
     for (const e of ENEMY) {
@@ -3230,13 +3248,13 @@ const ORDERS = [
   { id: 'FI-04', des: 0.15, shot: true, fam: 'arm', float: true, lvl: 'musket', fr: 'Feu', full: 'Feu!', gl: 'disparar', icon: 'aim', cmds: ['feu'],
     avail: () => armOrder(() => co.arm !== 'joue' ? 'primer Joue' : !co.loaded ? 'no estan carregats' : true), run: () => feu() },
   // Tiradors (infanteria lleugera): obrir i tancar files, foc a voluntat, foc avançant i reculant
-  { id: 'SK-01', pk: 'open', des: 0.3, fam: 'tir', k: 'skirm', lvl: 'skirm', sec: 'Formació', fr: 'En tirailleurs', full: 'Déployez en tirailleurs, par le flanc {s} – marche!', gl: 'obrir les files (tries els passos) cap a un flanc: la filera de l\'altre extrem es queda', sides: true, icons: ['left', 'right'], cmdsS: { '-1': ['skG'], '1': ['skD'] },
+  { id: 'SK-01', ctr: 'SK-02', pk: 'open', des: 0.3, fam: 'tir', k: 'skirm', lvl: 'skirm', sec: 'Formació', fr: 'En tirailleurs', full: 'Déployez en tirailleurs, par le flanc {s} – marche!', gl: 'obrir les files (tries els passos) cap a un flanc: la filera de l\'altre extrem es queda', sides: true, icons: ['left', 'right'], cmdsS: { '-1': ['skG'], '1': ['skD'] },
     avail: () => { const r = aturatLinia(); return r !== true ? r : true; }, run: sd => skRespace(sd > 0 ? 'last' : 'first', SKCFG.open * STEP) },
-  { id: 'SK-02', pk: 'open', des: 0.3, fam: 'tir', k: 'skirm', lvl: 'skirm', sec: 'Formació', fr: 'En tirailleurs (centre)', full: 'Déployez en tirailleurs, sur le centre – marche!', gl: 'obrir les files (tries els passos) a banda i banda del centre', icon: 'fan', cmds: ['skC'],
+  { id: 'SK-02', ctrOf: true, pk: 'open', des: 0.3, fam: 'tir', k: 'skirm', lvl: 'skirm', sec: 'Formació', fr: 'En tirailleurs (centre)', full: 'Déployez en tirailleurs, sur le centre – marche!', gl: 'obrir les files (tries els passos) a banda i banda del centre', icon: 'fan', cmds: ['skC'],
     avail: () => { const r = aturatLinia(); return r !== true ? r : true; }, run: () => skRespace('centre', SKCFG.open * STEP) },
-  { id: 'SK-04', des: 0.3, fam: 'tir', k: 'skirm', lvl: 'skirm', sec: 'Formació', fr: 'Serrez les files', full: 'Par le flanc {s}, serrez les files – marche!', gl: 'tornar a ajuntar les files cap a la filera d\'un flanc', sides: true, icons: ['left', 'right'], cmdsS: { '-1': ['serG'], '1': ['serD'] },
+  { id: 'SK-04', ctr: 'SK-05', des: 0.3, fam: 'tir', k: 'skirm', lvl: 'skirm', sec: 'Formació', fr: 'Serrez les files', full: 'Par le flanc {s}, serrez les files – marche!', gl: 'tornar a ajuntar les files cap a la filera d\'un flanc', sides: true, icons: ['left', 'right'], cmdsS: { '-1': ['serG'], '1': ['serD'] },
     avail: () => { const r = aturat(); return r !== true ? r : !co.open ? 'no estan en tiradors' : true; }, run: sd => skRespace(sd > 0 ? 'first' : 'last', FRONT) },
-  { id: 'SK-05', des: 0.3, fam: 'tir', k: 'skirm', lvl: 'skirm', sec: 'Formació', fr: 'Serrez (centre)', full: 'Sur le centre, serrez les files – marche!', gl: 'tornar a ajuntar les files cap al centre', icon: 'align', cmds: ['serC'],
+  { id: 'SK-05', ctrOf: true, des: 0.3, fam: 'tir', k: 'skirm', lvl: 'skirm', sec: 'Formació', fr: 'Serrez (centre)', full: 'Sur le centre, serrez les files – marche!', gl: 'tornar a ajuntar les files cap al centre', icon: 'align', cmds: ['serC'],
     avail: () => { const r = aturat(); return r !== true ? r : !co.open ? 'no estan en tiradors' : true; }, run: () => skRespace('centre', FRONT) },
   { id: 'SK-06', des: 0, fam: 'tir', k: 'skirm', lvl: 'skirm', sec: 'Foc', fr: 'Feu à volonté', full: 'Commencez – le feu!', gl: 'foc al lloc: cada home carrega i dispara pel seu compte', icon: 'aim', cmds: ['commencez'],
     avail: () => skAvail(), run: () => skStart('place') },
@@ -3380,6 +3398,7 @@ function buildOrderPanel() {
     panel.fams[f.id] = { wrap, btn, menu, badge: btn.querySelector('.badge') };
     const list = ORDERS.filter(x => x.fam === f.id && !x.float); let pairRow = null;
     for (const o of list) {
+      if (o.ctrOf) continue;                              // el «centre» es dibuixa dins la fila de l'ordre de flanc (gauche · centre · droite)
       if (o.pair && pairRow) {                           // segon botó gran d'una parella (Portez | Reposez)
         const b = document.createElement('button'); b.className = 'act wide'; b.innerHTML = ICONS[o.icon] + '<b>' + o.fr + '</b>'; b.onclick = () => fire(o);
         pairRow.acts.appendChild(b); panel.rows.push({ o, r: document.createElement('div'), items: [{ b, arg: undefined, cmds: o.cmds, title: orderTitle(o) }], fam: f.id }); continue;
@@ -3395,6 +3414,11 @@ function buildOrderPanel() {
         r.innerHTML = '<b>' + o.fr + '</b><div class="acts"></div>';
         const acts = r.querySelector('.acts');
         acts.appendChild(mk(ICONS[o.icons[0]] + '<span>gauche</span>', -1, o.cmdsS['-1'], 'side'));
+        if (o.ctr) {                                      // gauche · centre · droite: tres botons iguals
+          r.classList.add('tri'); const c = ORDER_BY_ID[o.ctr], b = document.createElement('button'); b.className = 'act side'; b.innerHTML = ICONS[c.icon] + '<span>centre</span>';
+          b.onclick = () => c.pk ? skPickOpen(c) : fire(c); acts.appendChild(b);
+          panel.rows.push({ o: c, r: document.createElement('div'), items: [{ b, arg: undefined, cmds: c.cmds, title: orderTitle(c) }], fam: f.id });
+        }
         acts.appendChild(mk('<span>droite</span>' + ICONS[o.icons[1]], 1, o.cmdsS['1'], 'side'));
       } else if (o.pair) { r.innerHTML = '<div class="acts"></div>'; r.acts = r.querySelector('.acts'); r.acts.appendChild(mk(ICONS[o.icon] + '<b>' + o.fr + '</b>', undefined, o.cmds, 'wide')); pairRow = r; }
       else { r.classList.add('one'); r.appendChild(mk(ICONS[o.icon] + '<b>' + o.fr + '</b>', undefined, o.cmds, 'wide')); }
@@ -3868,7 +3892,7 @@ let autoStepT = 0;
 const VOICE = { on: false, rec: null, running: false, tested: false, seg: {}, interim: '', state: '', failT: 0, lastFail: null,
   learn: { phr: {}, ex: {} }, shared: { phr: {}, ex: {} }, opt: { mode: 'cont', vol: true, log: false, tele: true, engine: '' }, log: [], recentExec: null, ptt: false, db: false, loading: false };
 // Connexió amb Supabase (la mateixa de la web: si el joc s'obre dins la web, agafa window.APP_CONFIG) i fonts del motor local Vosk
-const GAME_VERSION = '1.4.21';
+const GAME_VERSION = '1.4.22';
 const CFG = Object.assign({
   SUPABASE_URL: 'https://ltopullwhasagnkuqaek.supabase.co',
   SUPABASE_ANON_KEY: 'sb_publishable_DhHFUh-UrbBrI0l476Vcnw_tSn-Gmkr',
@@ -5115,10 +5139,10 @@ function buildLevel8() {
     { title: 'Carregar', pose: 'assenyala', unlock: ['musket'], mini: 'Dóna <b>Mosquet → Chargez</b> i espera que tots els rellotges es posin en verd.',
       get hl() { return co.loaded ? [] : ['chargez']; }, cue: () => co.loaded || co.arm === 'charge' ? '' : 'Mosquet → Chargez!', done: () => co.loaded },
     { title: 'Obrir les files', pose: 'assenyala', tag: 'Tiradors', hl: [], unlock: ['skirm'], btn: 'Entesos', ack: true,
-      text: ['Obre el menú <b>Tiradors</b> i tria <b>En tirailleurs (centre)</b>. Abans d\'executar-la t\'apareix un quadre per triar els <b>passos</b> entre fileres, de 2 a 20: tria\'n <b>3 o més</b> i prem <b>Executar</b>.',
+      text: ['Obre el menú <b>Tiradors</b> i, a <b>En tirailleurs</b>, tria <b>centre</b>. Abans d\'executar-la t\'apareix un quadre per triar els <b>passos</b> entre fileres: tria\'n <b>3 o més</b> i prem <b>Executar</b>.',
         'Així els homes s\'allunyen entre ells i ocupen més terreny: una bala de canó en troba menys al seu pas. Cada ordre de salt (avançar o recular) també et demanarà els seus passos.'],
       done() { return !!this.acked; } },
-    { title: 'En tirailleurs', pose: 'assenyala', unlock: ['skirm'], hl: [], mini: () => co.state !== 'parat' || busy() ? 'Espera que acabin de moure\'s…' : 'Tiradors → <b>En tirailleurs (centre)</b>, amb 3 passos o més, i <b>Executar</b>.',
+    { title: 'En tirailleurs', pose: 'assenyala', unlock: ['skirm'], hl: [], mini: () => co.state !== 'parat' || busy() ? 'Espera que acabin de moure\'s…' : 'Tiradors → <b>En tirailleurs → centre</b>, amb 3 passos o més, i <b>Executar</b>.',
       done: () => !!co.open && co.open >= 3 * STEP_M - 0.01 && co.state === 'parat' && !busy() },
     { title: 'Sota els canons', pose: 'assenyala', unlock: ['skirm'], hl: [], tag: 'Artilleria',
       mini: () => inZone() ? (co.state === 'marxa' ? 'Ja hi ets: <b>Halte!</b>' : 'A la línia de foc.') : 'Avança en <b>En avant</b> fins a la <b>línia de foc</b> (franja vermella) i fes <b>Halte</b>. Els canons ens dispararan: en rang obert cauran menys homes.',
