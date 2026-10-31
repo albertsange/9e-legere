@@ -1169,7 +1169,8 @@ const TUNE = {
               supMax: 0.5 },                  // per sobre d'aquesta supressió, el regiment no gosa disparar
   tirailleurs: { files: 4,                    // SK-01/02: «Ouvrez les files par 4 pas» (distància entre fileres)
               rangs: 6,                       // SK-07/08: distància (en passos) que guanya o perd cada rengle a cada salt
-              pas: 0.35 },                    // desviació lateral (m) en passar pel costat esquerre de l'altre rengle
+              pas: 0.35,                      // desviació lateral (m) en passar pel costat esquerre de l'altre rengle
+              minDist: 30 },                  // metres: els tiradors no salten més a prop d'una línia enemiga formada                    // desviació lateral (m) en passar pel costat esquerre de l'altre rengle
   art:      { abast: 65,                      // metres: la bateria ens dispara si som a menys d'aquesta distància i ens veu
               recarrega: 12,                  // segons entre trets
               apunta: 2,                      // segons que triga a apuntar un cop encarada
@@ -1833,6 +1834,17 @@ function drawEnemies() {
       ctx.beginPath(); ctx.arc(px, py, rS, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
       ctx.strokeStyle = '#8a877e'; ctx.lineWidth = Math.max(1, 0.06 * M); ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(px + Math.cos(e.h) * 0.32 * M, py + Math.sin(e.h) * 0.32 * M); ctx.stroke(); ctx.globalAlpha = 1;
     }
+  }  for (const e of ENEMY) {                        // barra de pressió del foc sobre cada regiment que dispara
+    if (!e.shoots || e.routed) continue;
+    const live = e.men.filter(v => v.alive); if (!live.length) continue;
+    let cx = 0, y0 = Infinity; for (const v of live) { cx += v.x; y0 = Math.min(y0, v.y); } cx /= live.length;
+    const T = TUNE.mosquet, w = 7 * M, h = Math.max(5, 0.45 * M), x = cx * M - w / 2, y = (y0 - 1.6) * M - h, p = e.supp || 0;
+    ctx.fillStyle = 'rgba(255,253,246,.92)'; ctx.fillRect(x, y, w, h);
+    ctx.fillStyle = p >= T.supMax ? '#2e7d32' : p >= 0.2 ? '#c9a227' : '#9b968a'; ctx.fillRect(x, y, w * p, h);
+    ctx.strokeStyle = '#3a3630'; ctx.lineWidth = 1; ctx.strokeRect(x, y, w, h);
+    for (const k of [0.2, T.supMax]) { ctx.beginPath(); ctx.moveTo(x + w * k, y - 2); ctx.lineTo(x + w * k, y + h + 2); ctx.stroke(); }
+    ctx.fillStyle = '#3a3630'; ctx.font = '600 ' + Math.max(10, 0.8 * M) + 'px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+    ctx.fillText(p >= T.supMax ? 'Sota pressió · no disparen' : p >= 0.2 ? 'Sota pressió' : 'Pressió del foc', cx * M, y - 3);
   }
 }
 
@@ -2001,6 +2013,12 @@ function skRanks() {                              // els rengles, amb la posici�
   co.vp = co.vp || {};                                                      // posició virtual d'un rengle sense homes: l'hem de superar igualment
   return [0, 1].map(r => { const ms = co.members.filter(m => m.rank === r), p = ms.length ? ms.reduce((s, m) => s + m.x * F.fx + m.y * F.fy, 0) / ms.length : co.vp[r]; if (ms.length) co.vp[r] = p; return { r, ms, p }; }).filter(o => o.p !== undefined);
 }
+function skTooClose(R, dist) {                    // el salt deixaria algú a menys de minDist d'un enemic formats?
+  const F = skFrame(), lim = TUNE.tirailleurs.minDist;
+  const ms = R.ms.length ? R.ms : co.members;
+  for (const e of ENEMY) { if (e.routed) continue; for (const v of e.men) if (v.alive) for (const m of ms) if (Math.hypot(m.x + F.fx * dist - v.x, m.y + F.fy * dist - v.y) < lim) return true; }
+  return false;
+}
 function skBound(R, dist) {                       // salt d'un rengle (endavant o enrere), passant per l'esquerra de l'altre, sempre de cara a l'enemic
   if (!R.ms.length) { co.vp[R.r] += dist; co.sk.moving = true; return; }       // rengle sense homes: només es mou el seu lloc imaginari
   const F = skFrame(), lx = -F.rx * TUNE.tirailleurs.pas, ly = -F.ry * TUNE.tirailleurs.pas, k = dist > 0 ? 1 : -1;
@@ -2015,7 +2033,7 @@ function skPickOpen(o, arg) {                     // l'ordre no s'executa fins q
   const pk = document.getElementById('skPick'); pk.querySelector('.t').textContent = SKPICK_T[o.pk]; SKPICK.upd(); pk.classList.add('open');
 }
 function skGo() { const sk = co.sk; if (sk && (sk.mode === 'avant' || sk.mode === 'arriere') && !sk.end && !sk.go && co.state !== 'auto' && !tutLocked()) { sk.go = true; return true; } return false; }
-function skVolley(R) { let i = 0; for (const m of R.ms) if (m.sh) manShot(m, (i++) * 0.05 + Math.random() * 0.35); SFX.rumble(0.05, 1.2); }
+function skVolley(R) { let i = 0; for (const m of R.ms) if (m.sh && manShot(m, i * 0.05 + Math.random() * 0.35, true)) i++; if (i) SFX.rumble(0.05, 1.2); }   // cadascú apunta al seu enemic; qui no en té cap a l'abast, no dispara
 function updateSkirm(dt) {
   if (!co.sk) return;
   const sk = co.sk;
@@ -2045,7 +2063,7 @@ function updateSkirm(dt) {
     co.sk = null; co.arm = 'portez'; co.loaded = true; lastKey = ''; say('Portez vos armes!'); return;
   }
   if (sk.mode === 'place') {
-    for (const m of co.members) if (m.sh) { m.wt -= dt; if (m.wt <= 0) { manShot(m, 0); m.wt = 0.8 + Math.random() * 3.5; } }
+    for (const m of co.members) if (m.sh) { m.wt -= dt; if (m.wt <= 0) { manShot(m, 0, true); m.wt = 0.8 + Math.random() * 3.5; } }
     return;
   }
   const D = (sk.mode === 'avant' ? SKCFG.adv : SKCFG.ret) * STEP, Rs = skRanks().sort((p, q) => q.p - p.p);           // Rs[0] = el rengle de davant
@@ -2056,6 +2074,7 @@ function updateSkirm(dt) {
     if (mover.ms.some(m => !m.sh)) return;                                                         // espera que el rengle estigui carregat
     sk.go = false;
     const target = (sk.step === 0 || Rs.length === 1 ? mover.p : Rs[0].p) + D;
+    if (skTooClose(mover, target - mover.p)) { reac('assenyala', '<b>Louis:</b> Prou, chasseur! Els tiradors no s\'acosten a menys de <b>' + TUNE.tirailleurs.minDist + ' m</b> d\'una línia formada: ens carregarien a la baioneta. Dispara des d\'aquí.', 5000); return; }
     sk.lastR = mover.r; skBound(mover, target - mover.p);
   } else {                                                                                         // reculant: dispara el de davant i es retira
     const front = Rs[0];
@@ -2193,7 +2212,7 @@ function updateEnemies(dt) {                     // els regiments enemics es gir
     const live = e.men.filter(v => v.alive); if (!live.length) continue;
     if (e.reload > 0) e.reload -= dt;
     e.supp = Math.max(0, (e.supp || 0) - T.supDecau * dt);
-    if (e.supp > T.supMax && !e.suppMsg) { e.suppMsg = true; reac('aprova', '<b>Louis:</b> El <b>' + e.name + '</b> s\'arrauleix: el nostre foc no el deixa apuntar!', 4000); }
+    if (e.supp > T.supMax && !e.suppMsg) { e.suppMsg = true; reac('aprova', '<b>Louis:</b> El <b>' + e.name + '</b> està sota una pressió de foc tan forta que <b>ja no gosa disparar</b>!', 4000); }
     const seen = !losBlocked(e.cx, e.cy, c.x, c.y);
     if (!e.alert && (e.volleys > 0 || (seen && Math.hypot(c.x - e.cx, c.y - e.cy) <= T.enAlerta))) {
       e.alert = true; reac('louis', '<b>Louis:</b> Ens han vist! El <b>' + e.name + '</b> gira cap a nosaltres.', 4500);
@@ -3552,7 +3571,7 @@ function updateInfo() {
   const am = armMode() && co.state === 'parat';            // amb el mosquet i aturats, la fila «Pas» mostra l'arma
   $('ucPasL').textContent = am ? 'Arma' : 'Pas';
   if (am) {
-    const AN = { portez: 'espatlla', repose: 'a terra', croise: 'baioneta', apprete: 'apprêtez', joue: 'joue' };
+    const AN = { portez: 'espatlla', repose: 'a terra', croise: 'baioneta', apprete: 'apprêtez', joue: 'joue', sk: 'a discreció' };
     const ld = co.arm === 'charge' ? co.members.filter(m => m.ld >= 1).length + '/' + co.members.length : '';
     $('ucPas').innerHTML = co.arm === 'charge' ? 'càrrega ' + ld : AN[co.arm] + ' <i style="font-style:normal;color:' + (co.loaded ? '#2e7d32' : '#b3b0a6') + '">●</i>';
     $('ucPas').title = co.arm === 'charge' ? 'carregant' : co.loaded ? 'carregada' : 'descarregada';
@@ -3892,7 +3911,7 @@ let autoStepT = 0;
 const VOICE = { on: false, rec: null, running: false, tested: false, seg: {}, interim: '', state: '', failT: 0, lastFail: null,
   learn: { phr: {}, ex: {} }, shared: { phr: {}, ex: {} }, opt: { mode: 'cont', vol: true, log: false, tele: true, engine: '' }, log: [], recentExec: null, ptt: false, db: false, loading: false };
 // Connexió amb Supabase (la mateixa de la web: si el joc s'obre dins la web, agafa window.APP_CONFIG) i fonts del motor local Vosk
-const GAME_VERSION = '1.4.23';
+const GAME_VERSION = '1.4.24';
 const CFG = Object.assign({
   SUPABASE_URL: 'https://ltopullwhasagnkuqaek.supabase.co',
   SUPABASE_ANON_KEY: 'sb_publishable_DhHFUh-UrbBrI0l476Vcnw_tSn-Gmkr',
@@ -5148,18 +5167,18 @@ function buildLevel8() {
       mini: () => inZone() ? (co.state === 'marxa' ? 'Ja hi ets: <b>Halte!</b>' : 'A la línia de foc.') : 'Avança en <b>En avant</b> fins a la <b>línia de foc</b> (franja vermella) i fes <b>Halte</b>. Els canons ens dispararan: en rang obert cauran menys homes.',
       resetStep: () => 1, done: () => co.state === 'parat' && inZone() },
     { title: 'La columna avança', pose: 'serios', tag: 'Foc en avançant', hl: [], unlock: ['skirm'], btn: 'Endavant', ack: true,
-      text: ['Aquí tens el truc: la <b>columna només avança mentre l\'enemic està arraulit</b>, i el que l\'arrauleix és el nostre foc.',
+      text: ['Aquí tens el truc: la <b>columna només avança mentre l\'enemic està sota pressió</b>. Cada bala nostra que li passa a prop li fa abaixar el cap i li puja la <b>barra de pressió</b> que veuràs sobre el regiment; si no hi disparem, baixa sola. Passada la <b>primera marca</b>, la columna avança; passada la <b>segona</b>, l\'enemic ja no gosa disparar.',
         'Dóna <b>Tiradors → Feu en avançant</b> (triaràs els passos de cada salt: <b>10 o més</b> t\'estalvien pulsacions). Cada cop que premis <b>Avancez!</b> (o espai), un rengle salta endavant els passos triats, passant per l\'esquerra de l\'altre, i dispara. Si es queden sense carregar, esperen. Més passos = més terreny; menys passos = foc més continu.'],
       done() { return !!this.acked; } },
     { title: 'Cobreix l\'avanç', pose: 'assenyala', unlock: ['skirm'], hl: [],
-      mini: () => !co.sk ? 'Tiradors → <b>Feu en avançant</b>, i prem <b>Avancez!</b> per fer saltar els rengles.' : supp(ex()) ? 'L\'enemic està arraulit: <b>la columna avança</b>. Continua amb <b>Avancez!</b>.' : 'La columna espera: fes més foc perquè l\'enemic s\'arrauleixi.',
+      mini: () => !co.sk ? 'Tiradors → <b>Feu en avançant</b>, i prem <b>Avancez!</b> per fer saltar els rengles.' : supp(ex()) ? 'L\'enemic està sota pressió: <b>la columna avança</b>. Continua amb <b>Avancez!</b>.' : 'La columna espera: la pressió sobre l\'enemic és massa baixa. Fes-li més foc (mira la barra de sobre el regiment).',
       resetStep: () => 1, done: () => advDone() },
     { title: 'Reforç austríac', pose: 'serios', tag: 'Foc en reculant', hl: [], unlock: ['skirm'], btn: 'Entesos', ack: true,
-      text: ['<b>Atenció!</b> La columna ha arribat, però ens ha sortit un <b>nou regiment austríac</b> pel davant. Ordre de <b>retirada</b>: la columna recula mentre l\'enemic estigui arraulit.',
+      text: ['<b>Atenció!</b> La columna ha arribat, però ens ha sortit un <b>nou regiment austríac</b> pel davant. Ordre de <b>retirada</b>: la columna recula mentre l\'enemic estigui sota pressió.',
         'Acaba amb <b>Roulement</b> si cal, i dóna <b>Tiradors → Feu en reculant</b>. Amb <b>Reculez!</b> el rengle de davant dispara i es retira per darrere de l\'altre. Porta els tiradors fins a la <b>línia de retirada</b> i la columna fins al seu punt de partida. Mentre l\'enemic estigui a tret, <b>pots seguir disparant-li</b>.'],
       done() { return !!this.acked; } },
     { title: 'Cobreix la retirada', pose: 'assenyala', unlock: ['skirm'], hl: [], tag: 'Retirada',
-      mini: () => !co.sk ? 'Tiradors → <b>Feu en reculant</b>, i prem <b>Reculez!</b>.' : supp(rf()) ? 'L\'enemic està arraulit: <b>la columna es retira</b>. Continua amb <b>Reculez!</b>.' : 'La columna espera: fes més foc al nou regiment.',
+      mini: () => !co.sk ? 'Tiradors → <b>Feu en reculant</b>, i prem <b>Reculez!</b>.' : supp(rf()) ? 'L\'enemic està sota pressió: <b>la columna es retira</b>. Continua amb <b>Reculez!</b>.' : 'La columna espera: fes més foc al nou regiment perquè en pugi la pressió.',
       resetStep: () => 1, done: () => retDone() },
     { title: 'Retirada ben coberta', pose: 'aprova', unlock: ['skirm'], hl: [], mini: 'La columna és a salvo, chasseur!', done: () => false }
   ];
