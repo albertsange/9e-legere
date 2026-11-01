@@ -269,11 +269,12 @@
   #skBox button:disabled{opacity:.4;cursor:default;animation:none;}
   #skBox button small{display:block;font-size:9px;font-weight:500;opacity:.8;letter-spacing:.06em;text-transform:uppercase;}
   #skBox button.rl{background:#b3261e;color:#fff;}
-  #rlPick{position:absolute;bottom:calc(100% + 70px);right:370px;display:none;align-items:center;gap:8px;z-index:92;padding:8px 8px 8px 16px;background:var(--sheet);border:1px solid var(--line);border-radius:14px;box-shadow:0 6px 20px rgba(0,0,0,.18);}
-  #rlPick.open{display:flex;} #rlPick .t{color:#b3261e;font-size:14px;margin-right:4px;}
-  #rlPick button{font-family:inherit;cursor:pointer;height:44px;padding:0 14px;border-radius:999px;border:none;background:#b3261e;color:#fff;font-weight:700;font-size:14px;}
-  #rlPick button.b{background:#7a1a14;} #rlPick button.x{background:transparent;color:var(--ink);height:32px;padding:0 10px;}
-  #rlPick button small{display:block;font-size:9px;font-weight:500;opacity:.85;letter-spacing:.06em;text-transform:uppercase;}
+  #rlPick{position:absolute;bottom:calc(100% + 70px);right:370px;display:none;align-items:center;gap:6px;z-index:92;padding:5px 6px 5px 14px;background:var(--sheet);border:1px solid var(--line);border-radius:999px;box-shadow:0 6px 18px rgba(0,0,0,.18);}
+  #rlPick.open{display:flex;} #rlPick .t{color:var(--bleu);font-size:13px;margin-right:2px;}
+  #rlPick button{font-family:inherit;cursor:pointer;height:34px;padding:0 14px;border-radius:999px;border:1px solid var(--line);background:var(--sheet);color:var(--bleu);font-weight:700;font-size:13px;}
+  #rlPick button:hover{background:var(--bleu);color:#fff;}
+  #rlPick button.a{color:#b3261e;border-color:#b3261e;} #rlPick button.a:hover{background:#b3261e;color:#fff;}
+  #rlPick button.x{border:none;background:transparent;color:var(--muted);height:28px;padding:0 8px;font-size:18px;}
   #controls .act.danger{background:#b3261e !important;color:#fff !important;border-color:#b3261e !important;}
   #controls.menuOpen #rlPick{display:none !important;}
   #skPick{position:absolute;bottom:calc(100% + 14px);right:370px;display:none;align-items:center;gap:10px;z-index:91;padding:8px 8px 8px 16px;background:var(--sheet);border:1px solid var(--line);border-radius:18px;box-shadow:0 6px 22px rgba(0,0,0,.22);}
@@ -3538,7 +3539,7 @@ function buildOrderPanel() {
   }
   if (!document.getElementById('rlPick')) {                  // Roulement: acabar de carregar o «chien au repos»
     const rp = document.createElement('div'); rp.id = 'rlPick';
-    rp.innerHTML = '<b class="t">Roulement</b><button type="button" class="a"><small>acaben de carregar</small>Roulement</button><button type="button" class="b"><small>armes a l\'espatlla ja</small>Chien au repos</button><button type="button" class="x" title="Cancel·lar">×</button>';
+    rp.innerHTML = '<b class="t">Roulement</b><button type="button" class="a" title="Acaben de carregar i després porten armes">Roulement</button><button type="button" class="b" title="Porten armes ja; no tots estaran carregats">Chien au repos</button><button type="button" class="x" title="Cancel·lar">×</button>';
     rp.querySelector('.a').onclick = () => { rp.classList.remove('open'); fire(ORDER_BY_ID['SK-RL']); };
     rp.querySelector('.b').onclick = () => { rp.classList.remove('open'); fire(ORDER_BY_ID['SK-RC']); };
     rp.querySelector('.x').onclick = () => rp.classList.remove('open');
