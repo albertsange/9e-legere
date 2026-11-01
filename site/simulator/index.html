@@ -268,6 +268,14 @@
   #skBox button.go{background:var(--bleu);color:#fff;animation:feuPulse 1.1s ease-in-out infinite;}
   #skBox button:disabled{opacity:.4;cursor:default;animation:none;}
   #skBox button small{display:block;font-size:9px;font-weight:500;opacity:.8;letter-spacing:.06em;text-transform:uppercase;}
+  #skBox button.rl{background:#b3261e;color:#fff;}
+  #rlPick{position:absolute;bottom:calc(100% + 70px);right:370px;display:none;align-items:center;gap:8px;z-index:92;padding:8px 8px 8px 16px;background:var(--sheet);border:1px solid var(--line);border-radius:14px;box-shadow:0 6px 20px rgba(0,0,0,.18);}
+  #rlPick.open{display:flex;} #rlPick .t{color:#b3261e;font-size:14px;margin-right:4px;}
+  #rlPick button{font-family:inherit;cursor:pointer;height:44px;padding:0 14px;border-radius:999px;border:none;background:#b3261e;color:#fff;font-weight:700;font-size:14px;}
+  #rlPick button.b{background:#7a1a14;} #rlPick button.x{background:transparent;color:var(--ink);height:32px;padding:0 10px;}
+  #rlPick button small{display:block;font-size:9px;font-weight:500;opacity:.85;letter-spacing:.06em;text-transform:uppercase;}
+  #controls .act.danger{background:#b3261e !important;color:#fff !important;border-color:#b3261e !important;}
+  #controls.menuOpen #rlPick{display:none !important;}
   #skPick{position:absolute;bottom:calc(100% + 14px);right:370px;display:none;align-items:center;gap:10px;z-index:91;padding:8px 8px 8px 16px;background:var(--sheet);border:1px solid var(--line);border-radius:18px;box-shadow:0 6px 22px rgba(0,0,0,.22);}
   #skPick.open{display:flex;}
   #controls.menuOpen #skPick{display:none !important;}
@@ -1606,7 +1614,7 @@ function reset() {
   msgEl.style.display = 'none';
   centreCam();
   if (level && level.free) co.atencio = true;
-  co.arm = 'portez'; co.loaded = false; FX.length = 0;
+  co.arm = 'portez'; co.loaded = false; co.reloading = false; co.serrez = null; FX.length = 0;
   CORPSES.length = 0; BALLS.length = 0; GUNS.length = 0; for (const g of (level && level.guns) || []) GUNS.push(Object.assign({ reload: 3, aimT: 0 }, g)); ENEMY.length = 0; for (const d of (level && level.enemies) || []) ENEMY.push(buildEnemy(d)); HOVER = null; if (level && level.onReset) level.onReset();
   objReset();
   tutOnReset();
@@ -1987,6 +1995,63 @@ function skRespace(anchor, gap) {                // anchor: 'first' (filera de l
   co.open = gap > FRONT + 0.01 ? gap : null;
   if (list.length) startAuto([{ list }], false, gap <= FRONT + 0.01 ? STEP * PACES.carrega.cad / 60 : ORD_SPEED, true);       // «Serrez les files» es fa al pas de charge
 }
+function rlPickOpen() { if (ORDER_BY_ID['SK-RL'].avail() !== true && ORDER_BY_ID['SK-RC'].avail() !== true) return; openMenu(null); document.getElementById('rlPick').classList.add('open'); }
+function skChien() {                              // «Le chien au repos»: armes a l'espatlla a l'instant; els que no havien carregat ho acaben fent (rellotge)
+  say('Le chien au repos!');
+  for (const m of co.members) if (!m.sh && !m.rl) { m.rl = true; m.ld = m.ld || 0; m.ldDur = m.ldDur || loadDur(); }
+  co.sk = null; co.arm = 'portez'; lastKey = '';
+  co.reloading = co.members.some(m => m.rl); co.loaded = !co.reloading;
+}
+function updateReload(dt) {                        // recàrrega pendent després d'un «chien au repos»
+  if (!co.reloading || co.sk) return;
+  let left = 0;
+  for (const m of co.members) if (m.rl) { m.ld = Math.min(1, m.ld + dt / m.ldDur); if (m.ld >= 1) { m.rl = false; m.sh = true; m.okT = 1.4; } else left++; }
+  if (!left) { co.reloading = false; co.loaded = true; lastKey = ''; }
+}
+function skTogether() {                           // els dos rengles estan junts (no separats pels salts)
+  if (!co.open) return true;
+  const Rs = skRanks().filter(o => o.ms.length); if (Rs.length < 2) return true;
+  return Math.abs(Rs[0].p - Rs[1].p) <= RANK_GAP + 0.35;
+}
+function skCloseRanks(dir) {                      // «Serrez les files»: en avant, el rengle de darrere avança fins al de davant; en arrière, el de davant fa mitja volta i recula
+  say(dir > 0 ? 'Serrez les files, en avant!' : 'Serrez les files, en arrière!');
+  const F = skFrame(), Rs = skRanks().sort((p, q) => q.p - p.p);
+  if (Rs.length > 1 && Rs[0].r === 1) { for (const m of co.members) m.rank = 1 - m.rank; co.vp = {}; }
+  const R = skRanks(), R0 = R.find(o => o.r === 0), R1 = R.find(o => o.r === 1);
+  const list = [], along = m => m.x * F.fx + m.y * F.fy;
+  if (dir > 0) {                                   // el de darrere es col·loca darrere el seu company (o el seu lloc imaginari)
+    for (const m of R1.ms) {
+      const f = R0.ms.find(q => q.file === m.file), d = (f ? along(f) : R0.p) - RANK_GAP - along(m);
+      if (Math.abs(d) > 0.05) list.push({ m, tasks: [{ path: [{ x: m.x + F.fx * d, y: m.y + F.fy * d }], i: 0, keep: true }] });
+    }
+  } else {                                         // el de davant fa mitja volta, recula fins davant del de darrere i torna a fer front
+    for (const m of R0.ms) {
+      const b = R1.ms.find(q => q.file === m.file), d = (b ? along(b) : R1.p) + RANK_GAP - along(m);
+      if (Math.abs(d) > 0.05) list.push({ m, tasks: [{ rot: F.h + Math.PI }, { path: [{ x: m.x + F.fx * d, y: m.y + F.fy * d }], i: 0, keep: true }, { rot: F.h }] });
+    }
+  }
+  co.vp = {};
+  if (list.length) startAuto([{ list }], false, ORD_SPEED, true);
+}
+function skAlign(dir) {                           // alineació en tiradors: tothom a la mateixa línia, mantenint la distància entre fileres; no cal Fixe
+  say(dir > 0 ? 'À droite, alignement!' : 'À gauche, alignement!');
+  const h = co.members[0].h, fx = Math.cos(h), fy = Math.sin(h), rx = -fy, ry = fx, gap = co.open || FRONT;
+  const D = m => m.x * fx + m.y * fy, L = m => m.x * rx + m.y * ry, P = (d, l) => ({ x: d * fx + l * rx, y: d * fy + l * ry });
+  const files = [...new Set(co.members.map(m => m.file))].map(f => { const ms = co.members.filter(m => m.file === f); return { f, ms, l: ms.reduce((s, m) => s + L(m), 0) / ms.length }; });
+  files.sort((a, b) => dir > 0 ? b.l - a.l : a.l - b.l);
+  const front = co.members.filter(m => m.rank === 0), dT = front.length ? Math.max(...front.map(D)) : Math.max(...co.members.map(D)), lG = files[0].l;
+  const list = [];
+  files.forEach((fl, j) => { for (const m of fl.ms) list.push({ m, tasks: [{ path: [P(m.rank === 0 ? dT : dT - RANK_GAP, lG - dir * j * gap)], i: 0, keep: true }, { rot: h }] }); });
+  startAuto([{ list }], false, ORD_SPEED);
+}
+function serrezTick(dt) {                          // «Serrez les rangs» caminant: en 10 s s'alineen del tot
+  const z = co.serrez; if (!z) return;
+  if (co.state !== 'marxa') { co.serrez = null; return; }
+  const left = z.T - z.t; z.t += dt;
+  const k = left <= dt ? 1 : dt / left;
+  for (const m of co.members) { const ax = -m.dx * k, ay = -m.dy * k; m.x += ax; m.y += ay; m.dx += ax; m.dy += ay; }
+  if (z.t >= z.T) { co.serrez = null; showMsg('Rengles serrats: ordre al 100 %', 2000); }
+}
 function skAvail() {
   return armOrder(() => !co.open ? 'cal estar en tiradors (files obertes)' : !co.loaded ? 'primer cal carregar (Chargez)' : co.arm !== 'portez' ? 'cal tenir l\'arma a l\'espatlla' : true);
 }
@@ -1994,7 +2059,7 @@ const loadDur = () => { const T = TUNE.mosquet; return T.carrega * (1 - T.varia 
 function skStart(mode) {
   co.vp = {};
   for (const m of co.members) { m.sh = true; m.rl = false; m.wt = 0.3 + Math.random() * 2.5; }
-  co.loaded = false; co.arm = 'sk'; co.fireDir = null; co.sk = { mode, step: 0, end: false, stage: 'fire', wait: 0.6 };
+  co.loaded = false; co.reloading = false; co.arm = 'sk'; co.fireDir = null; co.sk = { mode, step: 0, end: false, stage: 'fire', wait: 0.6 };
 }
 function manShot(m, delay, wide) {                // un tret apuntat d'un tirador. «wide»: tria ell mateix l'enemic més proper (±50°); si no en té, no dispara
   const T = TUNE.mosquet, cone = wide ? 0.9 : 0.17;
@@ -2051,23 +2116,6 @@ function updateSkirm(dt) {
   if (sk.wait > 0) { sk.wait -= dt; return; }
   if (sk.end) {                                   // Roulement: acaben de carregar, ajunten els rengles i armes a l'espatlla
     if (co.members.some(m => !m.sh)) return;
-    if (!sk.closed) {
-      sk.closed = true;
-      const Rs = skRanks().sort((p, q) => q.p - p.p);
-      if (Rs.length > 1 && Rs[0].r === 1) { for (const m of co.members) m.rank = 1 - m.rank; co.vp = { 0: Rs[0].p, 1: Rs[1].p }; }     // el rengle de davant passa a ser el primer
-      const F = skFrame(), list = [];
-      const R0 = skRanks().find(o => o.r === 0), p0 = R0 ? R0.p : null;                // posició (virtual si cal) del primer rengle
-      for (const m of co.members.filter(q => q.rank === 1)) {
-        const f = co.members.find(q => q.rank === 0 && q.file === m.file);
-        let tx, ty;
-        if (f) { tx = f.x - F.fx * RANK_GAP; ty = f.y - F.fy * RANK_GAP; }
-        else if (p0 !== null) { const d = p0 - RANK_GAP - (m.x * F.fx + m.y * F.fy); tx = m.x + F.fx * d; ty = m.y + F.fy * d; }      // el del davant ha mort: el seu lloc és imaginari, es queda al seu lloc
-        else continue;
-        if (Math.hypot(tx - m.x, ty - m.y) < 0.05) continue;
-        list.push({ m, tasks: [{ path: [{ x: tx, y: ty }], i: 0, keep: true }] });
-      }
-      if (list.length) { startAuto([{ list }], false, ORD_SPEED, true); return; }
-    }
     co.sk = null; co.arm = 'portez'; co.loaded = true; lastKey = ''; say('Portez vos armes!'); return;
   }
   if (sk.mode === 'place') {
@@ -2238,7 +2286,7 @@ function updateEnemies(dt) {                     // els regiments enemics es gir
 }
 function updateMusket(dt) {
   if (level && level.tick) level.tick(dt);
-  updateBayonet(); updateEnemies(dt); updateGlide(dt); updateSkirm(dt); updateGuns(dt); for (const c of CORPSES) c.t += dt;
+  updateBayonet(); updateEnemies(dt); updateGlide(dt); updateSkirm(dt); updateReload(dt); updateGuns(dt); for (const c of CORPSES) c.t += dt;
   for (const e of ENEMY) for (const v of e.men) if (v.fl && !v.gone) { v.fl.t += dt; if (v.fl.t > 0) { v.x += v.fl.vx * dt; v.y += v.fl.vy * dt; } if (v.fl.t > 4) v.gone = true; }
   if (co.arm === 'charge' && !co.ldSnd) { co.ldSnd = true; SFX.loadStart(() => co.arm === 'charge' ? 0.4 + 0.6 * co.members.filter(m => m.ld < 1).length / co.members.length : 0); }
   else if (co.arm !== 'charge' && co.ldSnd) { co.ldSnd = false; SFX.loadStop(); }
@@ -2273,7 +2321,7 @@ function drawMusket(m, px, py, a, rS) {        // l'arma, vista des de dalt
   const wood = '#5a3a1e', steel = '#c9ccd1', w = Math.max(1.2, 0.07 * M);
   L(px, py, px + c * 0.32 * M, py + s * 0.32 * M, T.tick, Math.max(1, 0.05 * M));     // cap on miren (curta)
   const sx = px + lx * rS * 0.9, sy = py + ly * rS * 0.9, rx = px - lx * rS * 0.9, ry = py - ly * rS * 0.9;
-  const arm = co.sk ? (m.rl ? 'charge' : 'apprete') : co.arm;
+  const arm = co.sk ? (m.rl ? 'charge' : 'apprete') : co.reloading && m.rl ? 'charge' : co.arm;
   switch (arm) {
     case 'portez': L(sx, sy, sx - c * 0.45 * M, sy - s * 0.45 * M, wood, w); break;                    // espatlla esquerra, cap enrere
     case 'repose': ctx.fillStyle = wood; ctx.beginPath(); ctx.arc(rx + c * 0.12 * M, ry + s * 0.12 * M, Math.max(1.4, 0.07 * M), 0, Math.PI * 2); ctx.fill(); break;   // a terra, al peu dret
@@ -2718,7 +2766,7 @@ function pivotMan(dir) {          // home de l'extrem del costat dir (+1 dreta, 
   return front.reduce((a, b) => dir > 0 ? (L(b) > L(a) ? b : a) : (L(b) < L(a) ? b : a));
 }
 function startWheel(kind, dir) {  // kind: 'stand' (WH-01) | 'move' (WH-02) | 'turn' (WH-03)
-  if (busy() || formationName() !== 'línia') return;
+  if (busy() || !(formationName() === 'línia' || (formationName() === 'tiradors' && !co.sk && skTogether()))) return;
   if (kind === 'turn') { startTurn(dir); return; }
   if (kind === 'stand') { if (co.state !== 'parat' || !co.atencio || co.hdT !== 0) return; }
   else if (co.state !== 'marxa' || co.mode !== 'direct') return;
@@ -2740,7 +2788,7 @@ const TURN_TURN = 9;            // rad/s: velocitat de gir del cos mentre corren
 function startTurn(dir) {         // WH-03 Tournez: el pivot gira 90° al lloc; la resta corre al lloc que tindria en un gir rígid
   if (co.state !== 'marxa' || co.mode !== 'direct') return;
   say(dir > 0 ? 'Tournez à droite, marche!' : 'Tournez à gauche, marche!');
-  const piv = pivotMan(dir), a = dir * Math.PI / 2, ca = Math.cos(a), sa = Math.sin(a), ks = TUNE.desordre.cop * ORDER_BY_ID['WH-03'].des * driftK();
+  const piv = pivotMan(dir), a = dir * Math.PI / 2, ca = Math.cos(a), sa = Math.sin(a), ks = TUNE.desordre.cop * ORDER_BY_ID['WH-03'].des * driftK() * (co.open ? 3 : 1);
   const px = piv.x - piv.dx, py = piv.y - piv.dy;
   const items = co.members.map(m => {
     const ix = m.x - m.dx - px, iy = m.y - m.dy - py;               // lloc ideal respecte al pivot
@@ -2776,7 +2824,7 @@ function updateTurn(c, dt) {
 }
 function wheelDrift(c) {          // més desordre com més lluny del pivot (cada pas)
   const ks = TUNE.desordre.roda * driftK(), R = TUNE.desordre.retorn;
-  const F = ORDER_BY_ID[CONV_ORDER[c.kind] || 'WH-01'].des * (c.kind === 'stand' ? 1 : paceMul(c.pace || co.pace));
+  const F = ORDER_BY_ID[CONV_ORDER[c.kind] || 'WH-01'].des * (c.kind === 'stand' ? 1 : paceMul(c.pace || co.pace)) * (co.open ? 3 : 1);   // en tiradors es desendrecen molt més
   for (const m of co.members) {
     const k = Math.hypot(m.x - c.px, m.y - c.py) / c.R;
     const ax = (Math.random() - 0.5) * k * ks * F - R * m.dx, ay = (Math.random() - 0.5) * k * ks * F - R * m.dy;
@@ -3208,6 +3256,10 @@ const aturat = () => pre() || (co.state !== 'parat' ? 'cal estar aturat' : busy(
 const aturatLinia = () => { const r = aturat(); return r !== true ? r : formationName() !== 'línia' ? 'cal estar en línia' : true; };
 const marxaRecta = () => pre() || (co.state !== 'marxa' ? 'cal estar en marxa' : co.mode !== 'direct' ? 'cal marxar recte (no en oblic ni reculant)' : busy() ? 'espera que acabi el par file' : true);
 const marxaLinia = () => { const r = marxaRecta(); return r !== true ? r : formationName() !== 'línia' ? 'cal estar en línia' : true; };
+const linTir = () => formationName() === 'línia' || (formationName() === 'tiradors' && !co.sk && skTogether());
+const linTirMsg = () => co.open ? (co.sk ? 'primer, Roulement' : 'cal tenir els dos rengles junts (Serrez les files)') : 'cal estar en línia';
+const aturatLiniaT = () => { const r = aturat(); return r !== true ? r : linTir() ? true : linTirMsg(); };
+const marxaLiniaT = () => { const r = marxaRecta(); return r !== true ? r : linTir() ? true : linTirMsg(); };
 const marxaColumna = () => { const r = marxaRecta(); return r !== true ? r : formationName() !== 'columna' ? 'cal estar en fila' : true; };
 const SIDE_FR = { '-1': 'gauche', '1': 'droite' };
 const ORDERS = [
@@ -3239,11 +3291,11 @@ const ORDERS = [
     avail: aturat, run: () => turn(Math.PI) },
   // Conversions
   { id: 'WH-01', des: 2.2, en: 1.5, fam: 'conv', k: 'conv', sec: 'Des d\'aturat', fr: 'Par peloton', full: 'Par peloton à {s} – marche!', gl: 'el pivot gira al lloc; s\'acaba amb Halte', sides: true, icons: ['wheelL', 'wheelR'], cmdsS: { '-1': ['wh01L'], '1': ['wh01R'] },
-    avail: aturatLinia, run: sd => startWheel('stand', sd) },
+    avail: aturatLiniaT, run: sd => startWheel('stand', sd) },
   { id: 'WH-02', des: 2.0, fam: 'conv', k: 'conv', sec: 'En marxa', fr: 'Conversion', full: 'À {s} conversion – marche!', gl: 'el pivot avança lentament; s\'acaba amb En avant', sides: true, icons: ['wheelL', 'wheelR'], cmdsS: { '-1': ['wh02L'], '1': ['wh02R'] },
-    avail: marxaLinia, run: sd => startWheel('move', sd) },
+    avail: marxaLiniaT, run: sd => startWheel('move', sd) },
   { id: 'WH-03', des: 2.4, fam: 'conv', k: 'tournez', sec: 'En marxa', fr: 'Tournez', full: 'Tournez à {s} – marche!', gl: 'el primer home gira 90° i la resta corre al seu costat; continua la marxa', sides: true, icons: ['wheelL', 'wheelR'], cmdsS: { '-1': ['wh03L'], '1': ['wh03R'] },
-    avail: marxaLinia, run: sd => startWheel('turn', sd) },
+    avail: marxaLiniaT, run: sd => startWheel('turn', sd) },
   // Formacions
   { id: 'CD-01', des: 1.5, shot: true, fam: 'gir', k: 'parfile', sec: 'Fila en marxa', fr: 'Par file', full: 'Par file à {s} – marche!', gl: 'la fila canvia de rumb pel mateix punt', sides: true, icons: ['snakeL', 'snakeR'], cmdsS: { '-1': ['pfG'], '1': ['pfD'] },
     avail: marxaColumna, run: sd => parFile(sd) },
@@ -3252,7 +3304,7 @@ const ORDERS = [
   { id: 'WH-04', des: 0, fam: 'form', k: 'ligne', sec: 'Fila en marxa', fr: 'Par peloton en ligne', full: 'Par peloton en ligne – marche!', gl: 'de fila a línia sense aturar-se', icon: 'ligne', cmds: ['ligne'],
     avail: marxaColumna, run: () => parPelotonEnLigne() },
   { id: 'CD-03', des: 0, fam: 'form', k: 'align', sec: 'Línia aturada', fr: 'Alignement', full: 'À {s} – alignement!', gl: 'el guia surt mig pas i els altres s\'hi alineen', sides: true, icons: ['left', 'right'], cmdsS: { '-1': ['alignG', 'align'], '1': ['alignD', 'align'] },
-    avail: aturatLinia, run: sd => alignement(sd) },
+    avail: () => { if (co.open) { const r = aturat(); return r !== true ? r : co.sk ? 'primer, Roulement' : busy() ? 'espera que acabi la maniobra' : true; } return aturatLinia(); }, run: sd => co.open ? skAlign(sd) : alignement(sd) },
   { id: 'CD-03b', des: 0, fam: 'form', k: 'align', sec: 'Línia aturada', fr: 'Fixe!', full: 'Fixe!', gl: 'tornar el cap al front', icon: 'attention', cmds: ['fixe'],
     avail: () => co.state !== 'parat' ? 'cal estar aturat' : co.hdT === 0 ? 'només després d\'alinear' : true, run: () => fixe() },
   { id: 'CD-06', des: 1, shot: true, fam: 'form', k: 'form', sec: 'Línia aturada', fr: 'Contremarche', full: 'Contremarche!', gl: 'mitja volta de tota la unitat', icon: 'counter', cmds: ['counter'],
@@ -3283,14 +3335,25 @@ const ORDERS = [
     avail: () => { const r = aturat(); return r !== true ? r : !co.open ? 'no estan en tiradors' : true; }, run: sd => skRespace(sd > 0 ? 'first' : 'last', FRONT) },
   { id: 'SK-05', ctrOf: true, des: 0.3, fam: 'tir', k: 'skirm', lvl: 'skirm', sec: 'Formació', fr: 'Serrez (centre)', full: 'Sur le centre, serrez les files – marche!', gl: 'tornar a ajuntar les files cap al centre, al pas de charge', icon: 'align', cmds: ['serC'],
     avail: () => { const r = aturat(); return r !== true ? r : !co.open ? 'no estan en tiradors' : true; }, run: () => skRespace('centre', FRONT) },
-  { id: 'SK-06', des: 0, fam: 'tir', k: 'skirm', lvl: 'skirm', sec: 'Foc', fr: 'Feu à volonté', full: 'Commencez – le feu!', gl: 'foc al lloc: cada home carrega i dispara pel seu compte', icon: 'aim', cmds: ['commencez'],
-    avail: () => skAvail(), run: () => skStart('place') },
-  { id: 'SK-07', pk: 'adv', des: 0, fam: 'tir', k: 'skirm', lvl: 'skirm', sec: 'Foc', fr: 'Feu en avançant', full: 'Premier rang, feu en avançant – marche!', gl: 'els rengles avancen a salts, l\'un passant per l\'esquerra de l\'altre, i disparen', icon: 'forward', cmds: ['skAv'],
+  { id: 'SK-11', des: 0.2, fam: 'tir', k: 'skirm', lvl: 'skirm', sec: 'Formació', fr: 'Serrez les files', fullS: { '1': 'Serrez les files – en avant!', '-1': 'Serrez les files – en arrière!' }, gl: 'ajuntar els dos rengles: en avant, el de darrere avança; en arrière, el de davant fa mitja volta i recula', sides: true, sideLbl: ['en arrière', 'en avant'], icons: ['back', 'forward'], cmdsS: { '-1': ['serArr'], '1': ['serAv'] },
+    avail: () => { const r = aturat(); return r !== true ? r : !co.open ? 'no estan en tiradors' : co.sk ? 'primer, Roulement' : skTogether() ? 'els rengles ja estan junts' : true; }, run: sd => skCloseRanks(sd) },
+  { id: 'SK-07', pk: 'adv', des: 0, fam: 'tir', k: 'skirm', lvl: 'skirm', sec: 'Foc', fr: 'Feu en avançant', full: 'Feu en avançant – marche!', gl: 'els rengles avancen a salts, l\'un passant per l\'esquerra de l\'altre, i disparen', icon: 'forward', cmds: ['skAv'],
     avail: () => skAvail(), run: () => skStart('avant') },
-  { id: 'SK-08', pk: 'ret', des: 0, fam: 'tir', k: 'skirm', lvl: 'skirm', sec: 'Foc', fr: 'Feu en reculant', full: 'Premier rang, feu en reculant – marche!', gl: 'el rengle de davant dispara i es retira darrere l\'altre, i així successivament', icon: 'back', cmds: ['skRe'],
+  { id: 'SK-06', des: 0, fam: 'tir', k: 'skirm', lvl: 'skirm', sec: 'Foc', fr: 'Feu en place', full: 'Feu en place – commencez le feu!', gl: 'foc al lloc: cada home carrega i dispara pel seu compte', icon: 'aim', cmds: ['commencez'],
+    avail: () => skAvail(), run: () => skStart('place') },
+  { id: 'SK-08', pk: 'ret', des: 0, fam: 'tir', k: 'skirm', lvl: 'skirm', sec: 'Foc', fr: 'Feu en reculant', full: 'Feu en reculant – marche!', gl: 'el rengle de davant dispara i es retira darrere l\'altre, i així successivament', icon: 'back', cmds: ['skRe'],
     avail: () => skAvail(), run: () => skStart('arriere') },
-  { id: 'SK-RL', sk: true, des: 0, fam: 'tir', k: 'skirm', lvl: 'skirm', sec: 'Foc', fr: 'Roulement', full: 'Roulement!', gl: 'acabar el foc: carreguen, ajunten els rengles i armes a l\'espatlla', icon: 'halt', cmds: ['roulement'],
-    avail: () => !co.sk ? 'no estan fent foc' : co.sk.end ? 'ja estan acabant' : true, run: () => { co.sk.end = true; say('Roulement!'); } }
+  { id: 'SK-RL', sk: true, danger: true, pick: true, des: 0, fam: 'tir', k: 'skirm', lvl: 'skirm', sec: 'Foc', fr: 'Roulement', full: 'Roulement!', gl: 'aturar el foc: acaben de carregar i armes a l\'espatlla (o «chien au repos»: armes a l\'espatlla ja)', icon: 'halt', cmds: ['roulement'],
+    avail: () => !co.sk ? 'no estan fent foc' : co.sk.end ? 'ja estan acabant' : true, run: () => { co.sk.end = true; say('Roulement!'); } },
+  { id: 'SK-RC', sk: true, des: 0, fam: null, k: 'skirm', lvl: 'skirm', fr: 'Chien au repos', full: 'Le chien – au repos!', gl: 'aturar el foc a l\'instant: armes a l\'espatlla encara que no tots hagin carregat', icon: 'halt', cmds: ['chien'],
+    avail: () => !co.sk ? 'no estan fent foc' : true, run: () => skChien() },
+  { id: 'SK-AV', des: 0, fam: null, k: 'skirm', lvl: 'skirm', fr: 'Avancez', full: 'Avancez!', gl: 'el rengle que toca salta endavant', cmds: ['avancez'],
+    avail: () => co.sk && co.sk.mode === 'avant' ? true : 'no estan fent foc en avançant', run: () => skGo() },
+  { id: 'SK-RE', des: 0, fam: null, k: 'skirm', lvl: 'skirm', fr: 'Reculez', full: 'Reculez!', gl: 'el rengle de davant dispara i recula', cmds: ['reculez'],
+    avail: () => co.sk && co.sk.mode === 'arriere' ? true : 'no estan fent foc en reculant', run: () => skGo() },
+  { id: 'SR-01', des: 0, fam: 'form', k: 'align', sec: 'Línia en marxa', fr: 'Serrez les rangs', full: 'Serrez les rangs!', gl: 'caminant, en 10 segons es van alineant fins a l\'ordre perfecte; qualsevol altra ordre ho atura', icon: 'align', cmds: ['serrezRangs'],
+    avail: () => { const r = pre(); if (r) return r; if (co.state !== 'marxa' || co.mode !== 'direct') return 'cal estar caminant endavant'; const f = formationName(); return f !== 'línia' && f !== 'tiradors' ? 'cal estar en línia' : co.serrez ? 'ja s\'estan alineant' : true; },
+    run: () => { say('Serrez les rangs!'); co.serrez = { t: 0, T: 10 }; } }
 ];
 // Camps interns de cada ordre (vegeu TUNE, a dalt):
 //  «des» = quant desordena. Ordres contínues (marxa, conversions): multiplicador del soroll per pas; el pas l'escala amb desOpt.
@@ -3354,13 +3417,14 @@ function openMenu(id) {
   }
 }
 const PACE_FR = { ordinari: 'ordinaire', accelerat: 'accéléré', carrega: 'de charge' };
-const orderTitle = (o, arg) => o.id === 'FI-02' && arg ? 'Oblique à ' + SIDE_FR[String(arg)] + ' – joue!' : o.full ? o.full.replace(/\{s\}/g, SIDE_FR[String(arg)] || '').replace('{o}', PACE_FR[arg] || arg || '') : o.fr;
+const orderTitle = (o, arg) => o.fullS && arg !== undefined ? o.fullS[String(arg)] : o.id === 'FI-02' && arg ? 'Oblique à ' + SIDE_FR[String(arg)] + ' – joue!' : o.full ? o.full.replace(/\{s\}/g, SIDE_FR[String(arg)] || '').replace('{o}', PACE_FR[arg] || arg || '') : o.fr;
 // Ordres en dues veus (reglament): primer la veu PREVENTIVA («Par le flanc droite») i, passat ORDER_DELAY, l'EXECUTIVA («droite!»), que és
 // quan la unitat executa. Les ordres d'una sola paraula (Fixe!, Contremarche!) i Halte s'executen al moment.
 const ORDER_DELAY = 1;
 let pendingCmd = null, speakOverride = null;
 function splitOrder(o, arg) { const t = orderTitle(o, arg), i = t.indexOf(' – '); return i < 0 ? null : [t.slice(0, i), t.slice(i + 3)]; }
 function runOrder(o, arg, exec) {
+  if (o.id !== 'SR-01') co.serrez = null;                    // qualsevol altra ordre atura el «Serrez les rangs»
   speakOverride = exec;
   try { o.run(arg); if (o.shot) jolt(o.des); } finally { speakOverride = null; }
   lastKey = '';
@@ -3434,21 +3498,21 @@ function buildOrderPanel() {
       const items = [];
       const mk = (html, arg, cmds, cls) => {
         const b = document.createElement('button'); b.className = 'act ' + cls; b.innerHTML = html;
-        b.onclick = () => o.pk ? skPickOpen(o, arg) : fire(o, arg);
+        b.onclick = () => o.pick ? rlPickOpen() : o.pk ? skPickOpen(o, arg) : fire(o, arg);
         items.push({ b, arg, cmds, title: orderTitle(o, arg) }); return b;
       };
       if (o.sides) {
         r.innerHTML = '<b>' + o.fr + '</b><div class="acts"></div>';
         const acts = r.querySelector('.acts');
-        acts.appendChild(mk(ICONS[o.icons[0]] + '<span>gauche</span>', -1, o.cmdsS['-1'], 'side'));
+        acts.appendChild(mk(ICONS[o.icons[0]] + '<span>' + (o.sideLbl ? o.sideLbl[0] : 'gauche') + '</span>', -1, o.cmdsS['-1'], 'side'));
         if (o.ctr) {                                      // gauche · centre · droite: tres botons iguals
           r.classList.add('tri'); const c = ORDER_BY_ID[o.ctr], b = document.createElement('button'); b.className = 'act side'; b.innerHTML = ICONS[c.icon] + '<span>centre</span>';
           b.onclick = () => c.pk ? skPickOpen(c) : fire(c); acts.appendChild(b);
           panel.rows.push({ o: c, r: document.createElement('div'), items: [{ b, arg: undefined, cmds: c.cmds, title: orderTitle(c) }], fam: f.id });
         }
-        acts.appendChild(mk('<span>droite</span>' + ICONS[o.icons[1]], 1, o.cmdsS['1'], 'side'));
+        acts.appendChild(mk('<span>' + (o.sideLbl ? o.sideLbl[1] : 'droite') + '</span>' + ICONS[o.icons[1]], 1, o.cmdsS['1'], 'side'));
       } else if (o.pair) { r.innerHTML = '<div class="acts"></div>'; r.acts = r.querySelector('.acts'); r.acts.appendChild(mk(ICONS[o.icon] + '<b>' + o.fr + '</b>', undefined, o.cmds, 'wide')); pairRow = r; }
-      else { r.classList.add('one'); r.appendChild(mk(ICONS[o.icon] + '<b>' + o.fr + '</b>', undefined, o.cmds, 'wide')); }
+      else { r.classList.add('one'); r.appendChild(mk(ICONS[o.icon] + '<b>' + o.fr + '</b>', undefined, o.cmds, 'wide' + (o.danger ? ' danger' : ''))); }
       menu.appendChild(r);
       panel.rows.push({ o, r, items, fam: f.id });
     }
@@ -3468,9 +3532,17 @@ function buildOrderPanel() {
   }
   if (!document.getElementById('skBox')) {                   // foc en avançant / reculant: botó que fa saltar els rengles
     const sb = document.createElement('div'); sb.id = 'skBox';
-    sb.innerHTML = '<span class="fst"></span><button type="button" class="go"></button><button type="button" class="rl"><small>acabar</small>Roulement</button>';
-    sb.querySelector('.go').onclick = () => skGo(); sb.querySelector('.rl').onclick = () => fire(ORDER_BY_ID['SK-RL']);
+    sb.innerHTML = '<span class="fst"></span><button type="button" class="go"></button><button type="button" class="rl"><small>aturar el foc</small>Roulement</button>';
+    sb.querySelector('.go').onclick = () => skGo(); sb.querySelector('.rl').onclick = () => rlPickOpen();
     document.getElementById('controls').appendChild(sb);
+  }
+  if (!document.getElementById('rlPick')) {                  // Roulement: acabar de carregar o «chien au repos»
+    const rp = document.createElement('div'); rp.id = 'rlPick';
+    rp.innerHTML = '<b class="t">Roulement</b><button type="button" class="a"><small>acaben de carregar</small>Roulement</button><button type="button" class="b"><small>armes a l\'espatlla ja</small>Chien au repos</button><button type="button" class="x" title="Cancel·lar">×</button>';
+    rp.querySelector('.a').onclick = () => { rp.classList.remove('open'); fire(ORDER_BY_ID['SK-RL']); };
+    rp.querySelector('.b').onclick = () => { rp.classList.remove('open'); fire(ORDER_BY_ID['SK-RC']); };
+    rp.querySelector('.x').onclick = () => rp.classList.remove('open');
+    document.getElementById('controls').appendChild(rp);
   }
   if (!document.getElementById('skPick')) {                  // tria els passos abans d'executar l'ordre
     const pk = document.createElement('div'); pk.id = 'skPick';
@@ -3535,7 +3607,7 @@ function renderUnitControls() {
     sbx.style.display = on ? 'flex' : 'none';
     if (on) {
       const g = sbx.querySelector('.go'), n = mv ? (sk.mode === 'avant' ? SKCFG.adv : SKCFG.ret) : 0;
-      sbx.querySelector('.fst').textContent = sk.mode === 'place' ? 'Feu à volonté' : sk.mode === 'avant' ? 'Feu en avançant' : 'Feu en reculant';
+      sbx.querySelector('.fst').textContent = sk.mode === 'place' ? 'Feu en place' : sk.mode === 'avant' ? 'Feu en avançant' : 'Feu en reculant';
       g.style.display = mv ? '' : 'none';
       g.innerHTML = '<small>' + n + ' passos · espai</small>' + (sk.mode === 'avant' ? 'Avancez!' : 'Reculez!');
       g.disabled = !!sk.go || co.state === 'auto' || sk.stage === 'retire' || lock || !!pendingCmd;
@@ -3581,7 +3653,7 @@ function updateInfo() {
   if (am) {
     const AN = { portez: 'espatlla', repose: 'a terra', croise: 'baioneta', apprete: 'apprêtez', joue: 'joue', sk: 'a discreció' };
     const ld = co.arm === 'charge' ? co.members.filter(m => m.ld >= 1).length + '/' + co.members.length : '';
-    $('ucPas').innerHTML = co.arm === 'charge' ? 'càrrega ' + ld : AN[co.arm] + ' <i style="font-style:normal;color:' + (co.loaded ? '#2e7d32' : '#b3b0a6') + '">●</i>';
+    $('ucPas').innerHTML = co.reloading ? 'espatlla · carregant ' + co.members.filter(m => !m.rl).length + '/' + co.members.length : co.arm === 'charge' ? 'càrrega ' + ld : AN[co.arm] + ' <i style="font-style:normal;color:' + (co.loaded ? '#2e7d32' : '#b3b0a6') + '">●</i>';
     $('ucPas').title = co.arm === 'charge' ? 'carregant' : co.loaded ? 'carregada' : 'descarregada';
   }
   const pct = orderPct(), T = TUNE;
@@ -3919,7 +3991,7 @@ let autoStepT = 0;
 const VOICE = { on: false, rec: null, running: false, tested: false, seg: {}, interim: '', state: '', failT: 0, lastFail: null,
   learn: { phr: {}, ex: {} }, shared: { phr: {}, ex: {} }, opt: { mode: 'cont', vol: true, log: false, tele: true, engine: '' }, log: [], recentExec: null, ptt: false, db: false, loading: false };
 // Connexió amb Supabase (la mateixa de la web: si el joc s'obre dins la web, agafa window.APP_CONFIG) i fonts del motor local Vosk
-const GAME_VERSION = '1.5.0';
+const GAME_VERSION = '1.5.1';
 const CFG = Object.assign({
   SUPABASE_URL: 'https://ltopullwhasagnkuqaek.supabase.co',
   SUPABASE_ANON_KEY: 'sb_publishable_DhHFUh-UrbBrI0l476Vcnw_tSn-Gmkr',
@@ -4004,6 +4076,8 @@ function voiceCands() {
 // Prioritat segons la situació: el que té sentit ara és més probable
 function vPrior(c) {
   const id = c.o.id || 'HALTE', st = co.state;
+  if (co.open && /^SK-/.test(id)) return 1.12;                                     // en tiradors, les ordres de tiradors són les probables
+  if (co.sk && id === 'MA-01') return 0.8;
   if (id === 'HALTE') return st === 'marxa' || st === 'conv' ? 1.08 : 1;
   if (id === 'MA-01') return st === 'parat' || co.mode === 'oblic' || st === 'conv' ? 1.05 : 1;
   if (st === 'marxa' && ['MA-07', 'MA-04', 'CD-01', 'CD-05', 'WH-02', 'WH-03', 'WH-04'].includes(id)) return 1.03;
@@ -4601,7 +4675,7 @@ function loop(now) {
   last = now;
   if (screen === 'game') {
     if (!paused && !tutOpen() && !vtestOpen()) {
-      updateCo(dt); checkTrees(); checkLevel(); objUpdate(); tutUpdate();
+      updateCo(dt); serrezTick(dt); checkTrees(); checkLevel(); objUpdate(); tutUpdate();
       if (co.state === 'auto') { autoStepT += dt; if (autoStepT >= 60 / 76) { autoStepT = 0; SFX.step(co.members.length, false); } } else autoStepT = 0;
     }
     stepZoom(dt);
