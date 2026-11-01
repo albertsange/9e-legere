@@ -1548,7 +1548,7 @@ let co, lastKey = '', level = null, screen = 'title', paused = false;
 // ---------- Puntuació i rànquing ----------
 // Cada nivell dóna fins a 1000 punts: 4 parts de 250 (temps, baixes, ordres donades i ordre mitjà del regiment). Es guarda la millor de cada nivell.
 const STAT = { t: 0, ord: 0, dead: 0, oSum: 0, men0: 20 };
-const SCORE_REF = { 1: { t: 90, o: 12 }, 2: { t: 100, o: 14 }, 3: { t: 110, o: 16 }, 4: { t: 140, o: 20 }, 5: { t: 200, o: 25 }, 6: { t: 120, o: 14 }, 7: { t: 150, o: 20 }, 8: { t: 170, o: 30 } };   // temps (s) i ordres de referència: 250 punts; amb el triple, 0
+const SCORE_REF = { 1: { t: 90, o: 12 }, 2: { t: 100, o: 14 }, 3: { t: 110, o: 16 }, 4: { t: 140, o: 20 }, 5: { t: 200, o: 25 }, 6: { t: 120, o: 14 }, 7: { t: 150, o: 20 }, 8: { t: 170, o: 30 }, 9: { t: 150, o: 10 }, 10: { t: 300, o: 35 } };   // temps (s) i ordres de referència: 250 punts; amb el triple, 0
 function statReset() { STAT.t = 0; STAT.ord = 0; STAT.dead = 0; STAT.oSum = 0; STAT.men0 = co ? co.members.length : 20; }
 function scoreCalc(n) {
   const R = SCORE_REF[n] || { t: 150, o: 20 }, lin = (v, ref) => Math.max(0, Math.min(1, 1 - (v - ref) / (2 * ref)));
@@ -1648,7 +1648,7 @@ function reset() {
   centreCam();
   if (level && level.free) co.atencio = true;
   co.arm = 'portez'; co.loaded = false; co.reloading = false; co.serrez = null; FX.length = 0;
-  CORPSES.length = 0; BALLS.length = 0; GUNS.length = 0; for (const g of (level && level.guns) || []) GUNS.push(Object.assign({ reload: 3, aimT: 0 }, g)); ENEMY.length = 0; for (const d of (level && level.enemies) || []) ENEMY.push(buildEnemy(d)); HOVER = null; if (level && level.onReset) level.onReset();
+  CORPSES.length = 0; BALLS.length = 0; GUNS.length = 0; for (const g of (level && level.guns) || []) GUNS.push(Object.assign({ reload: 3, aimT: 0 }, g)); ENEMY.length = 0; ALLY.length = 0; co.ldBoost = 1; for (const d of (level && level.enemies) || []) ENEMY.push(buildEnemy(d)); HOVER = null; if (level && level.onReset) level.onReset();
   objReset();
   tutOnReset();
 }
@@ -1809,6 +1809,8 @@ function updateCo(dt) {
 // ---------- Unitats enemigues i targeta d'unitat (en passar el ratolí per sobre) ----------
 const FLAGS = { aut: 'data:image/webp;base64,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', '9e': 'data:image/webp;base64,UklGRvoUAABXRUJQVlA4IO4UAABQQQCdASpwAHAAPk0ci0UioaEe/hVUKATEtgBajXQec9z8yKvP5f+17VrV/kOvpf671BeYB+vnnkfpL7ifM9+yXrK/6f9oPeN/ZfUM/m3/g9Z71IP8V6g/lxeyJ/a/+d+2HtQ4Kxv4/T+DPjN9uftPmq4N+rX/D9C/5T91P1/9/9A+8H4k6gX4//Nv9v4aexB03/Af9b1AvY/6p/zf7n4qXz16lfWP/me4B/Lv51/0fTT/L+Ap9z/03sA/zf+2/97/J+7B/Wf/T/Uecr6g/ab4Bv6B/dvTo9kn7u+0L+2RiePUdIl8kDp6so37qyQMH3e8q7rh00istBvUZ4l8f54yja7L/qrGElNFusQR2LqC2nGvYimx37Ip6WhpDR8gZPiZVs2clU2uNmHwM/+BabeZvNA1Sb9xextW3DSfMsChvVKBPzFuExO8dGwNkecmzC/QzhXg4b7v6xq+MeMb27Hy+Z8kDZGmS1U/Ff/w5PE5MWTiRfrmm2EDtRTU6AQdc52iSsiFGQ9+EUEABaqrmbAtrnMCZJIs5QiQBsmXqXhyNBxpavN/BESxcFDj+2UmX+nE96xij8blu53d9zOt7Ez8oKbow7mtOGPMMVfUzS7NPLUxdoNTzKR8aRzm4FN1xT61MyfEex9XoVEiq6pJTUthrTms4vlh5k8q+sgLFdCzLjREjigRy0YZdUtkcb1mvDa3NgAA/vipLgT292mUO8wclfmov7UN9nyY80l4RPx21sW8RSzIBiEJZst9slmHJ1c8aaqbNubu+dwR0kuOL83AzVkiL4jTlqweuC46JQm3/n2bPGhy+jTt4+C4QP20Gzj3o5y57wz3UE/ch1aG8l9xG9En3/Lhkb3fFQvejSCkMa61tFe77zEU4GExmE6qWpZcGPQHxwPLy4GTWTvdr+M0EeEFDm1ZKdByL8vZEO/y/sKdWo7YUVanR/LWAkMdCjsBzGAx2kcFTH41WWo7qkWTX//KnSxejPs3kOB75pwH7emBowgJJ3TtHI/B655LOQth/hhdLo1cQQV2Y1IElpJisx1YtrkK/aNwP70T/TLTcIyH5fFhVZkkd5EHFE3fa9LG3qPVqzbyuLK+tcBAxmyQQix//lTQBnImI9Gu/bJID+iU85a47te9UxdDeR/qsXf8K3PikKsMwYWdURmK3KhFT9/ASYuzC3E2tlRiUEkVDM8jGkx+Ab+t/2I6Yw7Ne6ScOOufvwzuqrL8BLPe3l7FT9qlkFZepBk3vylt+P7SA8lBopSoIZ6eY6IEPB8nK7CcwdGeeDRbO6rQHaWc+8SNEjVPyFI/7CRBseFohxlh1iQXMo7XCWwa5183E+fyijZE2j+i8Nz+M8g2JFH/xsTPAqorDoGZcESkowD2za27PE8ZgMBBctqbvTEAfhODn3rj0vwUCAm6MqsVfCMG871nd0+440w8Gg7cQGVXNquPXQyz4XtWIxG5JIZYPJWguBKYwqjJwNhTIbdCePTATY2ZdwFrmUScbgY72Mv6xz19vNRQY/XBaq09PaLuWZ7dB2MML2Lj5mNAMenwzvXP1SCn/zyenlzcg0/DAyNzeNpBhTPyR/o5BEM4F2zER+ooWJ9TZtkwmKk8waIw+aEEFS89LbAsOs9un9IyEwmRpl+zapECu5ibDKY7aCjPTaJxyaH+SZPFXM/lK+CMzF8EMw0h6lA0QxbGDZhPpo3v+T27tlYuKwt9mvAuqsnBQl55xz7sHw1FYLHBIuy5sjQ0qPqJk8rY9/HpJr9qVf+9whej8leTno4PRX9vbzerpCEXMdlIsfM2Im+5E+otoI/KU2EeLjIElqLwSf+9YyoLTVE0RqlfqjR2FVbLgZ6tssAgR4j7QPrv7T8bwNM0Q0Kko5FzoyBA0DIeGU6t7Ce/SFURPEYBXyvMWQT2nK2SKypKjisXlPkbYSKPD5npJQFCSS1XbPktNpuXUxRA8h3ZK2AEgySE9QPg2ZXm7Lc9CKhyRuTwtw+fegyGEbG3dsJWSy0o/0twkEJQY6qHeBZsMRxrWMiAXqejdEilAly8+I/kcwiU9FveFABSC5mpoMVkQ22zEeCLFpQ9/scgABJiYPrg4bz8Uur6y0C3XsXHcrOdieNETzOJpD8WH0TDuAnj0iGpmXG+gnnV/s0dAs2KKMG3l62tmZEudDwozlBSbpAWx1Ci4N68J7E7Ap1EodISeBrGRb2Gl1t3YEHOcluK4fd0AlY+qlgYJH32oK+dGQOvJTW2JDXJoYN7gNQprX0EIyHN0H6LtAzGBLsl1n19I3As6PNFDcUCLyPNip6O0sKbQfa2e6skC1UgP2NxrJJgG30BpQqQPIkpv0xVr8UHg5OeUEis7FctH6bJMctMucv8Jzsiz0fXIh060JhxMtf5YX2txnmDOXbgkTiLpDe/vQ1CY2Q06MV8OE3hSiM/wyHLWohI58s77BCB24POY4mohHCbkwlLMV/jY9u/4N5rwU5n3qHL7q0laAqFqpDkp7tV/a2quNPyEIWUejEODYM0qav/cwk4Aj01sy96nhJg1VMYuoOWUyA4Iy0p7pRYvM+U2oZqFRasegJe783GCDCnNgw4sfwWV8HUZ3W22TQJlEytAFFxx/qKWJ3PLGSwn3HOJIXTFPs0TMTrJuyRE/PrsSb9CrC4HdgKyvZo5EfAVSuxskJHkxlvaQH9vUJSmMXwM6GxquE9/z3jVJw+9F/XRmcMJZJiBoh7urho64MZt91oaSfH90XwNp7yiBfNZqaMKGfc41wnKC3SkodKtuJ7N97gDyEro+Vs1q2ap5knHQYqpfiv+m+3vJNqlu2EMDXfcd2qUzHVrvnjKBW/iym1klbAgSc7P67nHm2vS8ZZWR27oXs/xjwk2ezcZkRz8tXdpw6wX9T/xFCwOFs23Y6iPYVMPMtDDsg8406A4JD/+zLKgrrd3d6Xqhw5C/9uSdiR3O+fbVZP0/7soEtzR7wzRgVWpTws/OnW5lBRmRdl0qIku6ALO29wIqgRcTB3JVytz5cT8/8BgTCZYeN9cpLpqnouhBwqdFVrXCifA/lALWS2zt1Iw8tmuKyZeUmPRfaqZplmwMC82Gm3WveWjYUMp5RYBdmF8NNerL1w7oXefz4qDEMoSILgTw6WPJRNeMy8P/c1o50eDFLDthYVXDjaB+Soj/DN3N2Yxk8lZ1/WfJdW36lGWlhcbRkiN8F7lO5amW5vXioXS45+SCm+yQZKXm7hH/0jiL8HTuKQ88dAVIsMpTJfpdx61KVn2/bbuK4Pb/5Rzl7Er8MS3dZN/yIXSbWk3kAn64AvUOv/4dUwGNzxq/L3itz7gNUQK6X0PhboOZGcRK2FqtQKU2reShjitNp2earzSQVZPc3g0vL6pz+e80FUlhRl4NDfpKT5o0MLBsIaqNQxb5FAvwCwllM/dwBPvcuFY23G2E0rj3nEPvuSxgXyvs9zHk+xVRMNUkuLmeRSjmlDrKW0pLiVn7kqIOqTU/wgC+mtUeWd8CFADsbc7uGt3xAM5j/bJiB5YT+LIwH/uUlYIWypzSxsc+ylGfUiHd22DrlSQyzRLRTIG/AxbEJurOJJhxl48761SRo7O11xU4DbF7wbBhP7Yt8Kce/r28IuO2ifYVGgrUvD5ecEd9ZhRPq57sleBi17rNdDsIaIEoT0VSaDNfjWlJJbAT30kqCmjDLSMpSbLR4OOqhDPDL7gXFcNRGSvc8GnLCQREfMxY6visAdBAtftNlizIOljoYyLLIL872gyD2mvlh8uJkHuGPvOuKi3/gP7RmKJyCcW3osbxxM2XqngQ5AiT+ajjLk/MG3yigAuFuYUyr6kqlp5tQdUB3Y1ofQ+/Ji5peSWDYc8I2gfT2SJUxFpb1UVQRT9a/EujjxhVcPuXkZzX+3Klq0nctzOc5e53p77tJ281tgntXfjd24diXLrk35voCEpW39MnE8EVJVq3ckNFv/LbHkVfc6bQ5PS5vufDbAlLKFC5Vt7pkllhuKYOC4jC2kPHPZ3efMFl00nHIgvvR6hfMmkJxdfsTqQx9zlSDgAfOvUDhJfrhDrNH/8MJYB9+spGwRxZCFZg0ypbBbusiJG9qPmcXkWVugVkEqx5j/JDCdBGjrsdFb4K8QCpaDzanSGcVpMI1G3cZ9NGjpKeGy/1KBsCjObnjinraJDtlsRci5zCLQSOprqr7l3OE9Cad9SgrxTRhfgpQj22ItwNBRWm6NRuwE1qH+fMhDIL8ZTHbuTAJtMqmDxsW79Otd6t9ssdSnxA5JVNW46XCqhjGH86iaupZ14l1usz0SZ/JeBi0KtLB4ggP3lhdU/hpdipjsWqbtJmOiwkiL7ZIEaDPhvE7ExZ0Ah7Ge8LGe8A9wyiullluq2yFSeZobwMCCvZrB39j4zAy24BJQ4CHwYhlCXLudqwL8gNao9A2ZOmjSSbrcbwdRplYECXE6puAnS4C2ZCkzNowwHQeMFOc3s5JWR+ETbDsNmfk6AD7qmSp7Qw0Q//17HSVFOskjCKZJ8HtLugfE8yTkORR5YEsdNVOiQVP4796Gpoq96sZ9uA0Bf2yDGp0P04JVWidbp2NMZwriSzTiFxJMBrkl0deJLai/zVrOt5ynPK8VAWYZq+BMs2gdAD7Kq43c2fi1k5aFRxDdiXfb2i/5d6dDUwpxohaQ9kAZBot5qZtx9vncjvP3at13NEvkVVYKuxu3ifKH1tmEqsF1P6+czCDorWsjkqF3EWjxn83yvDFOoGeWzHH5/FCzacECgtbyRu7942jnoKNDBid/mo8XLBL3oAB6fgDFELLRw9xXFcrUCZowhAus57ZpIBE7uuOyV3KNz31aTx/MmDrRGvaBepK3IDF/j4f5kTghrSh/mMeiyo1BDJCd+kcW97VYfKGLFB3pV4wTEHANpLlyJTh6spxHHmZ0BTzIznSxLDk6obdBk7DVA6kkR/qZ/CZpySbetDjmQiERoMjGZzPLUjxgKDO8D2G57u3rqYgZznVkzhcT9+V1aKfh1n6o1FHYjime/G58nP8gF27XVfBXGBMBqTIgDBYTDgKorgSE2tyGdgUfjePT4kg4aoYmpCq57EpZthcvL85s9e/knB58vWX1sKI3PBEK6HSPuVMapMc13SC7SAZZZQ7Tlvidt3FMNbv53kE1k4m+ucA0dHSMKxMIe4dVSXRKNBnZFq6k6fnLLxa33PCmipW6wyYD2q5BQdUlZYWSKjJJy/Ak2/eMJy1+KN/T73jyRGYL4Ig1vsvnlX471Cq8L+z89ICJqNAgKw7xNTQV0lv73V8E78JMK9EWDjvDOLvVlTS2CyCfqcUdqDNLRaZd0HoI6ZLvn27axfkqSJc3T3EoEQrYgiVnpT3Y2YF+gKPWYUiUtpIwN8C8VD3vRekhW4ri5IRpeYnvemESne31CUYc7iVDjsswREUfZPN4uavk7oy9Qe5pbP/jLNqHkfveseuFvoHYa+htAQ8COefF7z3PZLNyWmBSiJPtEr/zkyol0bnCtH2iiGtUIl9G1FLJ3OHnFWvMWfckv3tmnmUWGKzn0uB1wWI+5MZGuaJb2VjRtcNwf8x/JopwOCzcYI/61X62gTBZslxN81gB0rXiRn/58/psgwq8G+a/sYx2z/3F508q/Uyqf+lz+Stt8UevQh4dU/NriWZ+pumQmAEeIQUAm+b42wTYDGNwNKanFyCL3b3kf91USwDkFIwiGw8oHmwMX0n8BJIZ3AXruAg2eaNqd5czWD7AuEHAmkDFYTPYYCyQAa9qwAUwAAtvi+BSPHF/3X96PkbgLILCq0q6J4jHTnD/U/VbpmkuXo+afNU8ffqOLhledcTSmW7bdReeeRLI3AvirxfLHtz+3Dk/lG5sKi8agoU30PehHe0y4BGT+FiO2qYoZNOzCMl5aTgSgN/EJSrJI0i7XUjjwGnxsv7UwGMjkum5EJBaFICiNjbBDnpXppLmBS/4XR7f07tKfNFaPnKHfkMcFVpl/eCcw7IWYQsl6bxll1ZA52zdUr0KE9ajooh8mFjEPzDOg82W/bAENgWzpHAjx4ZI4uGF9+5n8ruR/6G6T1zMjXg68qfta8njabye33X2R0OsyeoziqwebKzJ16u8liLMfJKreyg7R0+F7MwcT74NDiHJt2r8gZyDn04skWq0DXry9Dpz99f1oAu4Bsd8240XnggpRb3PIxpt5n9H0Bl65V1Zg5C63Yi6ld1Rm2TFDWrmy+tKjHHqIHu1246AzDrC25J/HgUGutuPyHEMP0/KXH3jyJLmZbpvdkOgQJ3OjXzo5Hp9EyW2+bsX+/OBQyuExD0vPIH+9PQbJs4gxEBvWoe2dQoX/ojiOvjpbQ8TzJmhlnB6bJuklrL5e3X747RU7q4e+ZN43FdzO6ka9hkownydNWJh965pFK4kQlKSSAp5kdgDm7uHqP3+vlejCgq1PtvLGwg09oDYI9SEHxKRqnaPV11MZXMx8LjlPKf+e+rHQUTk6Pd5hxAavFASZJLBbIGKom7lsELzWDQZ39U96pzWpa9K0kEwVivtlDGMKlskxqOnwzdoyqyrRstRCppFHIpOS/ftN/rDzj1LSN2L046HM+Z4e0Zb+eFWtslmTIbXgZTGtXmd3Bao5a4etDyQSDrsPAIH3MyyFF4l3R3MnRnjADmn5PKv17r9+Iefkx7TnTKJptPviGMEmIvX55s02SE3yQbHAtYzwofQBCErbm4655lYamzhg/qu2m0C/OEf1Nyan0R1mNr+vLeiJtlV7CwhkCw6m3YI8neEIzeS5W9wdDWCN/goxuYXD40OabPaPbPkrkUXrWqKctj7/OTGqzqC51We1C+z2kfXdL9w3bCp5E/IY7X+cmWCraLS89NcB6kHxv/RJsrLawpfJwlhX0t5VHsLWjishYMGaatW6ueqvauMfOLM7M1FUlXphJswCE7TdIys9+HQ2Ec4se7NrTkYsDWHNfnnMDy2WveY5kMIi4hrI9CC4j87TgZ3P/QIrJjOBRt1c87xEH/Xi6dzkOLaF11GTIi9yP8tNi2GQXDTzsdN6RfFdZ4p63Qo1FuUt2I/XyOKJkwZxk5//likA2I6qVfft69EhF8ZBu27E1GDcUwVXqMqq3S4f978878f8rI7BefLx6g0MXAHNQl0wvx7Mpbi1lc1kKnz1AZY/pQgAAA=' };
 const ENEMY = [];                              // unitats enemigues estàtiques del nivell: { name, flag, cx, cy, h, men: [{x,y,alive,t}] }
+const ALLY = [];                               // unitats amigues amb IA (nivell 10)
+let LASTORD = { id: '', n: 0, voice: false }, VOICE_RUN = false;   // darrera ordre executada i si ha estat per veu
 function buildEnemy(d) {
   const men = [], c = Math.cos(d.h), sn = Math.sin(d.h), nf = d.nFiles || FILES;
   for (let rank = 0; rank < 2; rank++) for (let file = 0; file < nf; file++) {
@@ -2038,7 +2040,7 @@ function skChien() {                              // «Le chien au repos»: arme
 function updateReload(dt) {                        // recàrrega pendent després d'un «chien au repos»
   if (!co.reloading || co.sk) return;
   let left = 0;
-  for (const m of co.members) if (m.rl) { m.ld = Math.min(1, m.ld + dt / m.ldDur); if (m.ld >= 1) { m.rl = false; m.sh = true; m.okT = 1.4; } else left++; }
+  for (const m of co.members) if (m.rl) { m.ld = Math.min(1, m.ld + dt * (co.ldBoost || 1) / m.ldDur); if (m.ld >= 1) { m.rl = false; m.sh = true; m.okT = 1.4; } else left++; }
   if (!left) { co.reloading = false; co.loaded = true; lastKey = ''; }
 }
 function skTogether() {                           // els dos rengles estan junts (no separats pels salts)
@@ -2143,7 +2145,7 @@ function skVolley(R) { co.lastShot = performance.now(); for (const g of GUNS) g.
 function updateSkirm(dt) {
   if (!co.sk) return;
   const sk = co.sk;
-  for (const m of co.members) if (m.rl) { m.ld = Math.min(1, m.ld + dt / m.ldDur); if (m.ld >= 1) { m.rl = false; m.sh = true; m.okT = 1.4; } }
+  for (const m of co.members) if (m.rl) { m.ld = Math.min(1, m.ld + dt * (co.ldBoost || 1) / m.ldDur); if (m.ld >= 1) { m.rl = false; m.sh = true; m.okT = 1.4; } }
   if (screen !== 'game' || paused || co.state === 'auto') return;
   if (sk.moving) { sk.moving = false; if (sk.mode === 'avant') sk.fireR = sk.lastR; }
   if (sk.wait > 0) { sk.wait -= dt; return; }
@@ -2297,7 +2299,7 @@ function updateEnemies(dt) {                     // els regiments enemics es gir
   if (screen !== 'game' || paused || tutOpen() || co.lost) return;
   const T = TUNE.mosquet, c = unitCentre();
   for (const e of ENEMY) {
-    if (!e.shoots || e.routed) continue;
+    if (!e.shoots || e.routed || e.ai) continue;
     const live = e.men.filter(v => v.alive); if (!live.length) continue;
     if (e.reload > 0) e.reload -= dt;
     e.supp = Math.max(0, (e.supp || 0) - T.supDecau * dt);
@@ -2317,6 +2319,96 @@ function updateEnemies(dt) {                     // els regiments enemics es gir
     if (e.aimT >= T.enAvis) enemyVolley(e, S, live);
   }
 }
+// ---------- Unitats amb IA (nivell 10): cada unitat del 9e i cada unitat austríaca actua per si sola ----------
+function aiRot(u, st) { const cs = Math.cos(st), sn = Math.sin(st); for (const v of u.men) { const x = v.x - u.cx, y = v.y - u.cy; v.x = u.cx + x * cs - y * sn; v.y = u.cy + x * sn + y * cs; } u.h += st; }
+function aiMove(u, dx, dy) { for (const v of u.men) { v.x += dx; v.y += dy; } u.cx += dx; u.cy += dy; }
+function aiGroups(side) {                       // contra qui lluita una unitat: els austríacs, contra el jugador i els aliats; els francesos, contra els austríacs
+  const g = [];
+  if (side === 'au') {
+    if (co.members.length) { const c = unitCentre(); g.push({ own: true, men: co.members, h: co.members[0].h, cx: c.x, cy: c.y }); }
+    for (const a of ALLY) { const l = a.men.filter(v => v.alive); if (l.length) g.push({ ally: a, men: l, h: a.h, cx: a.cx, cy: a.cy }); }
+  } else for (const e of ENEMY) { if (e.routed || e.state === 'retreat') continue; const l = e.men.filter(v => v.alive); if (l.length) g.push({ en: e, men: l, h: e.h, cx: e.cx, cy: e.cy }); }
+  return g;
+}
+function aiVolley(u, g, side) {
+  const T = TUNE.mosquet, live = u.men.filter(v => v.alive);
+  for (const v of live) { const d = Math.random() * T.escalf * (Math.random() < 0.12 ? 1.6 : 1); FX.push({ k: 'shot', x: v.x + Math.cos(u.h) * 1.25, y: v.y + Math.sin(u.h) * 1.25, a: u.h, t: -d }); SFX.shot(d); }
+  SFX.rumble(0.08, T.escalf + 1.2);
+  const S = makeStrip(live, u.h, u.h, T.enOberta), n = live.length / 20 * (side === 'au' ? 0.7 : 1.0) * (1 - Math.min(0.9, u.supp || 0));
+  const r = hitMen(S, g.men, n);
+  if (g.own) {
+    const k = r.dead.length; for (const m of r.dead) killOwn(m); lastKey = '';
+    setTimeout(() => reac(k ? 'decebut' : 'aprova', '<b>Louis:</b> ' + (k ? 'Ens disparen! Hem perdut <b>' + k + '</b> homes.' : 'Ens han disparat, però han errat!'), 4600), 700);
+    if (level && level.minMen && co.members.length < level.minMen && !co.lost) { co.lost = true; setTimeout(() => { reset(); showMsg('La unitat ha quedat destrossada: partida reiniciada', 3200); }, 2600); }
+  } else if (g.ally) {
+    for (const v of r.dead) { v.alive = false; addCorpse(v.x, v.y, g.ally.h, true, v.rank); }
+    if (r.inside.length) g.ally.supp = Math.min(1, (g.ally.supp || 0) + T.supDescarrega * 0.6);
+  } else {
+    for (const v of r.dead) killEnemy(v, g.en);
+    if (r.inside.length) { g.en.supp = Math.min(1, (g.en.supp || 0) + T.supDescarrega * 0.6); g.en.volleys++; }
+  }
+  u.reload = T.carrega * (0.85 + Math.random() * 0.5); u.aimT = 0;
+}
+function aiUnitTick(u, side, dt) {
+  const T = TUNE.mosquet, live = u.men.filter(v => v.alive); if (!live.length) return;
+  u.supp = Math.max(0, (u.supp || 0) - T.supDecau * dt);
+  if (u.reload > 0) u.reload -= dt;
+  if (u.state === 'retreat') {                                              // demi-tour i es retira al pas accéléré
+    const diff = wrapA(u.awayH - u.h), st = Math.max(-1.2 * dt, Math.min(1.2 * dt, diff));
+    if (Math.abs(st) > 1e-5) aiRot(u, st);
+    if (Math.abs(diff) < 0.06) { const sp = STEP * PACES.accelerat.cad / 60 * dt; aiMove(u, Math.cos(u.h) * sp, Math.sin(u.h) * sp); }
+    return;
+  }
+  const gs = aiGroups(side); if (!gs.length) return;
+  let best = null, bs = 1e9;                                                // tria objectiu: el més proper; compta com a més proper el que ens ensenya el flanc o és més feble
+  for (const g of gs) {
+    const d = Math.hypot(g.cx - u.cx, g.cy - u.cy), face = Math.abs(wrapA(Math.atan2(u.cy - g.cy, u.cx - g.cx) - g.h));
+    const sc = d - (face > 0.9 ? 10 : 0) - (g.men.length < 12 ? 4 : 0) - (g.own ? 8 : 0); if (sc < bs) { bs = sc; best = g; }
+  }
+  const d = Math.hypot(best.cx - u.cx, best.cy - u.cy), want = Math.atan2(best.cy - u.cy, best.cx - u.cx);
+  const diff = wrapA(want + (d > u.hold + 8 ? (u.off || 0) : 0) - u.h), rate = (d > u.hold ? 0.3 : T.enGir * 1.6) * dt, st = Math.max(-rate, Math.min(rate, diff));
+  if (Math.abs(st) > 1e-5) aiRot(u, st);
+  if (d > u.hold && Math.abs(diff) < 0.5) { const sp = STEP * PACES.ordinari.cad / 60 * dt; aiMove(u, Math.cos(u.h) * sp, Math.sin(u.h) * sp); }
+  if (d <= 42 && u.reload <= 0 && (u.supp || 0) <= T.supMax) {              // dispara quan té prou homes enemics dins la franja
+    const S = makeStrip(live, u.h, u.h, T.enOberta), inside = best.men.filter(m => inStrip(S, m.x, m.y) >= 0).length;
+    if (inside >= Math.max(3, best.men.length * 0.3)) { u.aimT = (u.aimT || 0) + dt; if (u.aimT >= 2.5) aiVolley(u, best, side); } else u.aimT = 0;
+  }
+}
+function aiTickAll(dt) {
+  if (screen !== 'game' || paused || tutOpen() || co.lost) return;
+  for (const e of ENEMY) if (e.ai) aiUnitTick(e, 'au', dt);
+  for (const a of ALLY) aiUnitTick(a, 'fr', dt);
+}
+function drawAllies() {                         // unitats amigues amb IA: blau més clar amb contorn blanc
+  const rS = Math.max(1.8, 0.2 * M);
+  for (const a of ALLY) {
+    let n = 0, cx = 0, cy = 0;
+    for (const m of a.men) if (m.alive) {
+      n++; cx += m.x; cy += m.y; const px = m.x * M, py = m.y * M;
+      ctx.fillStyle = m.rank === 0 ? '#2f5fae' : '#5b86cf'; ctx.strokeStyle = '#fff'; ctx.lineWidth = Math.max(1, 0.05 * M);
+      ctx.beginPath(); ctx.arc(px, py, rS, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      ctx.strokeStyle = '#fff'; ctx.lineWidth = Math.max(1, 0.06 * M); ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(px + Math.cos(a.h) * 0.4 * M, py + Math.sin(a.h) * 0.4 * M); ctx.stroke();
+    }
+    if (n) { ctx.fillStyle = '#2f5fae'; ctx.font = '600 ' + Math.max(10, 0.9 * M) + 'px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'; ctx.fillText(a.name + ' · ' + n, cx / n * M, (cy / n - 2.2) * M); }
+  }
+}
+function drawCaptain() {                        // el capità Le Jay: una bola daurada que segueix la unitat i l'ajuda a recarregar
+  const k = level && level.captain; if (!k) return;
+  const t = performance.now() / 1000, x = k.x * M, y = k.y * M, R = Math.max(5, 0.6 * M), pul = 1 + 0.12 * Math.sin(t * 3);
+  ctx.save();
+  if (k.near) { ctx.strokeStyle = 'rgba(199,154,43,.35)'; ctx.setLineDash([0.6 * M, 0.6 * M]); ctx.lineWidth = Math.max(1, 0.07 * M); ctx.beginPath(); ctx.arc(x, y, 16 * M, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]); }
+  const g = ctx.createRadialGradient(x, y, 0, x, y, R * 3.2 * pul);
+  g.addColorStop(0, 'rgba(255,214,90,.85)'); g.addColorStop(0.4, 'rgba(255,190,60,.35)'); g.addColorStop(1, 'rgba(255,190,60,0)');
+  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, R * 3.2 * pul, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#f6c945'; ctx.strokeStyle = '#7a5d14'; ctx.lineWidth = Math.max(1, 0.06 * M); ctx.beginPath(); ctx.arc(x, y, R, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  ctx.lineWidth = Math.max(1.5, 0.12 * M);                                  // anell tricolor que gira
+  [['#1f3a78', 0], ['#ffffff', 2.09], ['#b3261e', 4.19]].forEach(([c, o]) => { ctx.strokeStyle = c; ctx.beginPath(); ctx.arc(x, y, R * 0.62, t * 1.6 + o, t * 1.6 + o + 1.9); ctx.stroke(); });
+  ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(x, y, R * 0.22, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#7a5d14'; ctx.font = '700 ' + Math.max(9, 0.8 * M) + 'px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+  ctx.fillText('Capità Le Jay', x, y + R * 1.5);
+  if (k.near && (co.arm === 'charge' || co.reloading || (co.sk && co.members.some(m => m.rl)))) { ctx.fillStyle = '#2e7d32'; ctx.fillText('recàrrega −5 s', x, y + R * 1.5 + Math.max(10, 0.9 * M)); }
+  ctx.restore();
+}
 function updateMusket(dt) {
   if (level && level.tick) level.tick(dt);
   updateBayonet(); updateEnemies(dt); updateGlide(dt); updateSkirm(dt); updateReload(dt); updateGuns(dt); for (const c of CORPSES) c.t += dt;
@@ -2326,7 +2418,7 @@ function updateMusket(dt) {
   if (co.arm === 'charge') {
     let done = 0;
     for (const m of co.members) {
-      if (m.ld < 1) { m.ld = Math.min(1, m.ld + dt / m.ldDur); if (m.ld >= 1) m.okT = 1.4; }
+      if (m.ld < 1) { m.ld = Math.min(1, m.ld + dt * (co.ldBoost || 1) / m.ldDur); if (m.ld >= 1) m.okT = 1.4; }
       else { done++; if (m.okT > 0) m.okT -= dt; }
     }
     if (done === co.members.length) { co.arm = 'portez'; co.loaded = true; lastKey = ''; say('Portez vos armes!'); }
@@ -3458,7 +3550,7 @@ let pendingCmd = null, speakOverride = null;
 function splitOrder(o, arg) { const t = orderTitle(o, arg), i = t.indexOf(' – '); return i < 0 ? null : [t.slice(0, i), t.slice(i + 3)]; }
 function runOrder(o, arg, exec) {
   if (o.id !== 'SR-01') co.serrez = null;                    // qualsevol altra ordre atura el «Serrez les rangs»
-  speakOverride = exec; if (screen === 'game') STAT.ord++;
+  speakOverride = exec; if (screen === 'game') STAT.ord++; LASTORD = { id: o.id || 'HALTE', n: LASTORD.n + 1, voice: VOICE_RUN };
   try { o.run(arg); if (o.shot) jolt(o.des); } finally { speakOverride = null; }
   lastKey = '';
 }
@@ -3979,7 +4071,7 @@ function drawCo() {
     const c = co.conv; ctx.strokeStyle = T.ecarlate; ctx.lineWidth = 1.5; ctx.setLineDash([3, 3]);
     ctx.beginPath(); ctx.arc(c.px * M, c.py * M, Math.max(5, 0.5 * M), 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]);
   }
-  drawCorpses(); drawHover(); drawEnemies(); drawColumn(); drawGuns();
+  drawCorpses(); drawHover(); drawEnemies(); drawAllies(); drawColumn(); drawCaptain(); drawGuns();
   // Soldats: rodones; la ratlla blanca indica cap on miren
   const rS = Math.max(1.8, 0.2 * M);
   for (const m of co.members) {
@@ -4024,7 +4116,7 @@ let autoStepT = 0;
 const VOICE = { on: false, rec: null, running: false, tested: false, seg: {}, interim: '', state: '', failT: 0, lastFail: null,
   learn: { phr: {}, ex: {} }, shared: { phr: {}, ex: {} }, opt: { mode: 'cont', vol: true, log: false, tele: true, engine: '' }, log: [], recentExec: null, ptt: false, db: false, loading: false };
 // Connexió amb Supabase (la mateixa de la web: si el joc s'obre dins la web, agafa window.APP_CONFIG) i fonts del motor local Vosk
-const GAME_VERSION = '1.6.0';
+const GAME_VERSION = '1.7.0';
 const CFG = Object.assign({
   SUPABASE_URL: 'https://ltopullwhasagnkuqaek.supabase.co',
   SUPABASE_ANON_KEY: 'sb_publishable_DhHFUh-UrbBrI0l476Vcnw_tSn-Gmkr',
@@ -4173,7 +4265,7 @@ function voiceExecute(c, how) {
   pendingCmd = null; VOICE.vad.phase = 'idle';
   const a = c.o.avail(c.arg);
   if (a !== true) { showMsg('No es pot: ' + a, 2500); vlog('no', c.exec, 'no es pot: ' + a); return; }
-  runOrder(c.o, c.arg, c.exec);
+  VOICE_RUN = true; try { runOrder(c.o, c.arg, c.exec); } finally { VOICE_RUN = false; }
   if (VOICE.auto && VOICE.auto.key === c.key) { voiceTeachPhr(VOICE.auto.nh, c.key, 'ús'); } VOICE.auto = null;
   if (how === 'volum') VOICE.recentExec = { ek: vKey(c.E[c.E.length - 1]), t: performance.now() };   // la paraula arribarà després pel reconeixedor
   VOICE.state = ''; vlog('exec', c.exec, how);
@@ -5365,6 +5457,133 @@ function buildLevel8() {
   return build;
 }
 
+function buildLevel9() {
+  const A = MapKit.A, sc = [], W = 100, H = 56, R = TUNE.mosquet.abast;
+  sc.push(
+    A.field([[0, 0], [W, 0], [W, H], [0, H]], { kind: 'meadow' }),
+    A.road([[0, 40], [W, 40]], { kind: 'track' }),
+    A.fence([[60, 6], [60, 16]]), A.fence([[60, 46], [60, 54]]),
+    A.label('Camp d\'instrucció', 22, 8, { kind: 'place', scale: 0.55 })
+  );
+  const st = { base: 0, amb: false, fin: false };
+  const ordOk = id => LASTORD.id === id && LASTORD.n > st.base && (LASTORD.voice || !voiceSupported());
+  const fired = () => !!(co.volley && co.volley.ok);
+  const arm = () => co.arm === 'portez' ? 'Digues <b>«Apprêtez – vos armes!»</b>.' : co.arm === 'apprete' ? 'Digues <b>«Joue!»</b>.' : co.arm === 'joue' ? 'Digues <b>«Feu!»</b>.' : 'Estan descarregats: <b>«Chargez – vos armes!»</b>.';
+  const ALL = ['gir', 'mov', 'pace', 'parfile', 'bataille', 'align', 'obl', 'conv', 'tournez', 'ligne', 'form', 'repos', 'musket'];
+  const steps = [
+    { title: 'Ordres amb veu', pose: 'serios', hl: [], unlock: ALL, tag: 'Benvinguda', intro: true, btn: 'Endavant',
+      text: ['Respira, <b>chasseur</b>: els austríacs han fugit, de moment. Aprofitem la calma per <b>entrenar maniobres</b>.',
+        'I avui t\'ensenyaré un truc de debò: <b>pots parlar-me</b>. Els oficials no apretaven botons: cridaven les ordres. Fes-ho tu també.'],
+      done: () => TUT.intro },
+    { title: 'Activa la veu', pose: 'assenyala', unlock: ALL, hl: [], mini: () => voiceSupported() ? 'Prem el botó <b>Veu</b> (el micròfon sota el mapa) i accepta el permís del micròfon. La primera vegada es fa una petita prova.' : 'El teu navegador no admet la veu: practicarem amb els botons.',
+      done: () => VOICE.on || !voiceSupported() },
+    { title: 'Preventiva i executiva', pose: 'serios', tag: 'La veu', hl: [], unlock: ALL, btn: 'Entesos', ack: true,
+      text: ['Una ordre té <b>dues parts</b>: la <b>preventiva</b> (<i>«En avant…»</i>), que avisa, i l\'<b>executiva</b> (<i>«…marche!»</i>), que fa moure la tropa. Digues la primera, fes una breu pausa i crida la segona.',
+        'Parla <b>en francès</b>, clar i fort. Sota el mapa veuràs què t\'ha entès el joc. Si no ho encerta del tot, no passa res: ell va aprenent com parles.'],
+      done() { return !!this.acked; } },
+    { title: 'En avant', pose: 'assenyala', unlock: ALL, hl: [], enter() { st.base = LASTORD.n; },
+      mini: 'Digues en veu alta: <b>«En avant… marche!»</b>', done: () => ordOk('MA-01') },
+    { title: 'Halte', pose: 'assenyala', unlock: ALL, hl: [], enter() { st.base = LASTORD.n; },
+      mini: 'Ara atura\'ls: <b>«Halte!»</b>', done: () => ordOk('HALTE') && co.state === 'parat' },
+    { title: 'Contremarche', pose: 'assenyala', unlock: ALL, hl: [], enter() { st.base = LASTORD.n; },
+      mini: () => co.state !== 'parat' || busy() ? 'Espera que acabin de moure\'s…' : 'Mitja volta de tota la unitat: <b>«Contremarche!»</b>', done: () => ordOk('CD-06') && co.state === 'parat' && !busy() },
+    { title: 'Chargez', pose: 'assenyala', unlock: ALL, hl: [], enter() { st.base = LASTORD.n; },
+      mini: () => co.arm === 'charge' ? 'Carregant… espera que els rellotges es posin en <b>verd</b>.' : 'Carrega els mosquets: <b>«Chargez – vos armes!»</b>', done: () => ordOk('LS-01') && co.loaded },
+    { title: 'Ens han tornat a atacar!', pose: 'louis', unlock: ALL, hl: [],
+      enter() {
+        const c = unitCentre(), h = co.members[0].h; st.amb = true;
+        const e = buildEnemy({ name: 'Regiment austríac', flag: 'aut', cx: c.x + Math.cos(h) * 34, cy: c.y + Math.sin(h) * 34, h: h + Math.PI, shoots: true, alert: true });
+        e.reload = 40; ENEMY.push(e);
+        reac('louis', '<b>Louis:</b> Chasseur, ens han tornat a atacar!', 5000);
+      },
+      mini: () => co.chaos ? '…' : co.state !== 'parat' ? 'Atura\'t: <b>«Halte!»</b>' : arm(), resetStep: () => 6, done: () => fired() },
+    { title: 'Han fugit', pose: 'aprova', unlock: ALL, hl: [], mini: 'Els austríacs tornen a fugir!', done: () => false }
+  ];
+  return {
+    w: W, h: H, start: { x: 14, y: 40 }, obstacles: [], scene: MapKit.scene(sc), zone: null, musket: true, driftScale: 0.5, goalHeading: 0, minMen: 6,
+    enemies: [],
+    tutorial: { steps, figs: [], startAtencio: true, resetStep: () => 3 },
+    onReset() { st.amb = false; st.fin = false; },
+    tick(dt) {
+      if (st.amb && !st.fin && fired() && ENEMY[0] && performance.now() - co.volley.t > 1800) { st.fin = true; routEnemy(ENEMY[0]); reac('louis', '<b>Louis:</b> Fugen! Així es fa, chasseur.', 4000); }
+    },
+    win: () => st.fin && performance.now() - co.volley.t > 5500,
+    objectives: [
+      { t: 'Activar el mode de veu', ok: () => TUT.step >= 2 },
+      { t: 'Dictar quatre ordres: En avant, Halte, Contremarche i Chargez', ok: () => TUT.step >= 7 },
+      { t: 'Disparar contra els austríacs que tornen', ok: () => st.amb && fired() }
+    ],
+    goalText: 'Activa la veu, dicta quatre ordres i fes foc contra els austríacs quan tornin.',
+    endText: 'Molt bé, chasseur: has donat les ordres amb la teva veu i has rebutjat els austríacs. A partir d\'ara, el teu regiment t\'obeeix.'
+  };
+}
+
+function buildLevel10() {
+  const A = MapKit.A, sc = [], W = 130, H = 74;
+  sc.push(
+    A.field([[0, 0], [W, 0], [W, H], [0, H]], { kind: 'meadow' }),
+    A.road([[0, 36], [50, 38], [W, 36]], { kind: 'track' }),
+    A.wood([[8, 2], [40, 1], [42, 10], [10, 11]], { kind: 'mixed', spacing: 3.2, seed: 101 }), A.wood([[78, 64], [122, 63], [123, 73], [80, 73]], { kind: 'broad', spacing: 3.2, seed: 102 }),
+    A.fence([[62, 14], [62, 26]]), A.fence([[62, 48], [62, 60]]),
+    A.label('Camp de batalla', 52, 6, { kind: 'town', scale: 0.55 })
+  );
+  const cap = { x: 5, y: 36, near: true };
+  const st = { ret: false, retAt: 0, fired: false, au0: 40 };
+  const auLeft = () => ENEMY.reduce((n, e) => n + (e.ai ? enAlive(e) : 0), 0);
+  const steps = [
+    { title: 'Marxant a la guerra', pose: 'serios', hl: [], unlock: ['gir', 'mov', 'pace', 'parfile', 'bataille', 'align', 'obl', 'conv', 'tournez', 'ligne', 'form', 'repos', 'musket', 'skirm'], tag: 'Benvinguda', intro: true, btn: 'Endavant',
+      text: ['<b>Chasseur</b>, s\'ha acabat la instrucció. Ens han ordenat marxar contra els austríacs: <b>això ja és la guerra</b>.',
+        'No anem sols: a la nostra esquerra marxa una altra companyia del 9e. <b>Actua per si sola</b>, sense esperar les nostres ordres. Davant tenim <b>dos regiments austríacs</b> de la nostra mida, i tampoc ells no s\'estaran quiets.'],
+      done: () => TUT.intro },
+    { title: 'El capità Le Jay', pose: 'assenyala', tag: 'Capità', hl: [], unlock: ['gir', 'mov', 'pace', 'parfile', 'bataille', 'align', 'obl', 'conv', 'tournez', 'ligne', 'form', 'repos', 'musket', 'skirm'], btn: 'Som-hi', ack: true,
+      text: ['Aquella <b>bola daurada</b> que ens segueix per darrere és el <b>capità Le Jay</b>. Mentre sigui a prop i la unitat sigui viva, els homes <b>carreguen uns 5 segons més de pressa</b>.',
+        'Quan els austríacs hagin perdut <b>la meitat dels seus homes</b>, es retiraran. Carrega, avança, fes foc… i no deixis que el Le Jay es quedi enrere.'],
+      done() { return !!this.acked; } },
+    { title: 'A la guerra', pose: 'serios', hl: [], unlock: ['gir', 'mov', 'pace', 'parfile', 'bataille', 'align', 'obl', 'conv', 'tournez', 'ligne', 'form', 'repos', 'musket', 'skirm'],
+      mini: () => 'Austríacs caiguts: <b>' + (st.au0 - auLeft()) + '</b> de <b>' + st.au0 / 2 + '</b> necessaris per fer-los retirar.', resetStep: () => 2, done: () => st.ret },
+    { title: 'Es retiren!', pose: 'aprova', hl: [], unlock: ['gir', 'mov', 'pace', 'parfile', 'bataille', 'align', 'obl', 'conv', 'tournez', 'ligne', 'form', 'repos', 'musket', 'skirm'], mini: 'Els austríacs es retiren, chasseur!', done: () => false }
+  ];
+  return {
+    w: W, h: H, start: { x: 14, y: 36 }, obstacles: [], scene: MapKit.scene(sc), zone: null, musket: true, skirm: true, driftScale: 0.5, goalHeading: 0, minMen: 7, cover: [],
+    captain: cap,
+    enemies: [
+      { name: '1r Regiment austríac', flag: 'aut', cx: 108, cy: 30, h: Math.PI, shoots: true, ai: true, hold: 33, off: 0.3 },
+      { name: '2n Regiment austríac', flag: 'aut', cx: 108, cy: 50, h: Math.PI, shoots: true, ai: true, hold: 35, off: -0.3 }
+    ],
+    tutorial: { steps, figs: [], startAtencio: true, resetStep: () => 2 },
+    onReset() {
+      st.ret = false; st.fired = false; st.au0 = 0;
+      for (const e of ENEMY) if (e.ai) { e.reload = 24 + Math.random() * 10; e.supp = 0; e.state = ''; st.au0 += e.men.length; }
+      ALLY.push(Object.assign(buildEnemy({ name: 'Companyia B', flag: '9e', cx: 14, cy: 54, h: 0 }), { ai: true, hold: 30, reload: 10 + Math.random() * 8, supp: 0, state: '', off: 0 }));
+      cap.x = 5; cap.y = 36;
+    },
+    onVolley() { st.fired = true; },
+    tick(dt) {
+      if (screen !== 'game' || paused || tutOpen() || co.lost) return;
+      const c = unitCentre(), h = co.members[0].h, tx = c.x - Math.cos(h) * 7, ty = c.y - Math.sin(h) * 7, k = Math.min(1, 2.2 * dt);
+      cap.x += (tx - cap.x) * k; cap.y += (ty - cap.y) * k;
+      cap.near = co.members.length > 0 && Math.hypot(cap.x - c.x, cap.y - c.y) <= 16;
+      co.ldBoost = cap.near ? TUNE.mosquet.carrega / (TUNE.mosquet.carrega - 5) : 1;          // recarrega uns 5 s més de pressa de mitjana
+      if (TUT.step >= 2 && !st.ret) aiTickAll(dt);
+      if (TUT.step >= 2 && !st.ret && auLeft() <= st.au0 * 0.5) {
+        st.ret = true; st.retAt = performance.now();
+        for (const e of ENEMY) if (e.ai) { e.state = 'retreat'; e.awayH = Math.atan2(e.cy - c.y, e.cx - c.x); }
+        reac('louis', '<b>Louis:</b> Han perdut la meitat dels homes: es retiren!', 5000);
+      }
+      if (st.ret) aiTickAll(dt);
+    },
+    win: () => st.ret && performance.now() - st.retAt > 7000,
+    objectives: [
+      { t: 'Carregar els mosquets', ok: () => co.loaded || st.fired || st.ret },
+      { t: 'Fer foc contra els austríacs', ok: () => st.fired || st.ret },
+      { t: 'Fer caure la meitat dels austríacs perquè es retirin', ok: () => st.ret },
+      { t: 'Mantenir la unitat amb almenys 7 homes', ok: () => st.ret && co.members.length >= 7 }
+    ],
+    goalText: 'Carrega, avança amb el capità Le Jay i fes caure la meitat dels austríacs. La segona unitat del 9e lluita per ella sola.',
+    endText: 'Molt bé, chasseur: has mogut la teva companyia al costat de l\'altra, has fet recular els austríacs i el capità Le Jay n\'ha tingut cura. Que viu el 9e!'
+  };
+}
+
 const LEVELS = [{ n: 1, title: 'Sortir de la plaça', desc: 'Tutorial: surt d\'una plaça tancada, passa un corredor de tendes i torna a formar.', build: buildLevel1 },
   { n: 2, title: 'La porta i la cantonada', desc: 'Oblics, Tournez i Par peloton: passa una porta en diagonal, gira una cantonada sense trencar la línia i fes front des d\'aturat.', build: buildLevel2 }];
 LEVELS.push({ n: 3, title: 'Exercici de síntesi', desc: 'Practica el que has après: porta en oblic, camí estret en fila i formació final alineada, sense ajuda.', build: buildLevel3 });
@@ -5373,7 +5592,8 @@ LEVELS.push({ n: 5, title: 'Cansament i desordre', desc: 'Coneix el sergent-majo
 LEVELS.push({ n: 6, title: 'La guerra comença', desc: 'Carrega el mosquet, avança cap a una unitat austríaca i dispara-li.', build: buildLevel6 });
 LEVELS.push({ n: 7, title: 'Foc recte i foc oblic', desc: 'Dos regiments austríacs es giraran i et dispararan: dispara primer, en oblic i de cara, i cobreix-te amb els arbres.', build: buildLevel7 });
 LEVELS.push({ n: 8, title: 'Els tiradors', desc: 'Obre files i avança disparant per cobrir la columna francesa davant d\'un regiment austríac.', build: buildLevel8 });
-for (let i = 9; i <= 10; i++) LEVELS.push({ n: i, title: 'Properament', desc: 'Aquest nivell encara no està disponible.', locked: true });
+LEVELS.push({ n: 9, title: 'Ordres amb veu', desc: 'Activa el mode de veu, dicta quatre ordres senzilles i fes foc quan els austríacs tornin.', build: buildLevel9 });
+LEVELS.push({ n: 10, title: 'Marxant a la guerra', desc: 'Mena una companyia del 9e al costat d\'una altra que actua sola, contra dos regiments austríacs. El capità Le Jay et fa recarregar més de pressa.', build: buildLevel10 });
 
 const FREE = { build: buildFree };
 const NEWS_KEY = '9eNews_1.5.0';
