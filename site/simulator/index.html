@@ -80,13 +80,27 @@
   #btnCampaign:disabled{opacity:.45;cursor:default;background:var(--bleu);}
   #btnCampaign:disabled:hover{background:var(--bleu);}
   #btnCampaign small{font-size:.7em;letter-spacing:.04em;text-transform:none;opacity:.85;}
-  #btnFree{background:transparent;color:var(--bleu);}
-  #btnFree:hover{background:var(--quote-bg);}
+  #btnFree,#btnRank{background:transparent;color:var(--bleu);}
+  #btnFree:hover,#btnRank:hover{background:var(--quote-bg);}
   .btn-main:hover{background:color-mix(in srgb,var(--bleu) 80%,var(--ink));}
   .btn-main:focus-visible,.btn-sec:focus-visible,.lvl:focus-visible{outline:2px solid var(--ecarlate);outline-offset:3px;}
   .btn-sec{font-family:var(--label);letter-spacing:.05em;font-size:.95rem;color:var(--bleu);background:var(--sheet);border:1px solid var(--bleu);border-radius:3px;padding:.4rem 1rem;cursor:pointer;}
   .btn-sec:hover{background:var(--quote-bg);}
-  #screenLevels{padding:2.4rem 1.2rem 3rem;}
+  #screenLevels,#screenRank{padding:2.4rem 1.2rem 3rem;}
+  #rankBody{width:min(760px,100%);}
+  #rankMsg{color:var(--muted);text-align:center;margin:2rem 0;}
+  .podium{display:flex;align-items:flex-end;justify-content:center;gap:.6rem;margin:.4rem 0 1.6rem;}
+  .podium .pl{flex:1;max-width:210px;text-align:center;background:var(--sheet);border:1px solid var(--line);border-radius:4px 4px 0 0;padding:.7rem .4rem .5rem;display:flex;flex-direction:column;justify-content:flex-end;}
+  .podium .pl.p1{min-height:150px;border-top:4px solid #b8902a;} .podium .pl.p2{min-height:118px;border-top:4px solid #8a9199;} .podium .pl.p3{min-height:92px;border-top:4px solid #a8693a;}
+  .podium .pos{font-family:var(--display);font-size:2rem;line-height:1;color:var(--bleu);}
+  .podium .nm{font-weight:700;overflow-wrap:anywhere;margin-top:.2rem;} .podium .pt{font-variant-numeric:tabular-nums;color:var(--muted);}
+  .rtab{width:100%;border-collapse:collapse;} .rtab td,.rtab th{padding:.45rem .6rem;border-bottom:1px solid var(--line);text-align:left;}
+  .rtab th{font-family:var(--label);font-weight:400;letter-spacing:.08em;text-transform:uppercase;font-size:.8rem;color:var(--muted);}
+  .rtab td.n,.rtab th.n{text-align:right;font-variant-numeric:tabular-nums;} .rtab tr.row{cursor:pointer;} .rtab tr.row:hover{background:rgba(0,0,0,.03);}
+  .rtab tr.me{background:rgba(31,58,120,.09);font-weight:700;} .rtab tr.det td{font-size:.85rem;color:var(--muted);padding-top:.1rem;}
+  #endScore{margin:.6rem 0 .2rem;} #endScore .big{font-family:var(--display);font-size:2.2rem;color:var(--bleu);line-height:1;} #endScore .big small{font-size:1rem;color:var(--muted);}
+  #endScore table{border-collapse:collapse;width:100%;font-size:.9rem;margin-top:.4rem;} #endScore td{padding:.15rem .3rem;border-bottom:1px solid var(--line);} #endScore td:last-child{text-align:right;font-variant-numeric:tabular-nums;}
+  #endScore .sv{font-size:.8rem;color:var(--muted);margin-top:.3rem;}
   .lvl-head{width:min(1000px,100%);display:flex;align-items:center;gap:1.2rem;margin-bottom:1.4rem;}
   .lvl-head h2{font-family:var(--display);font-weight:400;font-size:2.2rem;margin:0;color:var(--bleu);}
   .lvl-grid{width:min(1000px,100%);display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:1rem;}
@@ -493,6 +507,7 @@
   <button class="btn-main" id="btnLevels">Tutorial</button>
   <button class="btn-main" id="btnCampaign" disabled title="Properament">Campanya <small>· properament</small></button>
   <button class="btn-main alt" id="btnFree">Mode lliure</button>
+  <button class="btn-main alt" id="btnRank">Rànquing</button>
   <img class="avtitle" alt="Capitaine Le Jay">
   <div class="gver" id="verTitle"></div>
   <div id="glangTitle"></div>
@@ -502,6 +517,10 @@
   <div class="lvl-head"><button class="btn-sec" id="btnBackTitle">‹ Enrere</button><h2>Tutorial</h2></div>
   <p id="lvlNote"></p>
   <div class="lvl-grid" id="lvlGrid"></div>
+</section>
+<section id="screenRank" class="screen">
+  <div class="lvl-head"><button class="btn-sec" id="btnRankBack">‹ Enrere</button><h2>Rànquing</h2></div>
+  <div id="rankBody"><p id="rankMsg">Carregant…</p></div>
 </section>
 <div id="goal"><div class="gh"><b id="goalH">Objectius</b><span id="goalCnt"></span><button class="mbtn" id="btnMenu" title="Menú (Esc)"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg><span>Menú</span></button></div>
   <div class="gbar"><i></i></div><ul id="objList"></ul><span id="goalText"></span></div>
@@ -514,7 +533,7 @@
   <button class="sb danger" id="sideLevels"><span>‹</span><b id="sideLevelsT">Tutorial</b></button></div></div>
 <div id="tmini"><img alt=""><div class="t"></div></div>
 <div id="tut"><div class="card"><div class="av"><img alt="Capitaine Le Jay"><span>Capitaine Le Jay</span></div><div class="n"></div><h4></h4><p></p><div class="figs"></div><button id="tutOk">Entesos</button></div></div>
-<div id="endmsg"><div class="card"><img class="av2" alt="Capitaine Le Jay"><h3>Nivell completat</h3><p id="endText"></p>
+<div id="endmsg"><div class="card"><img class="av2" alt="Capitaine Le Jay"><h3>Nivell completat</h3><p id="endText"></p><div id="endScore"></div>
   <div class="row"><button class="btn-sec" id="btnAgain">Repetir</button><button class="btn-sec" id="btnToLevels">Tutorial</button><button class="btn-main" id="btnNext" style="font-size:1rem;padding:.5rem 1.4rem">Nivell següent ›</button></div></div></div>
 <canvas id="c"></canvas>
 <div id="compass" data-cmd="compass" title="Brúixola: clica per posar el nord amunt; arrossega-la o usa les fletxes ← → del teclat per girar el mapa (↑ ↓ fan zoom)"><svg viewBox="-32 -32 64 64" aria-label="Brúixola"><circle r="27" fill="none" stroke="var(--line)" stroke-width="1"/><g id="needle"><path d="M0 -24 L6 0 L-6 0Z" fill="#b3261e"/><path d="M0 24 L6 0 L-6 0Z" fill="#6b6a63"/><text y="-12.5" text-anchor="middle" font-size="9" font-weight="700" fill="#fff" font-family="sans-serif" style="pointer-events:none">N</text></g><circle r="2.2" fill="var(--sheet)" stroke="var(--ink)" stroke-width=".6"/></svg></div>
@@ -1526,6 +1545,19 @@ function makeCo(cx, cy) {
 }
 
 let co, lastKey = '', level = null, screen = 'title', paused = false;
+// ---------- Puntuació i rànquing ----------
+// Cada nivell dóna fins a 1000 punts: 4 parts de 250 (temps, baixes, ordres donades i ordre mitjà del regiment). Es guarda la millor de cada nivell.
+const STAT = { t: 0, ord: 0, dead: 0, oSum: 0, men0: 20 };
+const SCORE_REF = { 1: { t: 90, o: 12 }, 2: { t: 100, o: 14 }, 3: { t: 110, o: 16 }, 4: { t: 140, o: 20 }, 5: { t: 200, o: 25 }, 6: { t: 120, o: 14 }, 7: { t: 150, o: 20 }, 8: { t: 170, o: 30 } };   // temps (s) i ordres de referència: 250 punts; amb el triple, 0
+function statReset() { STAT.t = 0; STAT.ord = 0; STAT.dead = 0; STAT.oSum = 0; STAT.men0 = co ? co.members.length : 20; }
+function scoreCalc(n) {
+  const R = SCORE_REF[n] || { t: 150, o: 20 }, lin = (v, ref) => Math.max(0, Math.min(1, 1 - (v - ref) / (2 * ref)));
+  const avg = STAT.t > 0 ? STAT.oSum / STAT.t : 100;
+  const p = { t: Math.round(250 * lin(STAT.t, R.t)), d: Math.round(250 * Math.max(0, 1 - STAT.dead / Math.max(1, STAT.men0))), o: Math.round(250 * lin(STAT.ord, R.o)), a: Math.round(250 * Math.max(0, Math.min(1, avg / 100))) };
+  return { total: p.t + p.d + p.o + p.a, parts: p, time: Math.round(STAT.t), dead: STAT.dead, orders: STAT.ord, avg: Math.round(avg) };
+}
+const fmtT = s => Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+
 
 // ---------- Objectius del nivell: llista de punts de control (si es mor, tornen a començar) ----------
 const OBJ = { done: [], complete: false };
@@ -1964,7 +1996,7 @@ function killOwn(m) {
   const i = co.members.indexOf(m); if (i < 0 || co.members.length <= 1) return;
   addCorpse(m.x, m.y, m.h, true, m.rank);
   if (co.open || co.sk) skRanks();                 // en tiradors el buit es queda (compta com un home imaginari)
-  co.members.splice(i, 1);
+  co.members.splice(i, 1); STAT.dead++;
   if (!co.open && !co.sk) fillHole(m.rank, m.file, m.x, m.y);
 }
 function updateGlide(dt) {                       // els qui cobreixen un buit hi caminen (el desplaçament és relatiu: no depèn de si la unitat es mou)
@@ -3426,7 +3458,7 @@ let pendingCmd = null, speakOverride = null;
 function splitOrder(o, arg) { const t = orderTitle(o, arg), i = t.indexOf(' – '); return i < 0 ? null : [t.slice(0, i), t.slice(i + 3)]; }
 function runOrder(o, arg, exec) {
   if (o.id !== 'SR-01') co.serrez = null;                    // qualsevol altra ordre atura el «Serrez les rangs»
-  speakOverride = exec;
+  speakOverride = exec; if (screen === 'game') STAT.ord++;
   try { o.run(arg); if (o.shot) jolt(o.des); } finally { speakOverride = null; }
   lastKey = '';
 }
@@ -3908,7 +3940,7 @@ function checkLevel() {
   if (disorderRms() > 0.03 || co.hdT !== 0) return;      // cal que la línia estigui alineada i amb el cap al front
   }
   paused = true; SFX.ding();
-  if (typeof curLevel === 'number') progDone(LEVELS[curLevel].n);
+  if (typeof curLevel === 'number') { progDone(LEVELS[curLevel].n); scoreShow(LEVELS[curLevel].n); } else document.getElementById('endScore').innerHTML = '';
   OBJ.complete = true; objUpdate();
   document.getElementById('btnNext').style.display = typeof curLevel === 'number' && levelUnlocked(curLevel + 1) ? '' : 'none';
   document.getElementById('tut').classList.remove('show'); document.getElementById('tmini').classList.remove('show');
@@ -3992,7 +4024,7 @@ let autoStepT = 0;
 const VOICE = { on: false, rec: null, running: false, tested: false, seg: {}, interim: '', state: '', failT: 0, lastFail: null,
   learn: { phr: {}, ex: {} }, shared: { phr: {}, ex: {} }, opt: { mode: 'cont', vol: true, log: false, tele: true, engine: '' }, log: [], recentExec: null, ptt: false, db: false, loading: false };
 // Connexió amb Supabase (la mateixa de la web: si el joc s'obre dins la web, agafa window.APP_CONFIG) i fonts del motor local Vosk
-const GAME_VERSION = '1.5.1';
+const GAME_VERSION = '1.6.0';
 const CFG = Object.assign({
   SUPABASE_URL: 'https://ltopullwhasagnkuqaek.supabase.co',
   SUPABASE_ANON_KEY: 'sb_publishable_DhHFUh-UrbBrI0l476Vcnw_tSn-Gmkr',
@@ -4676,6 +4708,7 @@ function loop(now) {
   last = now;
   if (screen === 'game') {
     if (!paused && !tutOpen() && !vtestOpen()) {
+      STAT.t += dt; STAT.oSum += orderPct() * dt;
       updateCo(dt); serrezTick(dt); checkTrees(); checkLevel(); objUpdate(); tutUpdate();
       if (co.state === 'auto') { autoStepT += dt; if (autoStepT >= 60 / 76) { autoStepT = 0; SFX.step(co.members.length, false); } } else autoStepT = 0;
     }
@@ -5348,11 +5381,41 @@ function newsShow() { let seen = false; try { seen = !!localStorage.getItem(NEWS
 function newsClose() { document.getElementById('news').classList.remove('show'); try { localStorage.setItem(NEWS_KEY, '1'); } catch (e) {} }
 document.getElementById('newsX').onclick = newsClose;
 document.getElementById('newsGo').onclick = () => { newsClose(); showScreen('levels'); };
+function scoreShow(n) {
+  const sc = scoreCalc(n), el = document.getElementById('endScore'), P = sc.parts;
+  el.innerHTML = '<div class="big">' + sc.total + ' <small>/ 1000 <span>punts</span></small></div><table>' +
+    '<tr><td><span>Temps</span> · ' + fmtT(sc.time) + '</td><td>' + P.t + ' / 250</td></tr><tr><td><span>Baixes</span> · ' + sc.dead + '</td><td>' + P.d + ' / 250</td></tr>' +
+    '<tr><td><span>Ordres donades</span> · ' + sc.orders + '</td><td>' + P.o + ' / 250</td></tr><tr><td><span>Ordre mitjà</span> · ' + sc.avg + ' %</td><td>' + P.a + ' / 250</td></tr></table><div class="sv"></div>';
+  const sv = el.querySelector('.sv'), a = progAuth();
+  if (!a) { sv.textContent = 'Inicia sessió a la web del 9e per entrar al rànquing.'; return; }
+  sv.textContent = 'Desant la puntuació…';
+  sbFetch('/rest/v1/rpc/game_submit_score', { method: 'POST', headers: { Authorization: 'Bearer ' + a.token }, body: JSON.stringify({ p_level: n, p_score: sc.total, p_detail: sc }) })
+    .then(() => { sv.textContent = 'Puntuació enviada al rànquing (compta la teva millor del nivell).'; }).catch(() => { sv.textContent = 'No s\'ha pogut enviar la puntuació al rànquing.'; });
+}
+async function rankLoad() {
+  const body = document.getElementById('rankBody'), a = progAuth();
+  const msg = t => { body.innerHTML = '<p id="rankMsg">' + vEsc(t) + '</p>'; };
+  if (!a) { msg('Inicia sessió a la web del 9e per veure el rànquing.'); return; }
+  msg('Carregant…');
+  let rows;
+  try { rows = await (await sbFetch('/rest/v1/rpc/game_ranking', { method: 'POST', headers: { Authorization: 'Bearer ' + a.token }, body: '{}' })).json(); } catch (e) { msg('No s\'ha pogut carregar el rànquing.'); return; }
+  if (!rows.length) { msg('Encara no hi ha cap puntuació. Completa un nivell per ser el primer!'); return; }
+  const lv = LEVELS.filter(L => !L.locked);
+  const pod = [1, 0, 2].filter(i => rows[i]).map(i => '<div class="pl p' + (i + 1) + '"><div class="pos">' + (i + 1) + '</div><div class="nm">' + vEsc(rows[i].nom_guerre) + '</div><div class="pt">' + rows[i].total + ' <span>punts</span></div></div>').join('');
+  let h = '<div class="podium">' + pod + '</div><table class="rtab"><tr><th class="n">#</th><th>Nom de guerre</th><th class="n">Punts</th></tr>';
+  rows.forEach((r, i) => {
+    h += '<tr class="row' + (r.me ? ' me' : '') + '" data-i="' + i + '"><td class="n">' + (i + 1) + '</td><td>' + vEsc(r.nom_guerre) + '</td><td class="n">' + r.total + '</td></tr>' +
+         '<tr class="det" id="rdet' + i + '" style="display:none"><td></td><td colspan="2">' + lv.map(L => '<span>Nivell</span> ' + L.n + ': <b>' + ((r.levels || {})[L.n] || '—') + '</b>').join(' · ') + '</td></tr>';
+  });
+  body.innerHTML = h + '</table>';
+  body.querySelectorAll('tr.row').forEach(tr => { tr.onclick = () => { const d = document.getElementById('rdet' + tr.dataset.i); d.style.display = d.style.display === 'none' ? '' : 'none'; }; });
+}
 function showScreen(name) {
   screen = name;
   if (name === 'title') newsShow(); else document.getElementById('news').classList.remove('show');
   document.getElementById('screenTitle').classList.toggle('show', name === 'title');
   document.getElementById('screenLevels').classList.toggle('show', name === 'levels');
+  document.getElementById('screenRank').classList.toggle('show', name === 'rank'); if (name === 'rank') rankLoad();
   if (name === 'levels') { renderLevelGrid(); progSync(); }
   const g = name === 'game';
   document.getElementById('controls').style.display = g ? 'grid' : 'none';
@@ -5381,7 +5444,7 @@ function startLevel(i) {
   zoom = 1.3; zoomTarget = 1.3; M = BASE_M * 1.3; rot = 0; rotGoal = null;
   resizeCanvas();
   tutStart();
-  reset();
+  reset(); statReset();
   buildMini();
 }
 // Miniatures dels nivells del tutorial (captures del joc, generades amb un script de Playwright)
@@ -5468,6 +5531,8 @@ window.addEventListener('keydown', e => {
 });
 document.getElementById('btnNext').onclick = () => { if (levelUnlocked(curLevel + 1)) startLevel(curLevel + 1); };
 document.getElementById('btnFree').onclick = () => startLevel('free');
+document.getElementById('btnRank').onclick = () => showScreen('rank');
+document.getElementById('btnRankBack').onclick = () => showScreen('title');
 function updVoiceTitle() { const b = document.getElementById('btnVoice'); if (b) b.innerHTML = ICONS.mic + '<span>' + (VOICE.on ? 'Mode de veu: activat' : 'Mode de veu') + '</span>'; }
 VOICE.on = !!VOICE.want && voiceSupported(); VOICE.tested = VOICE.on;
 
