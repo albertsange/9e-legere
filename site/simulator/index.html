@@ -1952,8 +1952,13 @@ function losBlocked(x0, y0, x1, y1) {            // els arbres (level.cover) i l
   return false;
 }
 function hitMen(S, men, n) {                      // retorna { inside, dead } de la llista d'homes {x,y,rank}
-  const inside = [], dead = [];
-  for (const m of men) { const u = inStrip(S, m.x, m.y); if (u < 0 || losBlocked(S.ox, S.oy, m.x, m.y)) continue; inside.push(m); if (Math.random() < dieProb(u, m.rank, n)) dead.push(m); }
+  const inside = [], dead = [], ca = Math.cos(S.a), sa = Math.sin(S.a);
+  for (const m of men) { const u = inStrip(S, m.x, m.y); if (u < 0 || losBlocked(S.ox, S.oy, m.x, m.y)) continue; m._u = u; m._v = -(m.x - S.ox) * sa + (m.y - S.oy) * ca; inside.push(m); }
+  for (const m of inside) {
+    let b = 0; for (const o of inside) if (o !== m && o._u < m._u - 0.3 && Math.abs(o._v - m._v) < 0.6) b++;   // homes davant seu, en la mateixa línia de tir: l'empara
+    const cover = b <= 1 ? 1 : Math.pow(0.12, b - 1);                    // en columna només els dos primers rengles de cara reben els trets
+    if (Math.random() < dieProb(m._u, m.rank, n) * cover) dead.push(m);
+  }
   return { inside, dead };
 }
 
@@ -4152,7 +4157,7 @@ let autoStepT = 0;
 const VOICE = { on: false, rec: null, running: false, tested: false, seg: {}, interim: '', state: '', failT: 0, lastFail: null,
   learn: { phr: {}, ex: {} }, shared: { phr: {}, ex: {} }, opt: { mode: 'cont', vol: true, log: false, tele: true, engine: '' }, log: [], recentExec: null, ptt: false, db: false, loading: false };
 // Connexió amb Supabase (la mateixa de la web: si el joc s'obre dins la web, agafa window.APP_CONFIG) i fonts del motor local Vosk
-const GAME_VERSION = '1.7.1';
+const GAME_VERSION = '1.7.2';
 const CFG = Object.assign({
   SUPABASE_URL: 'https://ltopullwhasagnkuqaek.supabase.co',
   SUPABASE_ANON_KEY: 'sb_publishable_DhHFUh-UrbBrI0l476Vcnw_tSn-Gmkr',
