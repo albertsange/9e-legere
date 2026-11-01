@@ -3909,7 +3909,7 @@ let autoStepT = 0;
 const VOICE = { on: false, rec: null, running: false, tested: false, seg: {}, interim: '', state: '', failT: 0, lastFail: null,
   learn: { phr: {}, ex: {} }, shared: { phr: {}, ex: {} }, opt: { mode: 'cont', vol: true, log: false, tele: true, engine: '' }, log: [], recentExec: null, ptt: false, db: false, loading: false };
 // Connexió amb Supabase (la mateixa de la web: si el joc s'obre dins la web, agafa window.APP_CONFIG) i fonts del motor local Vosk
-const GAME_VERSION = '1.4.32';
+const GAME_VERSION = '1.4.33';
 const CFG = Object.assign({
   SUPABASE_URL: 'https://ltopullwhasagnkuqaek.supabase.co',
   SUPABASE_ANON_KEY: 'sb_publishable_DhHFUh-UrbBrI0l476Vcnw_tSn-Gmkr',
@@ -5190,12 +5190,12 @@ function buildLevel8() {
       mini: () => co.state !== 'parat' || busy() ? 'Espera que acabin de moure\'s…' : 'Tiradors → <b>En tirailleurs</b> a <b>gauche</b> o <b>droite</b>, i <b>Executar</b>.',
       resetStep: () => 1, done: () => !!co.open && co.state === 'parat' && !busy() },
     { title: 'Cobreix la retirada', pose: 'assenyala', unlock: ['skirm'], hl: [], tag: 'Retirada',
-      mini: () => !co.sk ? 'Tiradors → <b>Feu en reculant</b>, i prem <b>Reculez!</b>.' : 'Dispara amb <b>Reculez!</b> perquè els canons callin: la columna es retira fins a les cases mentre tu cobreixes.',
+      mini: () => !co.sk ? 'Tiradors → <b>Feu en reculant</b>, i prem <b>Reculez!</b>.' : 'Dispara amb <b>Reculez!</b> perquè els canons callin: la columna es retira fins a les cases. Tu recula fins a l\'altura de les <b>tanques</b>.',
       resetStep: () => 1, done: () => retDone() },
     { title: 'Retirada ben coberta', pose: 'aprova', unlock: ['skirm'], hl: [], mini: 'La columna és a salvo, chasseur!', done: () => false }
   ];
   const build = {
-    w: W, h: H, start: { x: 18, y: 30 }, obstacles: [], scene: MapKit.scene(sc), get zone() { return TUT.step === 12 ? { x0: 20, y0: 20, x1: 36, y1: 40, label: 'LÍNIA DE RETIRADA' } : null; }, musket: true, skirm: true, driftScale: 0.5, goalHeading: 0, minMen: 6, cover: [], keepMin: 24,
+    w: W, h: H, start: { x: 18, y: 30 }, obstacles: [], scene: MapKit.scene(sc), get zone() { return null; }, musket: true, skirm: true, driftScale: 0.5, goalHeading: 0, minMen: 6, cover: [], keepMin: 24,
     column: col,
     enemies: [{ name: 'Regiment austríac', flag: 'aut', cx: 80, cy: 30, h: Math.PI, shoots: true, alert: true, nFiles: 20 }],
     guns: [],
@@ -5215,25 +5215,18 @@ function buildLevel8() {
       }
       if (TUT.step >= 9 && st.cvol && !st.gun && e) {
         st.t += dt;
-        if (st.t > 2.2 && !st.an) {                                                                                           // es retiren com nosaltres: par le flanc droit, en avant, par file à droite (×2), halte i front
-          const nf = 20, X0 = e.cx, Y0 = e.cy, XE = 96, L0 = { x: X0, y: Y0 - (nf / 2 - 0.5) * FRONT };
-          const P = [L0, { x: X0, y: L0.y - 4 }, { x: XE, y: L0.y - 4 }, { x: XE, y: 30 + (nf / 2 - 0.5) * FRONT }];
-          const seg = []; let tot = 0; for (let q = 1; q < P.length; q++) { const l = Math.hypot(P[q].x - P[q - 1].x, P[q].y - P[q - 1].y); seg.push({ a: P[q - 1], b: P[q], l, s0: tot }); tot += l; }
-          const men = []; e.men.forEach((v, k) => { if (v.alive) men.push({ v, o: (k % nf) * FRONT, q: Math.floor(k / nf) * RANK_GAP }); });
-          st.an = { t: 0, men, seg, tot, v: ORD_SPEED, turn: 0.6, XE };
+        if (st.t > 2.2 && !st.an) {                                                                                           // demi-tour i es retiren al pas accéléré; al final, demi-tour per tornar a fer-nos front
+          const men = e.men.filter(v => v.alive).map(v => ({ v, x0: v.x }));
+          st.an = { t: 0, men, X0: e.cx, XE: 96, v: STEP * PACES.accelerat.cad / 60, turn: 1.0 };
+          reac('louis', '<b>Louis:</b> Covards! Ja fugen!', 3500);
         }
         const an = st.an;
         if (an) {
           an.t += dt;
-          const ptAt = a => { if (a <= 0) return { x: an.seg[0].a.x, y: an.seg[0].a.y - a }; for (const g of an.seg) if (a <= g.s0 + g.l) { const u = (a - g.s0) / g.l; return { x: g.a.x + (g.b.x - g.a.x) * u, y: g.a.y + (g.b.y - g.a.y) * u }; } const g = an.seg[an.seg.length - 1]; return { x: g.b.x, y: g.b.y }; };
-          const tanAt = a => { const p = ptAt(a - 0.5), q = ptAt(a + 0.5), d = Math.hypot(q.x - p.x, q.y - p.y) || 1; return { x: (q.x - p.x) / d, y: (q.y - p.y) / d }; };
-          const T1 = an.turn, T2 = T1 + an.tot / an.v, T3 = T2 + an.turn;
-          for (const m of an.men) {
-            const lead = Math.min(an.tot, Math.max(0, an.t - T1) * an.v), a = lead - m.o, p = ptAt(a), d = tanAt(a);
-            m.v.x = p.x - d.y * m.q; m.v.y = p.y + d.x * m.q;
-            m.v.h = an.t < T1 ? Math.PI + (Math.PI / 2) * (an.t / T1) : an.t < T2 ? Math.atan2(d.y, d.x) : Math.PI / 2 + (Math.PI / 2) * Math.min(1, (an.t - T2) / an.turn);
-          }
-          if (an.men.length) { e.cx = an.men.reduce((q, m) => q + m.v.x, 0) / an.men.length; e.cy = an.men.reduce((q, m) => q + m.v.y, 0) / an.men.length; }
+          const T1 = an.turn, T2 = T1 + (an.XE - an.X0) / an.v, T3 = T2 + an.turn, dx = Math.min(an.XE - an.X0, Math.max(0, an.t - T1) * an.v);
+          const h = an.t < T1 ? Math.PI + Math.PI * (an.t / T1) : an.t < T2 ? 0 : Math.PI * Math.min(1, (an.t - T2) / an.turn);   // mitja volta per la dreta, i a l'arribar una altra
+          for (const m of an.men) { m.v.x = m.x0 + dx; m.v.h = h; }
+          e.cx = an.X0 + dx;
           if (an.t >= T3) { for (const m of an.men) m.v.h = undefined; e.h = Math.PI; st.gun = true; GUNS.push({ x: an.XE - 8, y: 30, h: Math.PI, name: 'Bateria austríaca', rt: 16, reload: 3, aimT: 0 }); FX.push({ k: 'shot', x: an.XE - 10, y: 30, a: Math.PI, t: -0.001, big: true }); SFX.cannon(); }
         }
       }
