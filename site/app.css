@@ -662,3 +662,6 @@ body.sim-fit{overflow:hidden}
   .camp-tag{font-family:var(--label);font-size:.78rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted,#666);white-space:nowrap;}
   .camp-lvl.cur .camp-tag{color:var(--ecarlate,#b3261e);}
   @media (max-width:560px){.camp-lvl{grid-template-columns:2rem 1fr;} .camp-tag{grid-column:2;}}
+
+.camp-wrap{margin-top:2.2rem;padding-top:1.4rem;border-top:1px solid var(--line,#ccc)}
+.camp-main{font-size:1.35rem;margin:0 0 .4rem}

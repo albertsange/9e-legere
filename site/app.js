@@ -319,7 +319,6 @@
       '<ol class="extra"><li><a href="#regulacions" data-sec="regulacions"><span class="n">§</span><span>' + esc(L((S.site.regs || {}).title) || t('regs_page')) + '</span></a></li>' +
       '<li><a href="#decisions" data-sec="decisions"><span class="n">·</span><span>' + esc(L((S.site.decisions || {}).title) || t('decisions')) + '</span></a></li>' +
       '<li><a href="#fonts" data-sec="fonts"><span class="n">·</span><span>' + esc(L((S.site.fonts || {}).title) || t('sources')) + '</span></a></li>' +
-      (isMember() ? '<li><a href="#campanya" data-sec="campanya"><span class="n">✦</span><span>' + esc(t('camp_title')) + '</span></a></li>' : '') +
       (isMember() ? '<li><a href="#simulator" data-sec="simulator"><span class="n">▶</span><span>' + esc(L((S.site.simulator || {}).title) || t('sim_title')) + '</span></a></li>' : '') +
       (isAdmin() ? '<li><a href="#nova" data-sec="nova"><span class="n">+</span><span>' + esc(t('new_page')) + '</span></a></li>' : '') + '</ol>';
 
@@ -471,7 +470,6 @@
     else if (id === 'decisions' || id === 'fonts') html = blockView(id);
     else if (id === 'regulacions') html = regsAllView();
     else if (id === 'simulator' && isMember()) html = simulatorView();
-    else if (id === 'campanya' && isMember()) html = campaignView();
     else if (id === 'registre') { html = homeView(); setTimeout(function () { history.replaceState(null, '', location.pathname); openRegister(); }, 0); }
     else if (id === 'compte') html = accountView();
     else if (id === 'gestio') html = adminView();
@@ -642,13 +640,12 @@
   }
 
   /* ------------------------------------------------------------------ 9e Simulator (game hosted in site/simulator/, notes editable like the other blocks) */
-function campaignView() {
+function campaignBlock() {
   const sp = ['camp_prep', 'camp_pending'];
   const body = CAMPAIGNS.map(c => '<section class="camp-block" aria-labelledby="camp-' + c.n + '"><h3 id="camp-' + c.n + '" class="camp-h">' + esc(t('camp_n').replace('{n}', c.n)) + ' · ' + esc(L(c.title)) + '</h3><ol class="camp-list">' +
     c.levels.map(l => '<li class="camp-lvl' + (l.n === 1 ? ' cur' : '') + '"><span class="camp-num">' + l.n + '</span><div><strong>' + esc(L(l.name)) + '</strong>' + (l.desc ? '<p class="muted">' + esc(L(l.desc)) + '</p>' : '') + '</div><span class="camp-tag">' + esc(t(l.n === 1 ? sp[0] : sp[1])) + '</span></li>').join('') +
     '</ol></section>').join('');
-  return '<section class="view" data-view="campaign"><p class="crumb"><a href="#">' + esc(t('home')) + '</a> <span aria-hidden="true">/</span> ' + esc(t('camp_title')) + '</p>' +
-    '<h2 class="page-title" tabindex="-1">' + esc(t('camp_title')) + '</h2><p class="muted">' + esc(t('camp_intro')) + '</p>' + body + '</section>';
+  return '<section class="camp-wrap" aria-labelledby="camp-main"><h3 id="camp-main" class="camp-main">' + esc(t('camp_title')) + '</h3><p class="muted">' + esc(t('camp_intro')) + '</p>' + body + '</section>';
 }
 
   function simulatorView() {
@@ -661,7 +658,7 @@ function campaignView() {
       '<p class="muted">' + esc(t('sim_intro')) + '</p>' +
       '<div class="sim-box" id="sim-box"><div class="sim-tools"><button type="button" class="btn-ghost sim-fs" data-act="sim-fit" aria-label="' + esc(t('sim_fit')) + '" data-tip="' + esc(t('sim_fit')) + '"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M8 10V8h2M16 10V8h-2M8 14v2h2M16 14v2h-2"/></svg></button><button type="button" class="btn-ghost sim-fs" data-act="sim-fs" aria-label="' + esc(t('sim_fs')) + '" data-tip="' + esc(t('sim_fs')) + '"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg></button></div>' +
       '<iframe id="sim-frame" src="simulator/index.html?t=' + Date.now() + '&lang=' + encodeURIComponent(S.lang || 'ca') + '" title="' + esc(t('sim_title')) + '" allow="microphone; fullscreen" style="display:block;width:100%;height:78vh;min-height:520px;border:1px solid var(--line,#ccc);border-radius:6px;background:#fff"></iframe></div>' +
-      '<div class="table-wrap block-simulator">' + F('site.simulator.html.' + S.lang, body, 'div', 'block-html', { raw: 1 }) + '</div></section>';
+      '<div class="table-wrap block-simulator">' + F('site.simulator.html.' + S.lang, body, 'div', 'block-html', { raw: 1 }) + '</div>' + campaignBlock() + '</section>';
   }
 
   /* ------------------------------------------------------------------ search inside the regulations and the inspections */
