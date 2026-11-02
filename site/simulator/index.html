@@ -2029,7 +2029,7 @@ function oblAim(sd) {
   return h + sd * (best == null ? lim : best);
 }
 const fdir = h0 => co.fireSide ? oblAim(co.fireSide) : co.fireDir == null ? h0 : co.fireDir;      // direcció de foc actual (o h0 si és recte)
-function fireStrip() { const h = co.members[0].h; return makeStrip(co.members, h, fdir(h), TUNE.mosquet.obertura); }
+function fireStrip() { const h = co.members[0].h; return makeStrip(co.members, h, fdir(h), (level && level.obertura) || TUNE.mosquet.obertura); }
 function inStrip(S, x, y) {                      // retorna la distància al llarg del tret si el punt és dins la franja, o -1
   const dx = x - S.ox, dy = y - S.oy, c = Math.cos(S.a), s = Math.sin(S.a), u = dx * c + dy * s, v = -dx * s + dy * c;
   return (u >= 0 && u <= S.R && Math.abs(v) <= S.hw + u * S.tg) ? u : -1;
@@ -4331,7 +4331,7 @@ let autoStepT = 0;
 const VOICE = { on: false, rec: null, running: false, tested: false, seg: {}, interim: '', state: '', failT: 0, lastFail: null,
   learn: { phr: {}, ex: {} }, shared: { phr: {}, ex: {} }, opt: { mode: 'cont', vol: true, log: false, tele: true, engine: '' }, log: [], recentExec: null, ptt: false, db: false, loading: false };
 // Connexió amb Supabase (la mateixa de la web: si el joc s'obre dins la web, agafa window.APP_CONFIG) i fonts del motor local Vosk
-const GAME_VERSION = '1.8.6';
+const GAME_VERSION = '1.8.7';
 const CFG = Object.assign({
   SUPABASE_URL: 'https://ltopullwhasagnkuqaek.supabase.co',
   SUPABASE_ANON_KEY: 'sb_publishable_DhHFUh-UrbBrI0l476Vcnw_tSn-Gmkr',
@@ -6006,7 +6006,7 @@ function buildCampaign1() {
       mini: () => st.p3 ? '<b>Defensa la riba est:</b> desplega\'t en tiradors al llarg del gual. Les avançades austríaques (8–10 homes) es retiren quan perden el 20%. L\'exèrcit creua: ' + Math.min(100, Math.round(st.army / ARMY_T * 100)) + '%.' : st.crossed ? 'Has creuat el rierol: carrega i <b>aixafa la patrulla</b>. Si et veuen, ja no podran donar l\'alarma: s\'hauran d\'enfrontar a tu.' : '<b>Creua el rierol sense que et vegin</b>, pel bosc del sud, mentre la patrulla va i ve pel camí.', resetStep: () => 1, done: () => false }
   ];
   return {
-    w: W, h: H, pad: 16, freeStab: true, start: { x: 8, y: 31 }, obstacles: obs, scene: MapKit.scene(sc), zone: null, musket: true, skirm: true, driftScale: 0.5, goalHeading: 0, minMen: 8,
+    w: W, h: H, pad: 16, freeStab: true, obertura: 0.1, start: { x: 8, y: 31 }, obstacles: obs, scene: MapKit.scene(sc), zone: null, musket: true, skirm: true, driftScale: 0.5, goalHeading: 0, minMen: 8,
     cover, walls,
     enemies: [{ name: 'Patrulla de jägers', flag: 'aut', cx: P.x, cy: P.y, h: P.h, nFiles: 8, shoots: true, stealth: true, jager: true }],
     tutorial: { steps, figs: [], startAtencio: true, resetStep: () => 1 },
