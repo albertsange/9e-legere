@@ -1373,6 +1373,7 @@ canvas.addEventListener('pointerdown', e => {
   }
 });
 canvas.addEventListener('pointermove', e => {
+  if (co && co.alignPick) { const rc = canvas.getBoundingClientRect(); co.alignPick.hov = alignPickAt(e.clientX - rc.left, e.clientY - rc.top); }
   if (!pointers.has(e.pointerId)) return;
   pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
   if (pointers.size === 2 && pinch) {
@@ -2874,10 +2875,10 @@ function parLeFlanc(dir) {
 
 // CD-03 À droite (gauche) – alignement!  (animat en temps real)
 // 1) el guia (home d'ala del costat indicat) fa mig pas endavant;
-// 2) apareix un selector d'angles sobre el guia (de −60° a +60°, cada 20°): l'angle és cap on mirarà la línia nova;
+// 2) apareix un selector d'angles en ventall des del guia, en l'eix de la línia: l'angle és el gir de la LÍNIA (0° = com està; ±2°, ±5°, ±10° per als retocs); la tropa mirarà perpendicular a la línia nova;
 // 3) un a un, des del guia cap a l'altre extrem, els homes del primer rengle es posen sobre la línia nova, amb el cap girat cap al guia;
 // 4) el segon rengle es posa exactament al darrere del primer; en acabar, «Fixe!» automàtic: tothom torna el cap al front.
-const ALIGN_ANGLES = [-60, -40, -20, 0, 20, 40, 60];
+const ALIGN_ANGLES = [-90, -60, -40, -20, -10, -5, -2, 0, 2, 5, 10, 20, 40, 60, 90];   // gir de la LÍNIA respecte a com està (0° = la deixa igual); els petits serveixen per als retocs
 function alignement(dir) {
   if (co.state !== 'parat' || !co.atencio || busy() || formationName() !== 'línia' || co.hdT !== 0) return;
   say(dir > 0 ? 'À droite, alignement!' : 'À gauche, alignement!');
@@ -2910,18 +2911,23 @@ function alignPickAt(sx, sy) {                   // clic sobre el selector d'ang
   for (const o of alignPickButtons(p)) if (Math.hypot(sx - o.x, sy - o.y) <= o.r + 4) return o.ang;
   return null;
 }
-function alignPickButtons(p) {
-  const c = toScreen(p.x * M, p.y * M), R = Math.max(100, 3.6 * M);
-  return ALIGN_ANGLES.map(ang => { const a = p.h + ang * Math.PI / 180 + rot; return { ang, x: c.x + Math.cos(a) * R, y: c.y + Math.sin(a) * R, r: 17, cx: c.x, cy: c.y }; });
+function alignPickButtons(p) {                  // botons en ventall al voltant de la línia actual, començant al seu extrem: l'angle és el gir de la línia
+  const c = toScreen(p.x * M, p.y * M), R = Math.max(110, (FILES * FRONT + 1.5) * M), n = ALIGN_ANGLES.length, mid = (n - 1) / 2, base = p.h - p.dir * Math.PI / 2 + rot;
+  return ALIGN_ANGLES.map((ang, i) => { const a = base + (i - mid) * 0.235; return { ang, x: c.x + Math.cos(a) * R, y: c.y + Math.sin(a) * R, r: 14, cx: c.x, cy: c.y, near: Math.abs(ang) <= 10 }; });
 }
 function drawAlignPick() {
   const p = co && co.alignPick; if (!p) return;
-  const bs = alignPickButtons(p);
-  ctx.save(); ctx.font = '700 12px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  const bs = alignPickButtons(p), c = toScreen(p.x * M, p.y * M);
+  ctx.save(); ctx.font = '700 11px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  if (p.hov !== undefined && p.hov !== null) {                                     // previsualització: la línia que sortiria
+    const a = p.h - p.dir * Math.PI / 2 + rot + p.hov * Math.PI / 180, L = (FILES - 1) * FRONT * M;
+    ctx.strokeStyle = 'rgba(179,38,30,.85)'; ctx.lineWidth = 3; ctx.setLineDash([]);
+    ctx.beginPath(); ctx.moveTo(c.x, c.y); ctx.lineTo(c.x + Math.cos(a) * L, c.y + Math.sin(a) * L); ctx.stroke();
+  }
   for (const o of bs) {
-    ctx.strokeStyle = 'rgba(31,58,120,.35)'; ctx.lineWidth = 1.5; ctx.setLineDash([4, 4]);
+    ctx.strokeStyle = 'rgba(31,58,120,.3)'; ctx.lineWidth = 1; ctx.setLineDash([3, 4]);
     ctx.beginPath(); ctx.moveTo(o.cx, o.cy); ctx.lineTo(o.x, o.y); ctx.stroke(); ctx.setLineDash([]);
-    ctx.fillStyle = o.ang === 0 ? '#b3261e' : '#1f3a78'; ctx.strokeStyle = '#fff'; ctx.lineWidth = 2;
+    ctx.fillStyle = o.ang === 0 ? '#b3261e' : o.near ? '#2f6b3a' : '#1f3a78'; ctx.strokeStyle = '#fff'; ctx.lineWidth = 2;
     ctx.beginPath(); ctx.arc(o.x, o.y, o.r, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
     ctx.fillStyle = '#fff'; ctx.fillText((o.ang > 0 ? '+' : o.ang < 0 ? '−' : '') + Math.abs(o.ang) + '°', o.x, o.y);
   }
@@ -4291,7 +4297,7 @@ let autoStepT = 0;
 const VOICE = { on: false, rec: null, running: false, tested: false, seg: {}, interim: '', state: '', failT: 0, lastFail: null,
   learn: { phr: {}, ex: {} }, shared: { phr: {}, ex: {} }, opt: { mode: 'cont', vol: true, log: false, tele: true, engine: '' }, log: [], recentExec: null, ptt: false, db: false, loading: false };
 // Connexió amb Supabase (la mateixa de la web: si el joc s'obre dins la web, agafa window.APP_CONFIG) i fonts del motor local Vosk
-const GAME_VERSION = '1.7.9';
+const GAME_VERSION = '1.7.10';
 const CFG = Object.assign({
   SUPABASE_URL: 'https://ltopullwhasagnkuqaek.supabase.co',
   SUPABASE_ANON_KEY: 'sb_publishable_DhHFUh-UrbBrI0l476Vcnw_tSn-Gmkr',
@@ -5087,7 +5093,7 @@ function buildLevel1() {
     { title: 'Alinear la línia', hl: ['align', 'alignD'], unlock: ['align'],
       enter: () => { if (disorderRms() < 0.05) for (const m of co.members) { const ax = (Math.random() - .5) * 0.16, ay = (Math.random() - .5) * 0.16; m.x += ax; m.y += ay; m.dx += ax; m.dy += ay; } },
       text: ['Caminant, els homes s\'han anat <b>desalineant</b> (mira l\'«Ordre» a la carta de la unitat, a baix a l\'esquerra). Per corregir-ho, obre <b>Formacions</b> i a <b>Alignement</b> tria <b>droite</b>.',
-        'L\'home de la dreta fa <b>mig pas</b> endavant i els altres s\'hi col·loquen d\'un en un; després el segon rengle els segueix. Quan el guia ha sortit, tria l\'<b>angle</b> de la línia al selector que apareix sobre seu (0° = recte). En acabar, els homes diuen <b>Fixe!</b> sols. Amb la línia ben alineada dins la placeta, el nivell estarà complet.'] }
+        'L\'home de la dreta fa <b>mig pas</b> endavant i els altres s\'hi col·loquen d\'un en un; després el segon rengle els segueix. Quan el guia ha sortit, tria l\'<b>angle</b> de la línia al selector que apareix al seu costat: és el gir de la línia respecte a com està ara (0° = la deixa igual; els verds, petits retocs). En acabar, els homes diuen <b>Fixe!</b> sols. Amb la línia ben alineada dins la placeta, el nivell estarà complet.'] }
   ];
   return {
     w: 44, h: 48, start: { x: 10, y: 12 }, tents, obstacles: obs, scene: MapKit.scene(decorSc(sc, 44, 48, { seed: 1, hamlets: 0, trees: 5, roads: [[[9.85, 30], [10, 34], [18, 34.5]]], boxes: [[17.5, 26, 40.5, 43], [22, 3, 42, 21], [0, 43, 44, 46], [4, 18, 17, 34]], pts: [[10, 30, 10]] })),
