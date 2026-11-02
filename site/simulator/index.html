@@ -1675,8 +1675,16 @@ function clearParFile() {
   for (const m of co.members) m.row = null;
 }
 
+function pfSnap() {                      // en aturar-se amb un par file a mitges: les fileres que giraven acaben el gir; les altres esperen la marxa
+  const pf = co.pf; if (!pf) return;
+  for (const row of pf.rows) if (row.turning) {
+    const ang = row.t.dir * Math.PI / 2, ca = Math.cos(ang), sa = Math.sin(ang);
+    for (const r of row.rel) { r.m.x = row.cx + r.rx * ca - r.ry * sa; r.m.y = row.cy + r.rx * sa + r.ry * ca; r.m.h = row.h0 + ang; }
+    row.turning = false; row.k++;
+  }
+}
 function stopCo(text) {
-  clearParFile();
+  if (co.pf) pfSnap(); else clearParFile();
   co.state = 'parat';
   co.haltReq = false;
   co.stepT = 0;
@@ -1755,27 +1763,26 @@ function updateCo(dt) {
 
   if (pf) {
     for (const row of pf.rows) {
-      if (row.turned) continue;
       if (row.turning) {
-        // La filera gira com un bloc sobre el seu centre: els dos homes
-        // es mantenen un al costat de l'altre
+        // La filera gira com un bloc sobre el seu centre: els dos homes es mantenen un al costat de l'altre
         row.turnT += dt;
         const k = Math.min(1, row.turnT / PF_TURN_T);
-        const ang = pf.dir * Math.PI / 2 * k;
+        const ang = row.t.dir * Math.PI / 2 * k;
         const ca = Math.cos(ang), sa = Math.sin(ang);
         for (const r of row.rel) {
           r.m.x = row.cx + r.rx * ca - r.ry * sa;
           r.m.y = row.cy + r.rx * sa + r.ry * ca;
           r.m.h = row.h0 + ang;
         }
-        if (k >= 1) { row.turning = false; row.turned = true; }
+        if (k >= 1) { row.turning = false; row.k++; }
         continue;
       }
-      // Quan la filera arriba a la línia de gir, comença a girar
+      const T = pf.turns[row.k]; if (!T) continue;         // ja ha fet tots els girs encarregats
+      // Quan la filera arriba a la línia del gir següent, comença a girar
       const cx = row.members.reduce((s, m) => s + m.x, 0) / row.members.length;
       const cy = row.members.reduce((s, m) => s + m.y, 0) / row.members.length;
-      if (cx * pf.fx + cy * pf.fy >= pf.s0 - 0.02) {
-        row.turning = true;
+      if (cx * T.fx + cy * T.fy >= T.s0 - 0.02) {
+        row.turning = true; row.t = T;
         row.turnT = 0;
         row.cx = cx; row.cy = cy;
         row.h0 = row.members[0].h;
@@ -1790,7 +1797,7 @@ function updateCo(dt) {
     m.y += Math.sin(m.h + off) * d;
   }
 
-  if (pf && pf.rows.every(r => r.turned)) clearParFile();
+  if (pf && pf.rows.every(r => !r.turning && r.k >= pf.turns.length)) clearParFile();
 
   co.stepT += dt;
   // Halte: s'executa al pas següent (quan un peu toca a terra)
@@ -1916,7 +1923,7 @@ function armOrder(fn) {                         // condicions comunes de les ord
 }
 function setArm(a, text) { say(text); co.arm = a; SFX.rustle(); lastKey = ''; }
 function startLoad() {
-  const T = TUNE.mosquet, slow = 1 + T.cansats * (1 - co.cansament / 100); co.fireDir = null;
+  const T = TUNE.mosquet, slow = 1 + T.cansats * (1 - co.cansament / 100); co.fireDir = null; co.fireSide = null;
   say('Chargez vos armes!'); co.arm = 'charge'; lastKey = '';
   for (const m of co.members) { m.ld = 0; m.ldDur = T.carrega * (1 - T.varia / 2 + Math.random() * T.varia) * slow; m.okT = 0; }
 }
@@ -1928,7 +1935,20 @@ function makeStrip(men, h, a, open) {             // franja de foc d'un grup d'h
   const mid = (lo + hi) / 2;
   return { a, ox: c.x + fw * fr + px * mid, oy: c.y + fs * fr + py * mid, hw: (hi - lo) / 2 + 0.6, tg: Math.tan(open), R: TUNE.mosquet.abast };
 }
-function fireStrip() { const h = co.members[0].h; return makeStrip(co.members, h, co.fireDir == null ? h : co.fireDir, TUNE.mosquet.obertura); }
+// Foc oblic (Joue à droite / à gauche): si hi ha un enemic entre el front i l'angle oblic (45°) d'aquest costat, s'apunta cap a ell; si no, a 45°
+function oblAim(sd) {
+  const h = co.members[0].h, lim = TUNE.mosquet.oblic, c = unitCentre(); let best = null, bd = 1e9;
+  for (const e of ENEMY) {
+    const al = e.men.filter(m => m.alive); if (!al.length) continue;
+    const ex = al.reduce((t, m) => t + m.x, 0) / al.length, ey = al.reduce((t, m) => t + m.y, 0) / al.length, d = Math.hypot(ex - c.x, ey - c.y);
+    if (d > TUNE.mosquet.abast + 8) continue;
+    const rel = wrapA(Math.atan2(ey - c.y, ex - c.x) - h) * sd;
+    if (rel >= 0 && rel <= lim && d < bd) { bd = d; best = rel; }
+  }
+  return h + sd * (best == null ? lim : best);
+}
+const fdir = h0 => co.fireSide ? oblAim(co.fireSide) : co.fireDir == null ? h0 : co.fireDir;      // direcció de foc actual (o h0 si és recte)
+function fireStrip() { const h = co.members[0].h; return makeStrip(co.members, h, fdir(h), TUNE.mosquet.obertura); }
 function inStrip(S, x, y) {                      // retorna la distància al llarg del tret si el punt és dins la franja, o -1
   const dx = x - S.ox, dy = y - S.oy, c = Math.cos(S.a), s = Math.sin(S.a), u = dx * c + dy * s, v = -dx * s + dy * c;
   return (u >= 0 && u <= S.R && Math.abs(v) <= S.hw + u * S.tg) ? u : -1;
@@ -2112,7 +2132,7 @@ const loadDur = () => { const T = TUNE.mosquet; return T.carrega * (1 - T.varia 
 function skStart(mode) {
   co.vp = {};
   for (const m of co.members) { m.sh = true; m.rl = false; m.wt = 0.3 + Math.random() * 2.5; }
-  co.loaded = false; co.reloading = false; co.arm = 'sk'; co.fireDir = null; co.sk = { mode, step: 0, end: false, stage: 'fire', wait: 0.6 };
+  co.loaded = false; co.reloading = false; co.arm = 'sk'; co.fireDir = null; co.fireSide = null; co.sk = { mode, step: 0, end: false, stage: 'fire', wait: 0.6 };
 }
 function manShot(m, delay, wide) {                // un tret apuntat d'un tirador. «wide»: tria ell mateix l'enemic més proper (±50°); si no en té, no dispara
   const T = TUNE.mosquet, cone = wide ? 0.9 : 0.17;
@@ -2265,12 +2285,12 @@ function feu() {
   for (const m of co.members) {
     const d = Math.random() * T.escalf * (Math.random() < 0.12 ? 1.6 : 1);   // no tots alhora: alguns trets surten tard
     tMax = Math.max(tMax, d);
-    const a = co.fireDir == null ? m.h : co.fireDir, len = 1.25;
+    const a = fdir(m.h), len = 1.25;
     FX.push({ k: 'shot', x: m.x + Math.cos(a) * len, y: m.y + Math.sin(a) * len, a, t: -d });
     SFX.shot(d);
   }
   SFX.rumble(0.08, tMax + 1.2);
-  const S = fireStrip(), nSh = co.members.length / 20; co.fireDir = null;
+  const S = fireStrip(), nSh = co.members.length / 20; co.fireDir = null; co.fireSide = null;
   if (co.open && ENEMY.length) { feuTiradors(); return; }
   if (ENEMY.length) {                                                       // efecte sobre els homes enemics dins la franja
     const c = unitCentre(); let near = Infinity, ok = false, hits = 0, exp = 0, tot = 0, exposed = [];
@@ -2310,7 +2330,7 @@ function enemyVolley(e, S, live) {
   e.reload = T.enRecarrega; e.aimT = 0; lastKey = '';
   setTimeout(() => reac(n ? 'decebut' : 'aprova', '<b>Louis:</b> ' + (n ? 'Ens disparen! Hem perdut <b>' + n + '</b> homes.' : 'Ens han disparat, però han errat!'), 4600), 700);
   if (level && level.minMen && co.members.length < level.minMen && !co.lost) {
-    co.lost = true; setTimeout(() => { reset(); showMsg('La unitat ha quedat destrossada: partida reiniciada', 3200); }, 2600);
+    co.lost = true; setTimeout(() => deathRetry('La unitat ha quedat destrossada: torna-ho a provar'), 2600);
   }
 }
 function updateEnemies(dt) {                     // els regiments enemics es giren cap a nosaltres quan ens veuen i disparen a qui tinguin al davant
@@ -2357,7 +2377,7 @@ function aiVolley(u, g, side) {
   if (g.own) {
     const k = r.dead.length; for (const m of r.dead) killOwn(m); lastKey = '';
     setTimeout(() => reac(k ? 'decebut' : 'aprova', '<b>Louis:</b> ' + (k ? 'Ens disparen! Hem perdut <b>' + k + '</b> homes.' : 'Ens han disparat, però han errat!'), 4600), 700);
-    if (level && level.minMen && co.members.length < level.minMen && !co.lost) { co.lost = true; setTimeout(() => { reset(); showMsg('La unitat ha quedat destrossada: partida reiniciada', 3200); }, 2600); }
+    if (level && level.minMen && co.members.length < level.minMen && !co.lost) { co.lost = true; setTimeout(() => deathRetry('La unitat ha quedat destrossada: torna-ho a provar'), 2600); }
   } else if (g.ally) {
     for (const v of r.dead) { v.alive = false; addCorpse(v.x, v.y, g.ally.h, true, v.rank); }
     if (r.inside.length) g.ally.supp = Math.min(1, (g.ally.supp || 0) + T.supDescarrega * 0.6);
@@ -2495,7 +2515,7 @@ function drawMusket(m, px, py, a, rS) {        // l'arma, vista des de dalt
     case 'repose': ctx.fillStyle = wood; ctx.beginPath(); ctx.arc(rx + c * 0.12 * M, ry + s * 0.12 * M, Math.max(1.4, 0.07 * M), 0, Math.PI * 2); ctx.fill(); break;   // a terra, al peu dret
     case 'charge': L(px + c * 0.15 * M + lx * 0.1 * M, py + s * 0.15 * M + ly * 0.1 * M, px + c * 0.45 * M + lx * 0.3 * M, py + s * 0.45 * M + ly * 0.3 * M, wood, w); break;
     case 'apprete': L(rx, ry, rx + (c * 0.55 + lx * 0.3) * M, ry + (s * 0.55 + ly * 0.3) * M, wood, w); break;
-    case 'joue': { const fa = co.fireDir == null ? a : co.fireDir; L(rx, ry, rx + Math.cos(fa) * 1.2 * M, ry + Math.sin(fa) * 1.2 * M, wood, w); break; }       // apunten cap a la direcció de foc (45° en oblic)
+    case 'joue': { const fa = fdir(a); L(rx, ry, rx + Math.cos(fa) * 1.2 * M, ry + Math.sin(fa) * 1.2 * M, wood, w); break; }       // apunten cap a la direcció de foc (45° en oblic)
     case 'croise': { const ex = rx + c * 0.95 * M, ey = ry + s * 0.95 * M; L(rx, ry, ex, ey, wood, w); L(ex, ey, ex + c * 0.4 * M, ey + s * 0.4 * M, steel, Math.max(1, 0.05 * M)); break; }
   }
   if (arm === 'charge' || m.okT > 0) {                       // rellotge de càrrega (i ✓ verd quan acaben)
@@ -2582,7 +2602,7 @@ function setPace(p) {
     co.mode = 'direct';
     co.stepT = 0;
     co.haltReq = false;
-  } else if (co.state !== 'marxa' || co.mode === 'enrere' || co.pf || co.flank) {
+  } else if (co.state !== 'marxa' || co.mode === 'enrere' || co.flank) {
     return;
   }
   co.pace = p;
@@ -2618,16 +2638,26 @@ function reprendreRecte() {
 
 // Peloton – halte! (MA-03)
 function halte() {
-  if (co.state !== 'marxa' || co.pf || co.flank) return;
+  if (co.state !== 'marxa' || co.flank) return;
   say('Peloton, halte!');
-  co.haltReq = true;
+  stopCo('Halte'); SFX.stomp();                 // s'atura en el moment de l'executiva (sense esperar el pas següent)
 }
 
 // Par file à droite / à gauche (CD-01): només en columna i en marxa recta.
 // La primera filera gira en arribar a la línia de gir, i després la següent, etc.
+const PF_MIN_LEG = 2;                                   // m que ha de fer la capçalera abans de poder fer un segon par file (ziga-zaga)
 function parFile(dir) {
-  if (co.state !== 'marxa' || co.mode !== 'direct' || co.pf || co.flank || formationName() !== 'columna') return;
+  if (co.state !== 'marxa' || co.mode !== 'direct' || co.flank || (!co.pf && formationName() !== 'columna')) return;
   say(dir > 0 ? 'Par file à droite, marche!' : 'Par file à gauche, marche!');
+  if (co.pf) {                                           // un altre par file amb el primer en curs: es posa un gir més a la cua
+    const pf = co.pf, head = pf.rows[0];
+    const hx = head.turning ? head.cx : head.members.reduce((t, m) => t + m.x, 0) / head.members.length;
+    const hy = head.turning ? head.cy : head.members.reduce((t, m) => t + m.y, 0) / head.members.length;
+    const fx = Math.cos(pf.h), fy = Math.sin(pf.h);
+    pf.turns.push({ dir, fx, fy, s0: hx * fx + hy * fy + PF_MIN_LEG });
+    pf.h += dir * Math.PI / 2;
+    return;
+  }
   const h = co.members[0].h;
   const fx = Math.cos(h), fy = Math.sin(h);
   let s0 = -Infinity;
@@ -2636,18 +2666,19 @@ function parFile(dir) {
   const rows = [];
   for (let f = 0; f < FILES; f++) {
     const members = co.members.filter(m => m.file === f);
-    const row = { members, turning: false, turned: false, turnT: 0 };
+    const row = { members, turning: false, k: 0, turnT: 0 };
     members.forEach(m => { m.row = row; });
     rows.push(row);
   }
-  co.pf = { dir, fx, fy, s0, rows };
+  co.pf = { turns: [{ dir, fx, fy, s0 }], h: h + dir * Math.PI / 2, rows };
 }
 
 // ---------- Maniobres automàtiques, en temps real (CD-02, CD-05, CD-06) ----------
 const ROT_RATE = (Math.PI / 2) / TURN_T;           // rad/s en girar sobre un mateix
 const ORD_SPEED = STEP * ORD_CADENCE / 60;
 function wrapA(a) { while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a += 2 * Math.PI; return a; }
-function busy() { return !!(co.pf || co.flank || co.fix); }
+function busy() { return !!((co.pf && co.state === 'marxa') || co.flank || co.fix); }          // el par file només bloqueja en marxa; aturats, queda en pausa
+const busyHard = () => !!(co.flank || co.fix);                                                  // maniobres que sí que cal esperar (par le flanc, alineació)
 
 // ---------- Desordre de la formació en marxa ----------
 // Cada home té una desviació (dx, dy) respecte al seu lloc ideal. Creix a poc a poc a cada pas
@@ -3244,15 +3275,26 @@ function tutSnap() {
   if (!tutOn()) return;
   const s = level.tutorial.steps[TUT.step]; if (!s || s.guide) return;
   if (co.state === 'conv' || co.state === 'gir' || co.state === 'auto' || co.pf || co.flank || co.fix || pendingCmd) return;
-  try { TUT.snap = { step: TUT.step, co: structuredClone(co) }; } catch (e) { TUT.snap = null; }
+  try { TUT.snap = { step: TUT.step, co: structuredClone(co), en: structuredClone(ENEMY), al: structuredClone(ALLY), gn: structuredClone(GUNS), cp: structuredClone(CORPSES) }; } catch (e) { TUT.snap = null; }
 }
 function canRetry() { return tutOn() && !!TUT.snap && TUT.snap.step === TUT.step; }
 function retryStep() {
   if (!canRetry()) { startLevel(curLevel); return; }
-  co = structuredClone(TUT.snap.co); pendingCmd = null; lastKey = '';
+  snapRestore();
+  showMsg('Tornem al principi d\'aquest pas', 2200);
+}
+function snapRestore() {                        // torna la unitat (i els enemics) a l'últim punt de control
+  const sn = TUT.snap;
+  co = structuredClone(sn.co); pendingCmd = null; lastKey = ''; co.lost = false;
+  for (const [arr, src] of [[ENEMY, sn.en], [ALLY, sn.al], [GUNS, sn.gn], [CORPSES, sn.cp]]) if (src) { arr.length = 0; arr.push(...structuredClone(src)); }
+  BALLS.length = 0; FX.length = 0;
   msgEl.style.display = 'none'; centreCam(); TUT.cued = -1; TUT.idleSince = 0;
   document.getElementById('reac').classList.remove('show');
-  showMsg('Tornem al principi d\'aquest pas', 2200);
+}
+// Mort de la unitat (obstacle, arbre, destrossada…): torna a l'últim punt de control i el capità Le Jay diu que ho tornem a provar
+function deathRetry(msg, delayMs) {
+  if (canRetry()) snapRestore(); else reset();
+  showMsg(msg, 2800); setTimeout(() => reac('decebut', 'Ho tornem a provar, chasseur.', 3200), 150);
 }
 function tutOnReset() {                       // després d'una col·lisió: es torna a l'inici però es conserva el que ja s'ha après
   if (!tutOn()) return;
@@ -3450,7 +3492,7 @@ const ORDERS = [
     avail: sd => pre() || (co.state !== 'marxa' ? 'cal estar en marxa' : co.mode === 'enrere' ? 'no es pot reculant' : busy() ? 'espera que acabi el par file' : (co.mode === 'oblic' && co.obSide === sd) ? 'ja va en oblic cap aquí' : true),
     run: sd => oblique(sd) },
   { id: 'MA-04', des: 1, desOpt: { ordinari: 1, accelerat: 1.5, carrega: 2.2 }, fam: 'mar', k: 'pace', fr: 'Pas', full: 'Pas {o} – marche!', gl: 'cadència de la marxa', options: [['ordinari', 'Ordinaire', 'pace1', '76'], ['accelerat', 'Accéléré', 'pace2', '100'], ['carrega', 'De charge', 'pace3', '120']],
-    avail: p => pre() || (co.state !== 'marxa' ? 'cal estar en marxa' : co.mode === 'enrere' ? 'no es pot reculant' : busy() ? 'espera que acabi el par file' : co.pace === p ? 'és el pas actual' : true),
+    avail: p => pre() || (co.state !== 'marxa' ? 'cal estar en marxa' : co.mode === 'enrere' ? 'no es pot reculant' : busyHard() ? 'espera que acabi la maniobra' : co.pace === p ? 'és el pas actual' : true),
     selected: p => co.state === 'marxa' && co.pace === p, run: p => setPace(p) },
   // Girs
   { id: 'FD-04', des: 0.5, shot: true, fam: 'gir', k: 'gir', fr: 'Par le flanc', full: 'Par le flanc {s} – {s}!', gl: 'quart de volta al lloc; la línia es fa fila', sides: true, icons: ['left', 'right'], cmdsS: { '-1': ['flancG'], '1': ['flancD'] },
@@ -3468,7 +3510,7 @@ const ORDERS = [
     avail: marxaLiniaT, run: sd => startWheel('turn', sd) },
   // Formacions
   { id: 'CD-01', des: 1.5, shot: true, fam: 'gir', k: 'parfile', sec: 'Fila en marxa', fr: 'Par file', full: 'Par file à {s} – marche!', gl: 'la fila canvia de rumb pel mateix punt', sides: true, icons: ['snakeL', 'snakeR'], cmdsS: { '-1': ['pfG'], '1': ['pfD'] },
-    avail: marxaColumna, run: sd => parFile(sd) },
+    avail: () => pre() || (co.state !== 'marxa' ? 'cal estar en marxa' : co.mode !== 'direct' ? 'cal marxar recte (no en oblic ni reculant)' : busyHard() ? 'espera que acabi la maniobra' : (co.pf || formationName() === 'columna') ? true : 'cal estar en fila'), run: sd => parFile(sd) },
   { id: 'CD-05', des: 0, fam: 'form', k: 'bataille', sec: 'Fila en marxa', fr: 'Sur la droite, par file en bataille', full: 'Sur la droite, par file en bataille – marche!', gl: 'de fila a línia, cap a la dreta', icon: 'batR', cmds: ['bat'],
     avail: marxaColumna, run: () => surLaDroite(1) },
   { id: 'WH-04', des: 0, fam: 'form', k: 'ligne', sec: 'Fila en marxa', fr: 'Par peloton en ligne', full: 'Par peloton en ligne – marche!', gl: 'de fila a línia sense aturar-se', icon: 'ligne', cmds: ['ligne'],
@@ -3491,9 +3533,9 @@ const ORDERS = [
   { id: 'FI-01', des: 0, fam: 'arm', float: true, lvl: 'musket', fr: 'Apprêtez', full: 'Apprêtez – vos armes!', gl: 'preparar per disparar (cal estar carregats)', icon: 'aim', cmds: ['appretez'],
     avail: () => armOrder(() => co.arm !== 'portez' ? 'cal tenir-la a l\'espatlla' : !co.loaded ? 'primer cal carregar (Chargez)' : true), run: () => setArm('apprete', 'Apprêtez vos armes!') },
   { id: 'FI-02', des: 0, fam: 'arm', float: true, lvl: 'musket', fr: 'Joue', full: 'Joue!', gl: 'apuntar (des d\'Apprêtez)', icon: 'aim', cmds: ['joue'],
-    avail: () => armOrder(() => co.arm !== 'apprete' ? 'primer Apprêtez' : true), run: sd => { co.fireDir = sd ? co.members[0].h + sd * TUNE.mosquet.oblic : null; setArm('joue', 'Joue!'); } },
+    avail: () => armOrder(() => co.arm !== 'apprete' ? 'primer Apprêtez' : true), run: sd => { co.fireDir = null; co.fireSide = sd || null; setArm('joue', 'Joue!'); } },
   { id: 'FI-03', des: 0, fam: 'arm', float: true, lvl: 'musket', fr: 'Redressez', full: 'Redressez – vos armes!', gl: 'de Joue tornen a Apprêtez sense disparar', icon: 'back', cmds: ['redressez'],
-    avail: () => armOrder(() => co.arm !== 'joue' || !co.loaded ? 'només apuntant amb l\'arma carregada' : true), run: () => { co.fireDir = null; setArm('apprete', 'Redressez vos armes!'); } },
+    avail: () => armOrder(() => co.arm !== 'joue' || !co.loaded ? 'només apuntant amb l\'arma carregada' : true), run: () => { co.fireDir = null; co.fireSide = null; setArm('apprete', 'Redressez vos armes!'); } },
   { id: 'FI-04', des: 0.15, shot: true, fam: 'arm', float: true, lvl: 'musket', fr: 'Feu', full: 'Feu!', gl: 'disparar', icon: 'aim', cmds: ['feu'],
     avail: () => armOrder(() => co.arm !== 'joue' ? 'primer Joue' : !co.loaded ? 'no estan carregats' : true), run: () => feu() },
   // Tiradors (infanteria lleugera): obrir i tancar files, foc a voluntat, foc avançant i reculant
@@ -3567,7 +3609,7 @@ function jolt(des) {
 }
 // Halte (MA-03): sempre al mateix lloc, sol i gros
 const HALTE = { k: 'mov', full: 'Peloton – halte!', cmds: ['halte', 'convHalte'],
-  avail: () => co.state === 'conv' ? (co.conv.kind === 'cm' || co.conv.kind === 'turn' ? 'la unitat executa una maniobra' : true) : co.state !== 'marxa' ? 'la unitat ja està aturada' : (co.pf || co.flank) ? 'espera que acabi el par file' : co.haltReq ? 's\'aturarà al pas següent' : true,
+  avail: () => co.state === 'conv' ? (co.conv.kind === 'cm' || co.conv.kind === 'turn' ? 'la unitat executa una maniobra' : true) : co.state !== 'marxa' ? 'la unitat ja està aturada' : co.flank ? 'espera que acabi la maniobra' : true,
   run: () => co.state === 'conv' ? convHalte() : halte() };
 
 let openFam = null, closeT = 0, famPinned = null;      // famPinned: menú obert amb un clic (no es tanca en sortir el ratolí)
@@ -3590,7 +3632,7 @@ const PACE_FR = { ordinari: 'ordinaire', accelerat: 'accéléré', carrega: 'de 
 const orderTitle = (o, arg) => o.fullS && arg !== undefined ? o.fullS[String(arg)] : o.id === 'FI-02' && arg ? 'Oblique à ' + SIDE_FR[String(arg)] + ' – joue!' : o.full ? o.full.replace(/\{s\}/g, SIDE_FR[String(arg)] || '').replace('{o}', PACE_FR[arg] || arg || '') : o.fr;
 // Ordres en dues veus (reglament): primer la veu PREVENTIVA («Par le flanc droite») i, passat ORDER_DELAY, l'EXECUTIVA («droite!»), que és
 // quan la unitat executa. Les ordres d'una sola paraula (Fixe!, Contremarche!) i Halte s'executen al moment.
-const ORDER_DELAY = 1;
+const ORDER_DELAY = 0.78;                 // s entre la veu preventiva i l'executiva (en tots els botons d'ordre)
 let pendingCmd = null, speakOverride = null;
 function splitOrder(o, arg) { const t = orderTitle(o, arg), i = t.indexOf(' – '); return i < 0 ? null : [t.slice(0, i), t.slice(i + 3)]; }
 function runOrder(o, arg, exec) {
@@ -4065,7 +4107,7 @@ function checkLevel() {
   if (!level || paused) return;
   for (const o of level.obstacles) for (const m of co.members)
     if (m.x > o.x0 - 0.15 && m.x < o.x1 + 0.15 && m.y > o.y0 - 0.15 && m.y < o.y1 + 0.15) {
-      SFX.hit(); reset(); showMsg(o.msg, 2500); reac('decebut', 'Ho tornem a provar, chasseur.', 2800); return;
+      SFX.hit(); deathRetry(o.msg); return;
     }
   if (level.win) { if (!level.win()) return; }
   else {
@@ -4089,8 +4131,7 @@ function checkLevel() {
 function checkTrees() {
   for (const t of trees) for (const m of co.members)
     if (Math.hypot(m.x - t.x, m.y - t.y) < t.r + 0.22) {
-      reset();
-      showMsg('Has tocat un arbre: partida reiniciada', 2500);
+      SFX.hit(); deathRetry('Has tocat un arbre: torna-ho a provar');
       return;
     }
 }
@@ -4100,15 +4141,13 @@ function drawTerrain() { MapKit.paper(ctx, M, MAP_W, MAP_H); }
 function drawCo() {
   // Línia de gir (quan hi ha un par file en curs)
   if (co.pf) {
-    const px = co.pf.s0 * co.pf.fx * M, py = co.pf.s0 * co.pf.fy * M;
-    const nx = -co.pf.fy, ny = co.pf.fx;
-    ctx.strokeStyle = T.ecarlate;
-    ctx.setLineDash([6, 6]);
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.moveTo(px + nx * 30 * M, py + ny * 30 * M);
-    ctx.lineTo(px - nx * 30 * M, py - ny * 30 * M);
-    ctx.stroke();
+    const last = co.pf.rows[co.pf.rows.length - 1], kmin = last.turning ? last.k : last.k;
+    ctx.strokeStyle = T.ecarlate; ctx.setLineDash([6, 6]); ctx.lineWidth = 1.5;
+    co.pf.turns.forEach((Tn, i) => {
+      if (i < kmin) return;                                     // els girs que ja ha fet tota la columna no es dibuixen
+      const px = Tn.s0 * Tn.fx * M, py = Tn.s0 * Tn.fy * M, nx = -Tn.fy, ny = Tn.fx;
+      ctx.beginPath(); ctx.moveTo(px + nx * 30 * M, py + ny * 30 * M); ctx.lineTo(px - nx * 30 * M, py - ny * 30 * M); ctx.stroke();
+    });
     ctx.setLineDash([]);
   }
 
@@ -4161,7 +4200,7 @@ let autoStepT = 0;
 const VOICE = { on: false, rec: null, running: false, tested: false, seg: {}, interim: '', state: '', failT: 0, lastFail: null,
   learn: { phr: {}, ex: {} }, shared: { phr: {}, ex: {} }, opt: { mode: 'cont', vol: true, log: false, tele: true, engine: '' }, log: [], recentExec: null, ptt: false, db: false, loading: false };
 // Connexió amb Supabase (la mateixa de la web: si el joc s'obre dins la web, agafa window.APP_CONFIG) i fonts del motor local Vosk
-const GAME_VERSION = '1.7.6';
+const GAME_VERSION = '1.7.7';
 const CFG = Object.assign({
   SUPABASE_URL: 'https://ltopullwhasagnkuqaek.supabase.co',
   SUPABASE_ANON_KEY: 'sb_publishable_DhHFUh-UrbBrI0l476Vcnw_tSn-Gmkr',
