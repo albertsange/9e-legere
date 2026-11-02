@@ -1285,6 +1285,8 @@ const TUNE = {
               decau: 1.5,                     // × velocitat de baixada de l'indicador quan ja no et veu (1/omple per s)
               corre: 1.6,                     // multiplicador de detecció si avances a pas accelerat o de càrrega
               fraccio: 0.15,                  // fracció d'homes de la unitat que han de ser vistos perquè compti
+              combat: 24,                     // m: si l'indicador s'omple a menys d'aquesta distància (o ja has creuat el rierol), no hi ha alarma: la patrulla es gira i lluita
+              espera: 10, vel: 0.823,         // s que la patrulla s'espera a cada extrem de la ruta, i m/s a què camina
               groc: 0.4, vermell: 0.75 },     // llindars de color de l'indicador
   puntuacio: { part: 250,                     // punts de cadascun dels 4 apartats (temps, baixes, ordres, ordre mitjà)
               marge: 2 },                     // amb referència × (1 + marge) el temps/les ordres puntuen 0
@@ -1982,9 +1984,9 @@ function drawEnemies() {
     if (m.gone) continue;
     if (m.alive || m.fl) {
       ctx.globalAlpha = m.fl ? Math.max(0, Math.min(1, 1 - (m.fl.t - 2.5) / 1.5)) : 1;
-      ctx.fillStyle = '#f7f5ee'; ctx.strokeStyle = '#6c6a63'; ctx.lineWidth = Math.max(1, 0.05 * M);
+      ctx.fillStyle = '#f7f5ee'; ctx.strokeStyle = e.jager ? '#2e8b3d' : '#6c6a63'; ctx.lineWidth = Math.max(1, (e.jager ? 0.1 : 0.05) * M);
       ctx.beginPath(); ctx.arc(px, py, rS, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-      ctx.strokeStyle = '#8a877e'; ctx.lineWidth = Math.max(1, 0.06 * M); ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(px + Math.cos(m.h ?? e.h) * 0.32 * M, py + Math.sin(m.h ?? e.h) * 0.32 * M); ctx.stroke(); ctx.globalAlpha = 1;
+      ctx.strokeStyle = e.jager ? '#2e8b3d' : '#8a877e'; ctx.lineWidth = Math.max(1, 0.06 * M); ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(px + Math.cos(m.h ?? e.h) * 0.32 * M, py + Math.sin(m.h ?? e.h) * 0.32 * M); ctx.stroke(); ctx.globalAlpha = 1;
     }
   }
 }
@@ -2432,6 +2434,7 @@ function updateEnemies(dt) {                     // els regiments enemics es gir
       const d = wrapA(Math.atan2(c.y - e.cy, c.x - e.cx) - e.h), st = Math.max(-T.enGir * dt, Math.min(T.enGir * dt, d));
       if (Math.abs(st) > 1e-5) { const cs = Math.cos(st), sn = Math.sin(st); for (const v of live) { const x = v.x - e.cx, y = v.y - e.cy; v.x = e.cx + x * cs - y * sn; v.y = e.cy + x * sn + y * cs; } e.h += st; }
     }
+    if (e.stealth && !e.alert) { e.aimT = 0; continue; }                      // una patrulla que no ha donat l'alerta no dispara
     const S = makeStrip(live, e.h, e.h, T.enOberta);
     if (!co.members.some(m => inStrip(S, m.x, m.y) >= 0 && !losBlocked(S.ox, S.oy, m.x, m.y))) { e.aimT = 0; continue; }
     if (e.reload > 0 || e.supp > T.supMax) { e.aimT = Math.min(e.aimT, T.enAvis * 0.5); continue; }
@@ -4328,7 +4331,7 @@ let autoStepT = 0;
 const VOICE = { on: false, rec: null, running: false, tested: false, seg: {}, interim: '', state: '', failT: 0, lastFail: null,
   learn: { phr: {}, ex: {} }, shared: { phr: {}, ex: {} }, opt: { mode: 'cont', vol: true, log: false, tele: true, engine: '' }, log: [], recentExec: null, ptt: false, db: false, loading: false };
 // Connexió amb Supabase (la mateixa de la web: si el joc s'obre dins la web, agafa window.APP_CONFIG) i fonts del motor local Vosk
-const GAME_VERSION = '1.8.0';
+const GAME_VERSION = '1.8.1';
 const CFG = Object.assign({
   SUPABASE_URL: 'https://ltopullwhasagnkuqaek.supabase.co',
   SUPABASE_ANON_KEY: 'sb_publishable_DhHFUh-UrbBrI0l476Vcnw_tSn-Gmkr',
@@ -5896,16 +5899,36 @@ function buildCampaign1() {
     A.tree(30, 33.5, { r: 1.2, seed: 41 }), A.tree(68, 33, { kind: 'con', r: 1.1, seed: 42 }), A.tree(72, 26, { r: 1.2, seed: 43 }), A.tree(58, 36, { r: 1.1, seed: 44 }),
     A.label('Philippeville', 12, 5.5, { kind: 'town', scale: 0.6 }), A.label('Le Viroin', 54.5, 54, { kind: 'place', scale: 0.5 }), A.label('Bosc de Philippeville', 22, 49, { kind: 'place', scale: 0.5 }), A.label('El gual', 50, 27, { kind: 'place', scale: 0.45 }));
   const cover = woods.flatMap(w => w.trees);
-  const P = { x: 62, y: 31, h: Math.PI };                                       // la patrulla de jägers, de cara a l'oest (vigilant el gual)
-  const st = { det: 0, behind: false, cp: 0, cone: null, alarmed: false };
+  const ROUTE = [[58, 30.3], [63, 29.8], [70, 30.4], [76, 31], [80, 30.7]], RLEN = [0];                       // ruta de la patrulla pel camí, a la riba est
+  for (let i = 1; i < ROUTE.length; i++) RLEN.push(RLEN[i - 1] + Math.hypot(ROUTE[i][0] - ROUTE[i - 1][0], ROUTE[i][1] - ROUTE[i - 1][1]));
+  const routeAt = d => { d = Math.max(0, Math.min(RLEN[RLEN.length - 1], d)); let i = 1; while (i < RLEN.length - 1 && RLEN[i] < d) i++; const k = (d - RLEN[i - 1]) / (RLEN[i] - RLEN[i - 1]);
+    return { x: ROUTE[i - 1][0] + (ROUTE[i][0] - ROUTE[i - 1][0]) * k, y: ROUTE[i - 1][1] + (ROUTE[i][1] - ROUTE[i - 1][1]) * k, a: Math.atan2(ROUTE[i][1] - ROUTE[i - 1][1], ROUTE[i][0] - ROUTE[i - 1][0]) }; };
+  const RIV = [[-2, 54], [8, 50], [19, 54], [29, 49], [39, 51], [49, 46], [58, 49], [63, 48]];                   // (y, x) del rierol, per saber quan s'ha creuat
+  const rivX = y => { let i = 1; while (i < RIV.length - 1 && RIV[i][0] < y) i++; const k = Math.max(0, Math.min(1, (y - RIV[i - 1][0]) / (RIV[i][0] - RIV[i - 1][0]))); return RIV[i - 1][1] + (RIV[i][1] - RIV[i - 1][1]) * k; };
+  const P = { x: ROUTE[0][0], y: ROUTE[0][1], h: Math.PI };                     // la patrulla de jägers comença a l'extrem oest, de cara al gual
+  const st = { det: 0, crossed: false, cp: 0, cone: null, coneT: 0, alarmed: false, pat: null };
   const SG = TUNE.sigil;
-  function cone() {                                                              // polígon de visió de la patrulla (tapat per arbres i cases): es calcula un cop
-    if (st.cone) return st.cone;
-    const pts = [{ x: P.x, y: P.y }], N = 40;
-    for (let k = -N; k <= N; k++) { const a = P.h + k / N * SG.mig; let r = 0;
-      while (r < SG.abast) { const nr = Math.min(SG.abast, r + 0.5); if (losBlocked(P.x, P.y, P.x + Math.cos(a) * nr, P.y + Math.sin(a) * nr)) break; r = nr; }
-      pts.push({ x: P.x + Math.cos(a) * r, y: P.y + Math.sin(a) * r }); }
-    return st.cone = pts;
+  function coneCalc() {                                                          // polígon de visió de la patrulla (tapat per arbres i cases): es recalcula mentre es mou
+    const e = ENEMY[0], pts = [{ x: e.cx, y: e.cy }], N = 30;
+    for (let k = -N; k <= N; k++) { const a = e.h + k / N * SG.mig; let r = 0;
+      while (r < SG.abast) { const nr = Math.min(SG.abast, r + 0.7); if (losBlocked(e.cx, e.cy, e.cx + Math.cos(a) * nr, e.cy + Math.sin(a) * nr)) break; r = nr; }
+      pts.push({ x: e.cx + Math.cos(a) * r, y: e.cy + Math.sin(a) * r }); }
+    st.coneKey = Math.round(e.cx * 2) + ',' + Math.round(e.cy * 2) + ',' + Math.round(e.h * 10); return st.cone = pts;
+  }
+  const cone = () => st.cone || coneCalc();
+  function patrolTick(e, dt) {                                                   // camina pel camí fins a un extrem, s'hi espera, es gira i torna
+    const p = st.pat, end = RLEN[RLEN.length - 1];
+    if (p.mode === 'wait') { p.t += dt; if (p.t >= SG.espera) { p.mode = 'turn'; p.dir = p.at === 0 ? 1 : -1; } }
+    if (p.mode === 'turn') {
+      const want = p.dir > 0 ? routeAt(p.d).a : routeAt(p.d).a + Math.PI, df = wrapA(want - e.h), stp = Math.max(-1.6 * dt, Math.min(1.6 * dt, df));
+      aiRot(e, stp); if (Math.abs(df) < 0.02) p.mode = 'walk';
+    } else if (p.mode === 'walk') {
+      p.d += p.dir * SG.vel * dt; const arrived = p.dir > 0 ? p.d >= end : p.d <= 0; p.d = Math.max(0, Math.min(end, p.d));
+      const q = routeAt(p.d); aiMove(e, q.x - e.cx, q.y - e.cy);
+      const df = wrapA((p.dir > 0 ? q.a : q.a + Math.PI) - e.h); aiRot(e, Math.max(-1 * dt, Math.min(1 * dt, df)));
+      if (arrived) { p.mode = 'wait'; p.t = 0; p.at = p.dir > 0 ? 1 : 0; }
+    }
+    st.coneT += dt; if (st.coneT > 0.35 || !st.cone) { st.coneT = 0; const k = Math.round(e.cx * 2) + ',' + Math.round(e.cy * 2) + ',' + Math.round(e.h * 10); if (k !== st.coneKey) coneCalc(); }
   }
   function detBar() {
     let el = document.getElementById('detBar');
@@ -5928,16 +5951,16 @@ function buildCampaign1() {
   const steps = [
     { title: 'El Bateig de Foc', pose: 'serios', hl: [], unlock: UN, tag: 'Philippeville · 23 de maig de 1793', intro: true, btn: 'Endavant',
       text: ['«Acabem d\'arribar a Philippeville, <b>chasseur</b>, i ja tenim la primera feina. Hem avistat una <b>patrulla de quinze jägers</b> austríacs al gual del riu. Si descobreixen el gruix del nostre exèrcit, l\'artilleria enemiga ens farà miques abans de començar.»',
-        '«No els ataquem de cara. <b>Fiqueu-vos a l\'espessor, voregeu-los per la dreta</b> aprofitant els arbres i aixafeu-los per l\'esquena abans que puguin disparar un sol tret d\'avís!»',
-        'Els jägers veuen en un <b>con davant seu</b> (el veuràs marcat al mapa; els arbres i les cases el tapen). Si hi ets massa estona, apareix un <b>indicador</b> que passa de groc a vermell: si s\'omple, donen l\'alarma i has de tornar al darrer <b>punt de control</b>. Anar de pressa fa que et vegin abans.'],
+        '«No els ataquem de cara. <b>Fiqueu-vos a l\'espessor, voregeu-los per la dreta</b> aprofitant els arbres, creueu el rierol sense que us vegin i aixafeu-los abans que puguin donar l\'alarma!»',
+        'Els jägers <b>patrullen pel camí</b>, s\'esperen deu segons a cada extrem i tornen. Veuen en un <b>con davant seu</b> (el veus al mapa; els arbres i les cases el tapen). Si hi ets massa estona, apareix un <b>indicador</b> que passa de groc a vermell: si s\'omple abans de creuar el rierol, donen l\'alarma i tornes al darrer <b>punt de control</b>. Si ja has creuat o ets a tir, no podran avisar ningú: s\'hauran d\'enfrontar a tu.'],
       done: () => TUT.intro },
     { title: 'Voreja la patrulla', pose: 'assenyala', hl: [], unlock: UN,
-      mini: () => st.behind ? 'Ja els tens per l\'esquena: carrega i <b>aixafa la patrulla</b>.' : 'Vareja pel bosc del sud, creua el rierol i surt per <b>darrere</b> dels jägers.', resetStep: () => 1, done: () => false }
+      mini: () => st.crossed ? 'Has creuat el rierol: carrega i <b>aixafa la patrulla</b>. Si et veuen, ja no podran donar l\'alarma: s\'hauran d\'enfrontar a tu.' : '<b>Creua el rierol sense que et vegin</b>, pel bosc del sud, mentre la patrulla va i ve pel camí.', resetStep: () => 1, done: () => false }
   ];
   return {
     w: W, h: H, start: { x: 8, y: 31 }, obstacles: obs, scene: MapKit.scene(sc), zone: null, musket: true, driftScale: 0.5, goalHeading: 0, minMen: 8,
     cover, walls,
-    enemies: [{ name: 'Patrulla de jägers', flag: 'aut', cx: P.x, cy: P.y, h: P.h, nFiles: 8, shoots: true, stealth: true }],
+    enemies: [{ name: 'Patrulla de jägers', flag: 'aut', cx: P.x, cy: P.y, h: P.h, nFiles: 8, shoots: true, stealth: true, jager: true }],
     tutorial: { steps, figs: [], startAtencio: true, resetStep: () => 1 },
     over(ctx, M, mini) {
       if (mini || !ENEMY.length || ENEMY[0].alert || enAlive(ENEMY[0]) === 0) return;
@@ -5946,14 +5969,15 @@ function buildCampaign1() {
       ctx.fillStyle = 'rgba(' + col + ',' + a.toFixed(3) + ')'; ctx.fill(); ctx.setLineDash([7, 6]); ctx.strokeStyle = 'rgba(' + col + ',.75)'; ctx.lineWidth = 1.6; ctx.stroke(); ctx.restore();
     },
     onReset() {
-      st.det = 0; st.behind = false; st.cp = 0; st.alarmed = false; st.cone = null; detShow(0);
-      const e = ENEMY[0]; if (e) { e.men.pop(); e.stealth = true; e.reload = 3; }                    // 16 → 15 jägers
+      st.det = 0; st.crossed = false; st.cp = 0; st.alarmed = false; st.cone = null; st.coneKey = ''; st.pat = { mode: 'wait', t: 0, d: 0, at: 0, dir: 1 }; detShow(0);
+      const e = ENEMY[0]; if (e) { e.men.pop(); e.stealth = true; e.jager = true; e.reload = 3; }                    // 16 → 15 jägers
     },
     tick(dt) {
       if (screen !== 'game' || paused || tutOpen() || co.lost) return;
       const e = ENEMY[0]; if (!e || TUT.step < 1) { detShow(0); return; }
       const c = unitCentre(), live = enAlive(e) > 0;
-      if (c.x > P.x + 4 && Math.abs(c.y - P.y) < 22) st.behind = true;
+      if (!st.crossed && c.x > rivX(c.y) + 2.5) st.crossed = true;
+      if (live && !e.alert) patrolTick(e, dt);
       let seen = 0, dmin = 1e9;
       if (live && !e.alert) for (const m of co.members) {
         const d = Math.hypot(m.x - e.cx, m.y - e.cy);
@@ -5963,26 +5987,31 @@ function buildCampaign1() {
       else st.det = Math.max(0, st.det - dt / SG.omple * SG.decau);
       detShow(st.det);
       if (st.det >= 1 && !st.alarmed) {
-        st.alarmed = true; st.det = 0; detShow(0); SFX.hit();
-        reac('decebut', '<b>Louis:</b> Ens han vist! Han donat l\'alarma!', 3000);
-        setTimeout(() => deathRetry('Els jägers han donat l\'alarma: torna-ho a provar'), 600); return;
+        if (st.crossed || dmin <= SG.combat) {                                       // ja és massa tard per donar l'alarma: la patrulla es gira i s'ha d'enfrontar a tu
+          e.alert = true; st.det = 0; detShow(0); reac('louis', '<b>Louis:</b> Ens han vist, però ja som a tir! La patrulla es gira cap a nosaltres.', 4000);
+        } else {
+          st.alarmed = true; st.det = 0; detShow(0); SFX.hit();
+          reac('decebut', '<b>Louis:</b> Ens han vist! Han donat l\'alarma!', 3000);
+          setTimeout(() => deathRetry('Els jägers han donat l\'alarma: torna-ho a provar'), 600); return;
+        }
       }
-      if (st.det === 0 && !live === false) {                                                 // punts de control en zones segures
-        const prev = TUT.snap, zone = c.x > 64 && c.y > 36 ? 2 : c.x > 22 && c.y > 36 ? 1 : 0;
+      if (st.det === 0 && live) {                                                    // punts de control en zones segures
+        const prev = TUT.snap, zone = st.crossed ? 2 : c.x > 22 && c.y > 36 ? 1 : 0;
         if (zone > st.cp && co.state === 'parat') { tutSnap(); if (TUT.snap !== prev) { st.cp = zone; reac('assenyala', 'Punt de control desat.', 2200); } }
       }
     },
     win: () => ENEMY.length > 0 && ENEMY.every(e => e.routed || enAlive(e) === 0),
     objectives: [
-      { t: 'Voltar la patrulla per la dreta sense ser vist', ok: () => st.behind },
+      { t: 'Creuar el rierol sense que et vegin', ok: () => st.crossed },
       { t: 'Aixafar els quinze jägers', ok: () => ENEMY.length > 0 && ENEMY.every(e => e.routed || enAlive(e) === 0) },
       { t: 'Mantenir la unitat amb almenys 8 homes', ok: () => co.members.length >= 8 }
     ],
-    goalText: 'Voreja la patrulla de jägers pel bosc, sense que et vegin, i aixafa-la per l\'esquena.',
+    goalText: 'Creua el rierol pel bosc sense que et vegin i aixafa la patrulla de jägers.',
     endText: 'Molt bé, chasseur: la patrulla ha caigut sense donar l\'alarma i l\'exèrcit continua ocult. Aquest ha estat el teu bateig de foc!'
   };
 }
-const CAMP = [{ id: 'c1n1', n: 1, title: 'El Bateig de Foc', desc: 'Philippeville, 23 de maig de 1793. Voreja pel bosc una patrulla de quinze jägers austríacs sense que et vegin i aixafa-la per l\'esquena.', build: buildCampaign1 }];
+const campFull = f => () => Object.assign(f(), { advanced: true });                   // a tota la campanya hi ha l'indicador de cansament i el d'ordre
+const CAMP = [{ id: 'c1n1', n: 1, title: 'El Bateig de Foc', desc: 'Philippeville, 23 de maig de 1793. Voreja pel bosc una patrulla de quinze jägers austríacs sense que et vegin i aixafa-la per l\'esquena.', build: campFull(buildCampaign1) }];
 const CAMP_BY_ID = {}; for (const L of CAMP) CAMP_BY_ID[L.id] = L;
 function renderCampList() {
   const grid = document.getElementById('campGrid'); grid.innerHTML = '';
