@@ -4331,7 +4331,7 @@ let autoStepT = 0;
 const VOICE = { on: false, rec: null, running: false, tested: false, seg: {}, interim: '', state: '', failT: 0, lastFail: null,
   learn: { phr: {}, ex: {} }, shared: { phr: {}, ex: {} }, opt: { mode: 'cont', vol: true, log: false, tele: true, engine: '' }, log: [], recentExec: null, ptt: false, db: false, loading: false };
 // Connexió amb Supabase (la mateixa de la web: si el joc s'obre dins la web, agafa window.APP_CONFIG) i fonts del motor local Vosk
-const GAME_VERSION = '1.8.9';
+const GAME_VERSION = '1.8.10';
 const CFG = Object.assign({
   SUPABASE_URL: 'https://ltopullwhasagnkuqaek.supabase.co',
   SUPABASE_ANON_KEY: 'sb_publishable_DhHFUh-UrbBrI0l476Vcnw_tSn-Gmkr',
@@ -5937,21 +5937,12 @@ function buildCampaign1() {
       v.fx = v.x; v.fy = v.y; v.tx = E[0] - rank * RANK_GAP; v.ty = E[1] + (4.5 - file) * FRONT; });
     u.front = 0;
   }
-  function banner(txt, sub) {
-    let el = document.getElementById('p3Banner');
-    if (!el) {
-      const css = document.createElement('style'); css.textContent = '#p3Banner{position:fixed;left:50%;top:22%;transform:translateX(-50%);z-index:40;display:none;text-align:center;pointer-events:none;background:rgba(251,250,246,.96);border:2px solid #b3261e;border-radius:8px;padding:14px 28px;box-shadow:0 10px 40px rgba(20,24,40,.4);font-family:var(--display,serif)}#p3Banner b{display:block;font-size:2rem;color:#b3261e;letter-spacing:.04em}#p3Banner span{display:block;font-size:1.05rem;color:#2a2118;margin-top:4px}';
-      document.head.appendChild(css); el = document.createElement('div'); el.id = 'p3Banner'; document.body.appendChild(el);
-    }
-    el.innerHTML = '<b></b><span></span>'; el.firstChild.textContent = txt; el.lastChild.textContent = sub; el.style.display = 'block'; clearTimeout(el._t); el._t = setTimeout(() => { el.style.display = 'none'; }, 8000);
-  }
   function startP3() {
     st.p3 = true; st.p3t = 0; st.army = 0; st.wave = 0; st.done = false; detShow(0); st.pend = [];
     for (let k = 0; k < NARMY; k++) {                                              // el gruix de l'exèrcit: unitats de 20 homes que van arribant en columna, creuen el gual i es desplegaran en línia a la riba est
       const r = 2 - Math.floor(k / 4), c = [0, 3, 1, 2][k % 4], sy = 19.5 + 7 * c, sx = rivX(sy) + 3.5 + 3.2 * r;
       st.pend.push({ t0: 4 + 8 * k, slot: [sx, sy] });
     }
-    banner('Protegeix la línia!', 'L\'exèrcit francès creua el gual: no deixis que els austríacs s\'hi acostin.');
     reac('assenyala', '<b>Capità Le Jay:</b> Ben fet, chasseur! Ara <b>protegeix la línia</b>: el gruix de l\'exèrcit creua el gual en columna. Desplega\'t en <b>tiradors</b> a la riba est, davant seu, i rebutja les avançades austríaques fins que hagin passat tots.', 11000);
   }
   function spawnWave(w) {
