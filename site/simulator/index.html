@@ -479,6 +479,9 @@
   .glang{display:inline-flex;gap:4px;}
   .glang button{font-family:var(--label);font-size:13px;letter-spacing:.08em;padding:3px 9px;border:1px solid var(--line);background:transparent;color:var(--muted);border-radius:4px;cursor:pointer;}
   .glang button.on{background:var(--bleu);border-color:var(--bleu);color:#fff;}
+  .glang button.gmute{padding:3px 7px;display:inline-flex;align-items:center;}
+  .glang button.gmute svg{width:15px;height:15px;display:block;}
+  .glang button.gmute.off{color:var(--ecarlate);border-color:var(--ecarlate);}
   .pop .glang{display:flex;margin-top:6px;}
   .gver{position:absolute;left:16px;bottom:12px;font-family:var(--label);font-size:13px;letter-spacing:.06em;color:var(--muted);}
   .pop .gver{position:static;display:block;border-top:1px dashed var(--line);margin-top:4px;padding-top:6px;font-size:12px;}
@@ -3370,7 +3373,8 @@ function buildMapControls() {
     const l = document.createElement('label'); l.title = tip;
     l.innerHTML = '<input type="checkbox"><span>' + label + '</span>';
     const cb = l.querySelector('input'); cb.checked = !!SFX.S[key];
-    cb.onchange = () => { SFX.S[key] = cb.checked; SFX.save(); if (after) after(); };
+    if (key === 'on') window.__soundCb = cb;
+    cb.onchange = () => { SFX.S[key] = cb.checked; SFX.save(); if (after) after(); if (key === 'on') soundUi(); };
     pop.appendChild(l);
   };
   tog('So', 'on', 'Activar o silenciar tots els sons', () => { MUSIC.sync(); if (SFX.S.on) { if (screen === 'game') SFX.ambientStart(); } else SFX.ambientStop(); });
@@ -4157,7 +4161,7 @@ let autoStepT = 0;
 const VOICE = { on: false, rec: null, running: false, tested: false, seg: {}, interim: '', state: '', failT: 0, lastFail: null,
   learn: { phr: {}, ex: {} }, shared: { phr: {}, ex: {} }, opt: { mode: 'cont', vol: true, log: false, tele: true, engine: '' }, log: [], recentExec: null, ptt: false, db: false, loading: false };
 // Connexió amb Supabase (la mateixa de la web: si el joc s'obre dins la web, agafa window.APP_CONFIG) i fonts del motor local Vosk
-const GAME_VERSION = '1.7.3';
+const GAME_VERSION = '1.7.4';
 const CFG = Object.assign({
   SUPABASE_URL: 'https://ltopullwhasagnkuqaek.supabase.co',
   SUPABASE_ANON_KEY: 'sb_publishable_DhHFUh-UrbBrI0l476Vcnw_tSn-Gmkr',
@@ -5904,8 +5908,16 @@ function updVer() {
 function langRow() {
   const d = document.createElement('div'); d.className = 'glang';
   for (const l of ['ca', 'en']) { const b = document.createElement('button'); b.type = 'button'; b.dataset.l = l; b.textContent = l.toUpperCase(); b.title = l === 'ca' ? 'Català' : 'English'; b.classList.toggle('on', I18N.lang === l); b.onclick = () => setGameLang(l); d.appendChild(b); }
-  return d;
+  const m = document.createElement('button'); m.type = 'button'; m.className = 'gmute'; m.onclick = () => { SFX.S.on = !SFX.S.on; SFX.save(); soundApply(); };
+  d.appendChild(m); soundUi(); return d;
 }
+const SND_ON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/></svg>';
+const SND_OFF = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4z"/><path d="m22 9-6 6M16 9l6 6"/></svg>';
+function soundUi() {                                       // botons de silenci (menú i desplegable) i la casella «So» sempre d'acord amb l'estat real
+  document.querySelectorAll('.glang .gmute').forEach(b => { const on = !!SFX.S.on; b.innerHTML = on ? SND_ON : SND_OFF; b.classList.toggle('off', !on); b.title = i18nTr(on ? 'Silenciar els sons' : 'Activar els sons'); });
+  if (window.__soundCb) window.__soundCb.checked = !!SFX.S.on;
+}
+function soundApply() { soundUi(); MUSIC.sync(); if (SFX.S.on) { if (screen === 'game') SFX.ambientStart(); } else SFX.ambientStop(); }
 const i18nP = I18N.lang === 'ca' ? Promise.resolve() : (I18N.ready ? (i18nApply(), i18nLoad(), Promise.resolve()) : i18nLoad());
 
 // ---- Pantalla d'inici de càrrega: comprova la versió, carrega el motor local i el diccionari abans de mostrar el joc ----

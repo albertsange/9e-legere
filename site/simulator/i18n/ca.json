@@ -3624,5 +3624,11 @@
  {
   "k": "Torna a comptar el <b>cansament</b> i l'<b>ordre</b>: marxar cansa, una tropa esgotada s'atura i carrega més a poc a poc, i una tropa desordenada és difícil de manar. Vigila les barres d'<b>energia</b> i d'<b>ordre</b>.",
   "h": 1
+ },
+ {
+  "k": "Silenciar els sons"
+ },
+ {
+  "k": "Activar els sons"
  }
 ]
