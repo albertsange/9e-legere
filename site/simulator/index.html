@@ -524,8 +524,7 @@
 </section>
 <section id="screenCamp" class="screen">
   <div class="lvl-head"><button class="btn-sec" id="btnCampBack">‹ Enrere</button><h2>Campanya</h2></div>
-  <p id="campNote">Campanya 1 · Forjant la República (1792-1797)</p>
-  <div class="lvl-grid" id="campGrid"></div>
+  <div id="campBody"></div>
 </section>
 <section id="screenRank" class="screen">
   <div class="lvl-head"><button class="btn-sec" id="btnRankBack">‹ Enrere</button><h2>Rànquing</h2></div>
@@ -1634,7 +1633,7 @@ let co, lastKey = '', level = null, screen = 'title', paused = false;
 // ---------- Puntuació i rànquing ----------
 // Cada nivell dóna fins a 1000 punts: 4 parts de 250 (temps, baixes, ordres donades i ordre mitjà del regiment). Es guarda la millor de cada nivell.
 const STAT = { t: 0, ord: 0, dead: 0, oSum: 0, men0: 20 };
-const SCORE_REF = { 1: { t: 90, o: 12 }, 2: { t: 100, o: 14 }, 3: { t: 110, o: 16 }, 4: { t: 140, o: 20 }, 5: { t: 200, o: 25 }, 6: { t: 120, o: 14 }, 7: { t: 150, o: 20 }, 8: { t: 170, o: 30 }, 9: { t: 150, o: 10 }, 10: { t: 300, o: 35 } };   // temps (s) i ordres de referència: 250 punts; amb el triple, 0
+const SCORE_REF = { 1: { t: 90, o: 12 }, 2: { t: 100, o: 14 }, 3: { t: 110, o: 16 }, 4: { t: 140, o: 20 }, 5: { t: 200, o: 25 }, 6: { t: 120, o: 14 }, 7: { t: 150, o: 20 }, 8: { t: 170, o: 30 }, 9: { t: 150, o: 10 }, 10: { t: 300, o: 35 }, c1n1: { t: 150, o: 18 } };   // temps (s) i ordres de referència: 250 punts; amb el triple, 0
 function statReset() { STAT.t = 0; STAT.ord = 0; STAT.dead = 0; STAT.oSum = 0; STAT.men0 = co ? co.members.length : 20; }
 function scoreCalc(n) {
   const R = SCORE_REF[n] || { t: 150, o: 20 }, P = TUNE.puntuacio, lin = (v, ref) => Math.max(0, Math.min(1, 1 - (v - ref) / (P.marge * ref)));
@@ -4249,9 +4248,10 @@ function checkLevel() {
   if (disorderRms() > 0.03 || co.hdT !== 0) return;      // cal que la línia estigui alineada i amb el cap al front
   }
   paused = true; SFX.ding();
-  if (typeof curLevel === 'number') { progDone(LEVELS[curLevel].n); scoreShow(LEVELS[curLevel].n); } else document.getElementById('endScore').innerHTML = '';
+  if (typeof curLevel === 'number') { progDone(LEVELS[curLevel].n); scoreShow(LEVELS[curLevel].n); } else if (typeof curLevel === 'string' && CAMP_BY_ID[curLevel]) { scoreShow(curLevel); campDone(curLevel, scoreCalc(curLevel).total); } else document.getElementById('endScore').innerHTML = '';
   OBJ.complete = true; objUpdate();
-  document.getElementById('btnNext').style.display = typeof curLevel === 'number' && levelUnlocked(curLevel + 1) ? '' : 'none';
+  { const camp = typeof curLevel === 'string' && !!CAMP_BY_ID[curLevel], tb = document.getElementById('btnToLevels'); tb.textContent = camp ? 'Campanya' : 'Tutorial';
+    document.getElementById('btnNext').style.display = camp ? (campNextId() ? '' : 'none') : typeof curLevel === 'number' && levelUnlocked(curLevel + 1) ? '' : 'none'; }
   document.getElementById('tut').classList.remove('show'); document.getElementById('tmini').classList.remove('show');
   document.getElementById('endText').textContent = level.endText;
   document.querySelector('#endmsg .av2').src = AV.saluda;
@@ -4331,7 +4331,7 @@ let autoStepT = 0;
 const VOICE = { on: false, rec: null, running: false, tested: false, seg: {}, interim: '', state: '', failT: 0, lastFail: null,
   learn: { phr: {}, ex: {} }, shared: { phr: {}, ex: {} }, opt: { mode: 'cont', vol: true, log: false, tele: true, engine: '' }, log: [], recentExec: null, ptt: false, db: false, loading: false };
 // Connexió amb Supabase (la mateixa de la web: si el joc s'obre dins la web, agafa window.APP_CONFIG) i fonts del motor local Vosk
-const GAME_VERSION = '1.8.1';
+const GAME_VERSION = '1.8.2';
 const CFG = Object.assign({
   SUPABASE_URL: 'https://ltopullwhasagnkuqaek.supabase.co',
   SUPABASE_ANON_KEY: 'sb_publishable_DhHFUh-UrbBrI0l476Vcnw_tSn-Gmkr',
@@ -6013,15 +6013,110 @@ function buildCampaign1() {
 const campFull = f => () => Object.assign(f(), { advanced: true });                   // a tota la campanya hi ha l'indicador de cansament i el d'ordre
 const CAMP = [{ id: 'c1n1', n: 1, title: 'El Bateig de Foc', desc: 'Philippeville, 23 de maig de 1793. Voreja pel bosc una patrulla de quinze jägers austríacs sense que et vegin i aixafa-la per l\'esquena.', build: campFull(buildCampaign1) }];
 const CAMP_BY_ID = {}; for (const L of CAMP) CAMP_BY_ID[L.id] = L;
+// ---- Campanyes: les 8 campanyes amb els 85 nivells; la campanya 1 té mapa il·lustrat amb el recorregut ----
+const CAMP_DATA = [{"n":1,"t":"Forjant la República (1792-1797)","l":[[1,"El Bateig de Foc (Philippeville)","23 maig 1793"],[2,"La Línia de Neerwinden","18 març 1793"],[3,"Esgotar el Perseguidor","Post-Neerwinden"],[4,"Avançada cap a Hondschoote","Setembre 1793"],[5,"La Càrrega a Hondschoote","6 setembre 1793"],[6,"Boscos de Wattignies","15 octubre 1793"],[7,"Trencament del Setge","16 octubre 1793"],[8,"L'Amalgama de Fleurus","Maig 1794"],[9,"La Defensa Implacable","26 juny 1794"],[10,"Les Altures de Partenheim","1796"],[11,"Foc a Gaualgesheim","6 octubre 1796"],[12,"Consolidació a Kempten","Tardor 1796"]]},{"n":2,"t":"La Forja de L'Incomparable (1798-1800)","l":[[13,"L'Espessor de la Vendée","1799"],[14,"La Preparació a Dijon","Abril 1800"],[15,"L'Infern de Gel (Valais)","Primavera 1800"],[16,"Les Ribes de la Chiusella","26 maig 1800"],[17,"La cursa cap a Piacenza","Juny 1800"],[18,"Captura d'Honor","5-7 juny 1800"],[19,"El Col·lapse del Matí (Marengo)","14 juny 1800"],[20,"L'Ancora de Desaix","14 juny 1800"],[21,"La Mort del Comandant","14 juny 1800"],[22,"La Càrrega Incomparable","14 juny 1800"],[23,"La Fama Sancionada","Juny 1802"]]},{"n":3,"t":"El Sol d'Austerlitz i les Ombres del Danubi (1803-1805)","l":[[24,"Exercicis a Boulogne","1803-1805"],[25,"La Marxa d'Àguiles","Tardor 1805"],[26,"La Solitud de Haslach","11 octubre 1805"],[27,"El Laberint de Jungingen","11 octubre 1805"],[28,"Caça i Captura a Ulm","Octubre 1805"],[29,"L'Eixam del Danubi","Novembre 1805"],[30,"Ombres de Dürenstein","11 novembre 1805"],[31,"Acer fred a la Nit","11 novembre 1805"],[32,"Ocupació a Viena","Desembre 1805"],[33,"Recompte i Reforma","Entre 1805 i 1808"]]},{"n":4,"t":"Triomf, Tragèdia i Redempció (1806-1807)","l":[[34,"Avançant a Turíngia (Jena)","Octubre 1806"],[35,"L'Obsolescència (Jena)","14 octubre 1806"],[36,"La Rereguarda Esgotada","Octubre 1806"],[37,"Fam al Fang i la Neu","Hivern 1806-1807"],[38,"Pànic a Mohrungen","25 gener 1807"],[39,"L'Eclipsi de l'Àguila","25 gener 1807"],[40,"Eylau: Esgotament Blanc","8 febrer 1807"],[41,"L'Error de Bennigsen","14 juny 1807"],[42,"El Càstig dels Canons","14 juny 1807"],[43,"Purificats pel Foc","14 juny 1807"],[44,"Tilsit i Nou Equipament","Final 1807"]]},{"n":5,"t":"Sang a Espanya i Foc a Àustria (1808-1811)","l":[[45,"Els Engorjats (Pirineus)","1808"],[46,"La Marxa Furtiva (Talavera)","27 juliol 1809"],[47,"L'Assalt a l'Alt de Medellín","Nit 27 juliol 1809"],[48,"El Preu de la Foscor","Matinada 28 juliol 1809"],[49,"Suportant el Càstig","28 juliol 1809"],[50,"Les Trinxeres de Badajoz","1812"],[51,"Cobrint el Glacis","Final setge 1812"],[52,"El Cap de Pont d'Essling","Maig 1809"],[53,"L'Escorxador (Aspern-Essling)","Maig 1809"],[54,"La Ruta a l'Illa de Lobau","Final d'Essling"],[55,"Tempesta a Lobau","Juliol 1809"],[56,"Silenciant els Grenz","5 juliol 1809 (Wagram)"],[57,"L'Infern Lineal de l'Artilleria","6 juliol 1809 (Wagram)"],[58,"La Cacera i les Amputacions","Post-Wagram"]]},{"n":6,"t":"El Desastre i el Renaixement (1812-1813)","l":[[59,"La Pols del Niemen","Estiu 1812"],[60,"Smolensk En Flames","Agost 1812"],[61,"L'Ombra de Borodino","Pre-7 Setembre 1812"],[62,"La Fletxa Trencada","7 Setembre 1812 (Borodino)"],[63,"L'Arrelament (Borodino)","Final de Borodino"],[64,"L'Infern de Cristall","Hivern 1812 (Moscou)"],[65,"Berezina Gelada","Novembre 1812"],[66,"La Generació \"Marie Louise\"","Primavera 1813"],[67,"Desesperació a Lützen","2 maig 1813"],[68,"Ganivetada a Bautzen","20-21 maig 1813"],[69,"Tancats a Dresden","Agost 1813"],[70,"La Doctrina dels Dos Rangs","Octubre 1813"],[71,"La Gran Derrota (Leipzig)","16-19 Octubre 1813"]]},{"n":7,"t":"La Defensa de França i la Descomposició (1814)","l":[[72,"La Guerrilla Imperial","Gener 1814"],[73,"El Foc Cremant (Vauchamps)","14 febrer 1814"],[74,"La Costa Carnissera (Craonne)","Març 1814"],[75,"Les Roques del Sud (Orthez)","27 febrer 1814"],[76,"Retrocés Destructiu","Post-Orthez"],[77,"El Mur Ensangonat (Tolosa)","Abril 1814"],[78,"L'Amagatall i la Vergonya","Estiu 1814"]]},{"n":8,"t":"El Vol de l'Àliga i l'Ocàs (1815)","l":[[79,"L'Àliga a la Llum","Març 1815"],[80,"Oportunitat Furtiva","Juny 1815"],[81,"L'Infern Absolut (Ligny)","16 juny 1815"],[82,"L'Espasa Partida de Blücher","16 juny 1815"],[83,"La Ceguesa als Boscos","18 juny 1815"],[84,"Tancat entre les Aigües (Wavre)","18-19 juny 1815"],[85,"L'Ordre de Llicenciament","Estiu 1815"]]}];   // [{ n, t: títol, l: [[nivell, nom, data], …] }]
+const CAMP_KEY = '9e_campaign_v1';
+let CAMP_PROG = {}; try { CAMP_PROG = JSON.parse(localStorage.getItem(CAMP_KEY) || '{}') || {}; } catch (e) { CAMP_PROG = {}; }
+function campSave() { try { localStorage.setItem(CAMP_KEY, JSON.stringify(CAMP_PROG)); } catch (e) {} }
+const campIdOf = n => 'c1n' + n;                         // id jugable d'un nivell global (ara només el 1)
+const campIdx = id => CAMP.findIndex(L => L.id === id);
+function campDone(id, score) { const o = CAMP_PROG[id]; if (!o || score > (o.score || 0)) CAMP_PROG[id] = { score, at: new Date().toISOString() }; campSave(); }
+function campNextId() { const k = campIdx(curLevel); return k >= 0 && CAMP[k + 1] ? CAMP[k + 1].id : null; }
+function campOpen(id) { const k = campIdx(id); return k === 0 || (k > 0 && !!CAMP_PROG[CAMP[k - 1].id]); }   // jugable: el primer, o si has completat l'anterior
+// Mapa de la campanya 1 (Flandes, Valònia i Renània): (lon, lat) de cada parada; es dibuixa amb MapKit i el recorregut per sobre
+const CAMP_MAP1 = {
+  stops: { 1: [4.55, 50.2, 1, 0], 2: [5.07, 50.76, 1, 0], 3: [4.7, 50.92, -1, 0], 4: [2.85, 50.7, -1, 0], 5: [2.5, 51.02, 1, 0], 6: [4.22, 50.1, -1, 0], 7: [3.88, 50.36, -1, 0], 8: [4.5, 50.52, -1, 0], 9: [4.95, 50.5, 1, 0], 10: [8.0, 49.82, 1, 0], 11: [7.78, 50.06, -1, 0], 12: [10.32, 47.78, -1, 0] },
+  towns: [['Brussel·les', 4.35, 50.8], ['Lille', 3.06, 50.63], ['Namur', 4.87, 50.46], ['Lieja', 5.57, 50.64], ['Mainz', 8.27, 50.0], ['Colònia', 6.96, 50.94], ['Gant', 3.72, 51.05], ['Luxemburg', 6.13, 49.61], ['Metz', 6.17, 49.12], ['Estrasburg', 7.75, 48.58], ['Ulm', 9.99, 48.4], ['Augsburg', 10.9, 48.37]]
+};
+const campProj = (lon, lat) => [(lon - 1.2) * 15.4, (51.4 - lat) * 24.7];
+function campMap1Scene() {
+  const A = MapKit.A, P = (lon, lat) => campProj(lon, lat), L = pts => pts.map(q => P(q[0], q[1])), sc = [];
+  sc.push(A.field([[0, 0], [150, 0], [150, 100], [0, 100]], { kind: 'meadow' }));
+  sc.push(A.pond([[-3, -3], [62, -3], [54, 1.5], [40, 3.6], [26, 5.2], [14, 6.6], [6, 7.6], [-3, 9]]));
+  sc.push(A.river(L([[4.7, 49.77], [4.85, 50.2], [4.87, 50.46], [5.2, 50.5], [5.57, 50.64], [5.75, 51.0], [5.9, 51.5]]), { width: 1.4, water: true, arrow: false, seed: 11 }));
+  sc.push(A.river(L([[3.23, 50.17], [3.52, 50.36], [3.39, 50.6], [3.72, 51.05], [4.0, 51.5]]), { width: 1.0, water: true, arrow: false, seed: 12 }));
+  sc.push(A.river(L([[3.97, 50.28], [4.44, 50.41], [4.87, 50.46]]), { width: 0.8, water: true, arrow: false, seed: 13 }));
+  sc.push(A.river(L([[8.5, 48.9], [8.47, 49.5], [8.27, 50.0], [7.8, 50.22], [7.6, 50.36], [7.2, 50.72], [6.96, 50.94], [6.8, 51.5]]), { width: 1.9, water: true, arrow: false, seed: 14 }));
+  sc.push(A.river(L([[10.31, 47.72], [10.18, 48.2], [10.0, 48.5], [9.9, 48.6]]), { width: 0.8, water: true, arrow: false, seed: 15 }));
+  sc.push(A.wood(L([[4.7, 49.95], [5.8, 49.95], [6.2, 50.45], [5.3, 50.4], [4.85, 50.12]]), { kind: 'mixed', spacing: 3.6, seed: 61 }));
+  sc.push(A.wood(L([[7.3, 49.7], [8.05, 49.68], [8.15, 49.98], [7.5, 50.05]]), { kind: 'broad', spacing: 3.6, seed: 62 }));
+  sc.push(A.wood(L([[3.1, 50.28], [3.75, 50.3], [3.8, 50.12], [3.2, 50.05]]), { kind: 'mixed', spacing: 3.8, seed: 63 }));
+  sc.push(A.river(L([[6.17, 49.12], [6.3, 49.45], [6.64, 49.75], [7.1, 50.0], [7.6, 50.36]]), { width: 0.9, water: true, arrow: false, seed: 16 }));
+  sc.push(A.river(L([[5.38, 49.16], [5.0, 49.6], [4.7, 49.77]]), { width: 0.9, water: true, arrow: false, seed: 17 }));
+  sc.push(A.river(L([[8.5, 47.95], [9.3, 48.1], [9.99, 48.4], [10.9, 48.6], [11.4, 48.75]]), { width: 1.2, water: true, arrow: false, seed: 18 }));
+  sc.push(A.pond(L([[9.1, 47.62], [9.5, 47.55], [9.75, 47.6], [9.5, 47.72], [9.2, 47.72]])));
+  sc.push(A.wood(L([[7.8, 48.0], [8.3, 47.95], [8.45, 48.9], [8.0, 48.95]]), { kind: 'mixed', spacing: 3.6, seed: 64 }));
+  sc.push(A.wood(L([[6.85, 48.2], [7.3, 48.15], [7.45, 48.95], [7.0, 48.95]]), { kind: 'broad', spacing: 3.8, seed: 65 }));
+  sc.push(A.wood(L([[9.3, 48.6], [10.2, 48.7], [10.3, 49.1], [9.4, 49.1]]), { kind: 'broad', spacing: 3.8, seed: 66 }));
+  const peaks = []; for (let k = 0; k < 22; k++) { const r = MapKit.rng(7 + k); peaks.push([9.0 + r() * 1.9, 47.55 + r() * 0.5, 1.6 + r() * 1.6]); }
+  sc.push({ layer: MapKit.LAYER.mark, draw(ctx, M) {
+    ctx.save(); ctx.strokeStyle = '#2a2118'; ctx.fillStyle = '#e4d6b4'; ctx.lineWidth = Math.max(1, 0.12 * M); ctx.lineJoin = 'round';
+    for (const q of peaks) { const [x, y] = P(q[0], q[1]), h = q[2]; ctx.beginPath(); ctx.moveTo((x - h) * M, y * M); ctx.lineTo(x * M, (y - h * 1.25) * M); ctx.lineTo((x + h) * M, y * M); ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.beginPath(); for (let k = 1; k <= 3; k++) { ctx.moveTo((x + h * k / 4) * M, (y - h * 1.25 * (1 - k / 4)) * M); ctx.lineTo((x + h * k / 5) * M, y * M); } ctx.lineWidth = Math.max(0.8, 0.07 * M); ctx.stroke(); ctx.lineWidth = Math.max(1, 0.12 * M); }
+    ctx.restore(); } });
+  for (const t of CAMP_MAP1.towns) { const [x, y] = P(t[1], t[2]); sc.push(A.building({ x, y, w: 1.2, h: 1, kind: 'house' }), A.label(t[0], x + 5.2, y + 0.4, { kind: 'place', scale: 0.42 })); }
+  sc.push(A.label('Mar del Nord', 34, 2.8, { kind: 'place', scale: 0.7 }), A.label('Les Ardenes', 56, 38, { kind: 'place', scale: 0.62 }), A.label('Riu Mosa', 72, 42, { kind: 'place', scale: 0.4 }), A.label('Rin', 96, 30, { kind: 'place', scale: 0.5 }), A.label('Alps d\'Algäu', 112, 93, { kind: 'place', scale: 0.55 }));
+  sc.push(A.label('Campanya 1 · Forjant la República', 96, 5, { kind: 'town', scale: 0.9 }), A.label('1792 – 1797', 96, 10, { kind: 'place', scale: 0.6 }));
+  return MapKit.scene(sc);
+}
+let campMapCache = null;
+function drawCampMap1(cv) {
+  const W = 150, H = 100, dpr = Math.min(2, window.devicePixelRatio || 1), cw = Math.max(320, Math.min(1000, cv.parentNode.clientWidth || 900));
+  cv.width = cw * dpr; cv.height = cw * H / W * dpr; cv.style.width = cw + 'px'; cv.style.height = (cw * H / W) + 'px';
+  const ctx = cv.getContext('2d'), M = cv.width / W; ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.fillStyle = MapKit.COLORS.PAPER_OUT; ctx.fillRect(0, 0, cv.width, cv.height);
+  ctx.save(); ctx.beginPath(); ctx.rect(0, 0, W * M, H * M); ctx.clip();
+  if (!campMapCache) campMapCache = campMap1Scene();
+  campMapCache.draw(ctx, M);
+  const ns = CAMP_DATA[0].l.map(r => r[0]), pts = ns.map(n => { const q = CAMP_MAP1.stops[n], p = campProj(q[0], q[1]); return { n, x: p[0], y: p[1], dx: q[2], dy: q[3] }; });
+  const route = MapKit.smooth(pts.map(q => [q.x, q.y]), 10);
+  ctx.setLineDash([Math.max(8, 1.6 * M), Math.max(6, 1.1 * M)]); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  ctx.strokeStyle = 'rgba(255,255,255,.75)'; ctx.lineWidth = Math.max(5, 0.95 * M); ctx.beginPath(); route.forEach((q, i) => i ? ctx.lineTo(q[0] * M, q[1] * M) : ctx.moveTo(q[0] * M, q[1] * M)); ctx.stroke();
+  ctx.strokeStyle = '#b3261e'; ctx.lineWidth = Math.max(3, 0.55 * M); ctx.beginPath(); route.forEach((q, i) => i ? ctx.lineTo(q[0] * M, q[1] * M) : ctx.moveTo(q[0] * M, q[1] * M)); ctx.stroke(); ctx.setLineDash([]);
+  const rows = CAMP_DATA[0].l;
+  cv._stops = pts.map(q => { const id = campIdOf(q.n), has = !!CAMP_BY_ID[id], done = !!CAMP_PROG[id], open = has && campOpen(id), px = q.x * M / dpr, py = q.y * M / dpr;
+    const r = Math.max(9, 1.45 * M), x = q.x * M, y = q.y * M, col = done ? '#2e7d32' : open ? '#b3261e' : '#8d8676';
+    ctx.fillStyle = '#fff'; ctx.strokeStyle = col; ctx.lineWidth = Math.max(2, 0.3 * M); ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = col; ctx.font = '700 ' + Math.round(r * 1.15) + 'px "Alegreya Sans SC", sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(done ? '✓' : q.n, x, y + r * 0.04);
+    if (open && !done) { ctx.strokeStyle = 'rgba(179,38,30,.35)'; ctx.lineWidth = Math.max(2, 0.4 * M); ctx.beginPath(); ctx.arc(x, y, r * 1.6, 0, Math.PI * 2); ctx.stroke(); }
+    const name = rows.find(z => z[0] === q.n)[1].replace(/\s*\(.*\)$/, ''), fs = Math.max(11, 1.55 * M);
+    ctx.font = '600 ' + Math.round(fs) + 'px "Alegreya Sans SC", sans-serif'; ctx.textAlign = q.dx < 0 ? 'right' : 'left'; ctx.textBaseline = 'middle';
+    const tx = q.dx < 0 ? x - r - 5 : x + r + 5, ty = y;
+    ctx.lineWidth = Math.max(3, 0.5 * M); ctx.strokeStyle = 'rgba(247,243,232,.92)'; ctx.strokeText(name, tx, ty); ctx.fillStyle = '#2a2118'; ctx.fillText(name, tx, ty);
+    return { n: q.n, id, has, done, open, x: x / dpr, y: y / dpr, r: r / dpr, name: rows.find(z => z[0] === q.n)[1], date: rows.find(z => z[0] === q.n)[2] }; });
+  ctx.restore();
+}
 function renderCampList() {
-  const grid = document.getElementById('campGrid'); grid.innerHTML = '';
-  for (const L of CAMP) {
-    const b = document.createElement('button'); b.className = 'lvl';
-    b.innerHTML = '<span class="img ph"><i></i></span><span class="n">' + L.n + '</span><span class="t">' + L.title + '</span><span class="d">' + L.desc + '</span><span class="tag">Disponible</span>';
-    b.onclick = () => startLevel(L.id); grid.appendChild(b);
+  if (!document.getElementById('campCss')) {
+    const css = document.createElement('style'); css.id = 'campCss';
+    css.textContent = '#campBody{width:min(1040px,100%);margin:0 auto}.cmp{border:1px solid var(--line,#cfc7b2);border-radius:8px;background:var(--sheet,#fbfaf6);margin:0 0 .9rem;overflow:hidden}.cmp>summary{cursor:pointer;padding:.7rem 1rem;font-size:1.25rem;color:var(--bleu,#1f3a78);list-style:none}.cmp>summary small{font-size:.85rem;opacity:.7;margin-left:.5rem}.cmp[open]>summary{border-bottom:1px solid var(--line,#cfc7b2)}'
+      + '.cmpMap{position:relative;padding:.7rem .7rem 0}.cmpMap canvas{position:static;left:auto;top:auto;display:block;border:1px solid var(--line,#cfc7b2);border-radius:6px;cursor:default;max-width:100%}.cmpCap{min-height:1.5rem;padding:.35rem .9rem;font-size:.95rem;color:var(--ink,#2a2118)}'
+      + '.cmpRows{list-style:none;margin:0;padding:.4rem .7rem .8rem}.cmpRow{display:flex;gap:.7rem;align-items:baseline;padding:.45rem .5rem;border-radius:6px;border:0;background:none;width:100%;text-align:left;font:inherit;color:inherit}.cmpRow.on{cursor:pointer}.cmpRow.on:hover{background:rgba(31,58,120,.07)}.cmpRow .n{min-width:2rem;color:var(--ecarlate,#b3261e);font-size:1.15rem}.cmpRow .t{flex:1}.cmpRow .t small{display:block;opacity:.65}.cmpRow .g{font-size:.78rem;letter-spacing:.04em;text-transform:uppercase;border:1px solid currentColor;border-radius:4px;padding:.05rem .4rem;opacity:.75}.cmpRow.off{opacity:.55}.cmpRow .g.ok{color:#2e7d32;opacity:1}.cmpRow .g.go{color:#1f3a78;opacity:1}';
+    document.head.appendChild(css);
   }
-  const more = document.createElement('div'); more.className = 'lvl'; more.style.opacity = '.55'; more.style.cursor = 'default';
-  more.innerHTML = '<span class="img ph"><i>Properament</i></span><span class="n">2–85</span><span class="t">Nivells 2 a 85</span><span class="d">La resta de la campanya arribarà més endavant.</span><span class="tag">Bloquejat</span>'; grid.appendChild(more);
+  const body = document.getElementById('campBody'); body.innerHTML = '';
+  CAMP_DATA.forEach((c, ci) => {
+    const d = document.createElement('details'); d.className = 'cmp'; if (ci === 0) d.open = true;
+    const first = c.l[0][0], last = c.l[c.l.length - 1][0];
+    d.innerHTML = '<summary>Campanya ' + c.n + ' · ' + c.t + '<small>nivells ' + first + '–' + last + '</small></summary>' + (ci === 0 ? '<div class="cmpMap"><canvas id="campCv"></canvas></div><div class="cmpCap" id="campCap">Passa el ratolí per sobre d\'una parada.</div>' : '') + '<ul class="cmpRows"></ul>';
+    const ul = d.querySelector('.cmpRows');
+    for (const r of c.l) {
+      const id = campIdOf(r[0]), has = !!CAMP_BY_ID[id], done = !!CAMP_PROG[id], open = has && campOpen(id);
+      const li = document.createElement('li'), b = document.createElement('button'); b.className = 'cmpRow' + (open ? ' on' : ' off'); b.disabled = !open;
+      const sc = done && CAMP_PROG[id].score ? ' · ' + CAMP_PROG[id].score + ' / 1000' : '';
+      b.innerHTML = '<span class="n">' + r[0] + '</span><span class="t">' + r[1] + '<small>' + (r[2] || '') + sc + '</small></span><span class="g ' + (done ? 'ok' : open ? 'go' : '') + '">' + (done ? 'Completat ✓' : open ? 'Disponible' : has ? 'Bloquejat' : 'Properament') + '</span>';
+      if (open) b.onclick = () => startLevel(id);
+      li.appendChild(b); ul.appendChild(li);
+    }
+    body.appendChild(d);
+    if (ci === 0) {
+      const cv = d.querySelector('#campCv'), cap = d.querySelector('#campCap');
+      const draw = () => drawCampMap1(cv); setTimeout(draw, 0); d.addEventListener('toggle', () => { if (d.open) setTimeout(draw, 0); });
+      const hit = e => { const rc = cv.getBoundingClientRect(), x = e.clientX - rc.left, y = e.clientY - rc.top; return (cv._stops || []).find(q => Math.hypot(q.x - x, q.y - y) <= q.r + 6); };
+      cv.onmousemove = e => { const q = hit(e); cv.style.cursor = q && q.open ? 'pointer' : 'default'; cap.innerHTML = q ? '<b>' + q.n + '. ' + q.name + '</b> · ' + (q.date || '') + ' — ' + (q.done ? 'completat' : q.open ? 'fes clic per jugar' : q.has ? 'bloquejat: completa el nivell anterior' : 'properament') : 'Passa el ratolí per sobre d\'una parada.'; };
+      cv.onclick = e => { const q = hit(e); if (q && q.open) startLevel(q.id); };
+    }
+  });
 }
 
 const LEVELS = [{ n: 1, title: 'Sortir de la plaça', desc: 'Tutorial: surt d\'una plaça tancada, passa un corredor de tendes i torna a formar.', build: buildLevel1 },
@@ -6047,6 +6142,7 @@ function scoreShow(n) {
     '<tr><td><span>Temps</span> · ' + fmtT(sc.time) + '</td><td>' + P.t + ' / 250</td></tr><tr><td><span>Baixes</span> · ' + sc.dead + '</td><td>' + P.d + ' / 250</td></tr>' +
     '<tr><td><span>Ordres donades</span> · ' + sc.orders + '</td><td>' + P.o + ' / 250</td></tr><tr><td><span>Ordre mitjà</span> · ' + sc.avg + ' %</td><td>' + P.a + ' / 250</td></tr></table><div class="sv"></div>';
   const sv = el.querySelector('.sv'), a = progAuth();
+  if (typeof n === 'string') { sv.textContent = 'Puntuació desada en aquest navegador (el rànquing de la campanya arribarà més endavant).'; return; }
   if (!a) { sv.textContent = 'Inicia sessió a la web del 9e per entrar al rànquing.'; return; }
   sv.textContent = 'Desant la puntuació…';
   sbFetch('/rest/v1/rpc/game_submit_score', { method: 'POST', headers: { Authorization: 'Bearer ' + a.token }, body: JSON.stringify({ p_level: n, p_score: sc.total, p_detail: sc }) })
@@ -6227,7 +6323,7 @@ window.addEventListener('keydown', e => {
   if (tutOpen() || openFam || vtestOpen() || document.getElementById('endmsg').classList.contains('show')) return;
   e.preventDefault(); openSide();
 });
-document.getElementById('btnNext').onclick = () => { if (levelUnlocked(curLevel + 1)) startLevel(curLevel + 1); };
+document.getElementById('btnNext').onclick = () => { if (typeof curLevel === 'string') { const nx = campNextId(); if (nx) startLevel(nx); return; } if (levelUnlocked(curLevel + 1)) startLevel(curLevel + 1); };
 document.getElementById('btnFree').onclick = () => startLevel('free');
 document.getElementById('btnRank').onclick = () => showScreen('rank');
 document.getElementById('btnRankBack').onclick = () => showScreen('title');
@@ -6336,7 +6432,7 @@ if (/[?&]noboot\b/.test(location.search)) { document.getElementById('boot').remo
 updVer();
 document.getElementById('glangTitle').appendChild(langRow());
 setInterval(() => { if (VOICE.on) vShareInit(); }, 120000);   // es refresca el diccionari compartit cada 2 minuts mentre es juga amb la veu
-document.getElementById('btnToLevels').onclick = () => showScreen('levels');
+document.getElementById('btnToLevels').onclick = () => showScreen(typeof curLevel === 'string' && CAMP_BY_ID[curLevel] ? 'camp' : 'levels');
 document.getElementById('btnAgain').onclick = () => startLevel(curLevel);
 
 buildMapControls();
