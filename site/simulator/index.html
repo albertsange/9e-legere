@@ -229,7 +229,7 @@
   .menu{display:none;position:absolute;bottom:calc(100% + 10px);left:0;z-index:60;min-width:390px;max-height:60vh;overflow:auto;
     background:var(--sheet);border:1px solid var(--line);border-top:3px solid var(--bleu);border-radius:4px;padding:8px 10px 10px;box-shadow:0 22px 50px -18px rgba(20,30,60,.55);}
   .fam.open .menu{display:block;}
-  .fam .menu::after{content:"";position:absolute;}
+  .fam .menu::after{content:"";position:absolute;left:0;right:0;top:100%;height:14px;}
   .mtitle{font-family:var(--display);font-size:1.25rem;color:var(--bleu);margin:0 0 4px;}
   .msec{font-family:var(--label);font-weight:700;font-size:11.5px;color:var(--chasseur);text-transform:uppercase;letter-spacing:.08em;margin:8px 0 2px;border-top:1px dashed var(--line);padding-top:6px;}
   .mrow{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:5px 0;}
@@ -2396,7 +2396,7 @@ function updateBayonet() {                      // càrrega a la baioneta: amb l
   let touch = false;
   for (const e of ENEMY) for (const v of e.men) if (v.alive && co.members.some(m => Math.hypot(m.x - v.x, m.y - v.y) < 1.0)) { touch = true; break; }
   if (!touch) return;
-  if (!(co.volley && co.volley.ok)) { if (!co.stabWarn || performance.now() - co.stabWarn > 8000) { co.stabWarn = performance.now(); reac('louis', '<b>Louis:</b> Sense haver disparat primer? Així no, chasseur: <b>recula</b>, carrega i fes una <b>descàrrega</b> abans de la baioneta.', 5000); } return; }
+  if (!(co.volley && co.volley.ok) && !(level && level.freeStab)) { if (!co.stabWarn || performance.now() - co.stabWarn > 8000) { co.stabWarn = performance.now(); reac('louis', '<b>Louis:</b> Sense haver disparat primer? Així no, chasseur: <b>recula</b>, carrega i fes una <b>descàrrega</b> abans de la baioneta.', 5000); } return; }
   let dead = 0, fled = 0;
   for (const e of ENEMY) { const live = e.men.filter(v => v.alive); for (const v of live) if (Math.random() < 0.5) { killEnemy(v, e); dead++; } fled += routEnemy(e); }
   co.stab = { t: performance.now(), n: dead + fled, dead, fled }; SFX.hit(); SFX.cry(8, 0.08);
@@ -2463,7 +2463,7 @@ function aiGroups(side) {                       // contra qui lluita una unitat:
   const g = [];
   if (side === 'au') {
     if (co.members.length) { const c = unitCentre(); g.push({ own: true, men: co.members, h: co.members[0].h, cx: c.x, cy: c.y }); }
-    for (const a of ALLY) { const l = a.men.filter(v => v.alive); if (l.length) g.push({ ally: a, men: l, h: a.h, cx: a.cx, cy: a.cy }); }
+    for (const a of ALLY) { if (a.script) continue; const l = a.men.filter(v => v.alive); if (l.length) g.push({ ally: a, men: l, h: a.h, cx: a.cx, cy: a.cy }); }
   } else for (const e of ENEMY) { if (e.routed || e.state === 'retreat') continue; const l = e.men.filter(v => v.alive); if (l.length) g.push({ en: e, men: l, h: e.h, cx: e.cx, cy: e.cy }); }
   return g;
 }
@@ -2540,7 +2540,7 @@ function aiAvoid(u) {                           // sondeja davant la unitat: nul
 function aiTickAll(dt) {
   if (screen !== 'game' || paused || tutOpen() || co.lost) return;
   for (const e of ENEMY) if (e.ai) aiUnitTick(e, 'au', dt);
-  for (const a of ALLY) aiUnitTick(a, 'fr', dt);
+  for (const a of ALLY) if (!a.script) aiUnitTick(a, 'fr', dt);
 }
 function drawAllies() {                         // unitats amigues amb IA: blau més clar amb contorn blanc
   const rS = Math.max(1.8, 0.2 * M);
@@ -2552,7 +2552,7 @@ function drawAllies() {                         // unitats amigues amb IA: blau 
       ctx.beginPath(); ctx.arc(px, py, rS, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
       ctx.strokeStyle = '#fff'; ctx.lineWidth = Math.max(1, 0.06 * M); ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(px + Math.cos(a.h) * 0.4 * M, py + Math.sin(a.h) * 0.4 * M); ctx.stroke();
     }
-    if (n) { ctx.fillStyle = '#2f5fae'; ctx.font = '600 ' + Math.max(10, 0.9 * M) + 'px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'; ctx.fillText(a.name + ' · ' + n, cx / n * M, (cy / n - 2.2) * M); }
+    if (n && !a.script) { ctx.fillStyle = '#2f5fae'; ctx.font = '600 ' + Math.max(10, 0.9 * M) + 'px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'; ctx.fillText(a.name + ' · ' + n, cx / n * M, (cy / n - 2.2) * M); }
   }
 }
 function drawCaptain() {                        // el capità Le Jay: una bola daurada que segueix la unitat i l'ajuda a recarregar
@@ -3820,11 +3820,10 @@ function buildOrderPanel() {
     const menu = document.createElement('div'); menu.className = 'menu';
     menu.innerHTML = '<div class="mtitle">' + f.name + '</div>';
     wrap.appendChild(menu); wrap.appendChild(btn); row.appendChild(wrap);
-    wrap.addEventListener('mouseenter', () => openMenu(f.id));
-    wrap.addEventListener('mouseleave', () => { clearTimeout(closeT); closeT = setTimeout(() => { if (openFam === f.id && famPinned !== f.id) openMenu(null); }, 450); });
+    wrap.addEventListener('mouseenter', () => { if (famPinned && famPinned !== f.id) return; openMenu(f.id); });
+    wrap.addEventListener('mouseleave', () => { clearTimeout(closeT); closeT = setTimeout(() => { if (openFam === f.id && famPinned !== f.id) openMenu(null); }, 800); });
     btn.addEventListener('click', () => {            // el ratolí ja obre el menú en passar-hi per sobre: un clic el deixa fix; un segon clic el tanca
-      if (openFam === f.id) { if (famPinned === f.id) openMenu(null); else famPinned = f.id; }
-      else { openMenu(f.id); famPinned = f.id; }
+      if (openFam !== f.id) openMenu(f.id); famPinned = f.id;
     });
     panel.fams[f.id] = { wrap, btn, menu, badge: btn.querySelector('.badge') };
     const list = ORDERS.filter(x => x.fam === f.id && !x.float); let pairRow = null;
@@ -3904,6 +3903,7 @@ window.addEventListener('keydown', e => {                    // espai = Feu! (si
 });
 document.addEventListener('pointerdown', e => { if (!e.target.closest('#skPick') && !e.target.closest('.menu')) { const k = document.getElementById('skPick'); if (k) k.classList.remove('open'); } if (!e.target.closest('#fireBox')) { const j = document.querySelector('#fireBox .jm'); if (j) j.classList.remove('open'); } if (openFam && !e.target.closest('#famrow')) openMenu(null); });
 window.addEventListener('keydown', e => { if (e.key === 'Escape' && openFam) openMenu(null); });
+document.addEventListener('pointerdown', e => { if (famPinned && !e.target.closest('.fam')) openMenu(null); });   // un clic fora del menú fixat el tanca
 
 function renderUnitControls() {
   const lock = tutLocked();
@@ -4331,7 +4331,7 @@ let autoStepT = 0;
 const VOICE = { on: false, rec: null, running: false, tested: false, seg: {}, interim: '', state: '', failT: 0, lastFail: null,
   learn: { phr: {}, ex: {} }, shared: { phr: {}, ex: {} }, opt: { mode: 'cont', vol: true, log: false, tele: true, engine: '' }, log: [], recentExec: null, ptt: false, db: false, loading: false };
 // Connexió amb Supabase (la mateixa de la web: si el joc s'obre dins la web, agafa window.APP_CONFIG) i fonts del motor local Vosk
-const GAME_VERSION = '1.9.0';
+const GAME_VERSION = '1.8.6';
 const CFG = Object.assign({
   SUPABASE_URL: 'https://ltopullwhasagnkuqaek.supabase.co',
   SUPABASE_ANON_KEY: 'sb_publishable_DhHFUh-UrbBrI0l476Vcnw_tSn-Gmkr',
@@ -5913,11 +5913,16 @@ function buildCampaign1() {
   const P = { x: ROUTE[0][0], y: ROUTE[0][1], h: Math.PI };                     // la patrulla de jägers comença a l'extrem oest, de cara al gual
   const st = { det: 0, crossed: false, cp: 0, cone: null, coneT: 0, alarmed: false, pat: null, p3: false, p3t: 0, army: 0, wave: 0, done: false };
   // Part 2 (fase 3): defensa de la riba est fins que l'exèrcit francès creui el gual; avançades austríaques de 8–10 homes que es retiren en perdre el 20%
-  const FORD = { x: 50.6, y: 31 }, ARMY_T = 150, WAVES = [[22, 30, 4], [44, 27, 5], [66, 34, 4], [86, 31, 5], [108, 26, 4], [126, 33, 5]];
+  const FORD = { x: 50.6, y: 31 }, ARMY_T = 100, WAVES = [[18, 30, 4], [38, 27, 5], [58, 34, 4], [76, 31, 5], [94, 26, 4], [112, 33, 5]], NARMY = 14;
   const p1done = () => { const e = ENEMY[0]; return !!e && (e.routed || enAlive(e) === 0); };
   function startP3() {
     st.p3 = true; st.p3t = 0; st.army = 0; st.wave = 0; st.done = false; detShow(0);
-    reac('louis', '<b>Louis:</b> La patrulla ha caigut! Retira\'t cap al gual i desplega\'t en <b>tiradors</b> per la riba est: el gruix de l\'exèrcit està a punt de creuar i ens vindran a buscar.', 7000);
+    for (let k = 0; k < NARMY; k++) {                                              // el gruix de l'exèrcit: una columna llarga a l'oest del rierol que va creuant el gual i es desplega a la riba est
+      const lane = k % 2, col = (k - lane) / 2, line2 = k >= 8, j = line2 ? k - 8 : k, sy = (line2 ? 19 : 17) + 3.9 * j, sx = rivX(sy) + (line2 ? 7.4 : 3.8);
+      const u = buildEnemy({ name: 'Exèrcit francès', flag: '9e', cx: 43 - col * 4.6, cy: lane ? 33.2 : 29.2, h: 0, nFiles: 4 });
+      Object.assign(u, { script: true, t0: 5 + 5 * k, wi: 0, arrived: false, supp: 0, state: '', path: [[47, 31], [FORD.x, 31], [FORD.x + 6, 31], [sx, sy]] }); ALLY.push(u);
+    }
+    reac('louis', '<b>Louis:</b> La patrulla ha caigut! El gruix de l\'exèrcit ja ve pel gual. Desplega\'t en <b>tiradors</b> davant seu, a la riba est, i no deixis que els austríacs s\'hi acostin.', 8000);
   }
   function spawnWave(w) {
     const u = buildEnemy({ name: 'Avançada austríaca', flag: 'aut', cx: 94, cy: w[1], h: Math.PI, nFiles: w[2], shoots: true, ai: true, hold: 26, off: 0 });
@@ -5935,9 +5940,17 @@ function buildCampaign1() {
       if (n === 0 || (u.state === 'retreat' && (u.cx > W - 1.5 || u.cx < 1.5 || u.cy < 1.5 || u.cy > H - 1.5))) { for (const m of u.men) m.alive = false; u.routed = true; continue; }
       if (u.state !== 'retreat' && Math.hypot(u.cx - FORD.x, u.cy - FORD.y) < 14) contested = true;
     }
-    st.contested = contested; if (!contested) st.army += dt;
+    st.contested = contested; if (!contested) { st.army += dt;
+      for (const u of ALLY) if (u.script && st.army >= u.t0 && !u.arrived) {
+        const wp = u.path[u.wi];
+        if (!wp) { const df = wrapA(0 - u.h); aiRot(u, Math.max(-2 * dt, Math.min(2 * dt, df))); if (Math.abs(df) < 0.03) u.arrived = true; continue; }
+        const dx = wp[0] - u.cx, dy = wp[1] - u.cy, d = Math.hypot(dx, dy);
+        if (d < 0.5) { u.wi++; continue; }
+        const df = wrapA(Math.atan2(dy, dx) - u.h); aiRot(u, Math.max(-2.5 * dt, Math.min(2.5 * dt, df)));
+        if (Math.abs(df) < 0.5) { const sp = Math.min(d, 1.5 * dt); aiMove(u, dx / d * sp, dy / d * sp); }
+      } }
     const el = detBar();
-    if (st.army >= ARMY_T) { st.done = true; el.style.display = 'none'; reac('aprova', '<b>Louis:</b> Ja han creuat! El gruix de l\'exèrcit és a l\'altra riba. Ben fet, chasseur!', 5000); return; }
+    if (st.army >= ARMY_T && ALLY.every(u => !u.script || u.arrived)) { st.done = true; el.style.display = 'none'; reac('aprova', '<b>Louis:</b> Ja han creuat! El gruix de l\'exèrcit és a l\'altra riba. Ben fet, chasseur!', 5000); return; }
     el.style.display = screen === 'game' ? 'block' : 'none'; el.classList.remove('pulse');
     const col = contested ? '#e07b24' : '#2e8b3d'; el.querySelector('b').textContent = contested ? 'Assetgen el gual! L\'exèrcit s\'atura…' : 'L\'exèrcit francès creua el gual…'; el.querySelector('b').style.color = col;
     const f = el.querySelector('i'); f.style.width = Math.min(100, st.army / ARMY_T * 100) + '%'; f.style.background = col;
@@ -5993,14 +6006,14 @@ function buildCampaign1() {
       mini: () => st.p3 ? '<b>Defensa la riba est:</b> desplega\'t en tiradors al llarg del gual. Les avançades austríaques (8–10 homes) es retiren quan perden el 20%. L\'exèrcit creua: ' + Math.min(100, Math.round(st.army / ARMY_T * 100)) + '%.' : st.crossed ? 'Has creuat el rierol: carrega i <b>aixafa la patrulla</b>. Si et veuen, ja no podran donar l\'alarma: s\'hauran d\'enfrontar a tu.' : '<b>Creua el rierol sense que et vegin</b>, pel bosc del sud, mentre la patrulla va i ve pel camí.', resetStep: () => 1, done: () => false }
   ];
   return {
-    w: W, h: H, pad: 16, start: { x: 8, y: 31 }, obstacles: obs, scene: MapKit.scene(sc), zone: null, musket: true, skirm: true, driftScale: 0.5, goalHeading: 0, minMen: 8,
+    w: W, h: H, pad: 16, freeStab: true, start: { x: 8, y: 31 }, obstacles: obs, scene: MapKit.scene(sc), zone: null, musket: true, skirm: true, driftScale: 0.5, goalHeading: 0, minMen: 8,
     cover, walls,
     enemies: [{ name: 'Patrulla de jägers', flag: 'aut', cx: P.x, cy: P.y, h: P.h, nFiles: 8, shoots: true, stealth: true, jager: true }],
     tutorial: { steps, figs: [], startAtencio: true, resetStep: () => 1 },
     over(ctx, M, mini) {
       if (!mini) {
-        ctx.save(); ctx.setLineDash([10, 8]); ctx.strokeStyle = 'rgba(90,70,40,.45)'; ctx.lineWidth = 1.5; ctx.strokeRect(0, 0, W * M, H * M);
-        if (st.p3 && !st.done) { ctx.strokeStyle = 'rgba(46,139,61,.8)'; ctx.lineWidth = 2.2; ctx.beginPath(); for (let y = 20; y <= 42; y += 2) { const x = rivX(y) + 6; y === 20 ? ctx.moveTo(x * M, y * M) : ctx.lineTo(x * M, y * M); } ctx.stroke(); ctx.beginPath(); ctx.arc(FORD.x * M, FORD.y * M, 3 * M, 0, 7); ctx.stroke(); }
+        ctx.save(); ctx.setLineDash([10, 8]);
+        if (st.p3 && !st.done) { ctx.strokeStyle = 'rgba(46,139,61,.8)'; ctx.lineWidth = 2.2; ctx.beginPath(); for (let y = 20; y <= 42; y += 2) { const x = rivX(y) + 11; y === 20 ? ctx.moveTo(x * M, y * M) : ctx.lineTo(x * M, y * M); } ctx.stroke(); ctx.beginPath(); ctx.arc(FORD.x * M, FORD.y * M, 3 * M, 0, 7); ctx.stroke(); }
         ctx.restore();
       }
       if (mini || !ENEMY.length || ENEMY[0].alert || enAlive(ENEMY[0]) === 0) return;
