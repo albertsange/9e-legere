@@ -4331,7 +4331,7 @@ let autoStepT = 0;
 const VOICE = { on: false, rec: null, running: false, tested: false, seg: {}, interim: '', state: '', failT: 0, lastFail: null,
   learn: { phr: {}, ex: {} }, shared: { phr: {}, ex: {} }, opt: { mode: 'cont', vol: true, log: false, tele: true, engine: '' }, log: [], recentExec: null, ptt: false, db: false, loading: false };
 // Connexió amb Supabase (la mateixa de la web: si el joc s'obre dins la web, agafa window.APP_CONFIG) i fonts del motor local Vosk
-const GAME_VERSION = '1.8.8';
+const GAME_VERSION = '1.8.9';
 const CFG = Object.assign({
   SUPABASE_URL: 'https://ltopullwhasagnkuqaek.supabase.co',
   SUPABASE_ANON_KEY: 'sb_publishable_DhHFUh-UrbBrI0l476Vcnw_tSn-Gmkr',
@@ -5913,16 +5913,29 @@ function buildCampaign1() {
   const P = { x: ROUTE[0][0], y: ROUTE[0][1], h: Math.PI };                     // la patrulla de jägers comença a l'extrem oest, de cara al gual
   const st = { det: 0, crossed: false, cp: 0, cone: null, coneT: 0, alarmed: false, pat: null, p3: false, p3t: 0, army: 0, wave: 0, done: false };
   // Part 2 (fase 3): defensa de la riba est fins que l'exèrcit francès creui el gual; avançades austríaques de 8–10 homes que es retiren en perdre el 20%
-  const FORD = { x: 50.6, y: 31 }, ARMY_T = 125, NARMY = 14, WAVES = [[50, 30, 4], [72, 27, 5], [94, 34, 4], [114, 31, 5], [134, 26, 4], [154, 33, 5]];
+  const FORD = { x: 50.6, y: 31 }, ARMY_T = 140, NARMY = 12, WAVES = [[45, 30, 4], [55, 26, 5], [68, 34, 6], [82, 29, 4], [94, 36, 5], [104, 25, 6], [116, 31, 5], [126, 28, 4], [138, 33, 6], [150, 27, 5]];
   const p1done = () => { const e = ENEMY[0]; return !!e && (e.routed || enAlive(e) === 0); };
-  function layMen(u, t) {                                                          // 20 homes: de columna de dos en fons (t=0) a línia de dos rengles (t=1)
-    const c = Math.cos(u.h), sn = Math.sin(u.h);
-    u.men.forEach((v, i) => {
-      const rank = i < 10 ? 0 : 1, file = i % 10, lane = i % 2, row = (i - lane) / 2;
-      const aL = -rank * RANK_GAP, lL = (4.5 - file) * FRONT, aC = (4.5 - row) * 0.9, lC = (0.5 - lane) * 0.9;
-      const a = aC + (aL - aC) * t, l = lC + (lL - lC) * t;
-      v.x = u.cx + c * a - sn * l; v.y = u.cy + sn * a + c * l;
-    });
+  // una unitat de 20 homes: columna de 4 en fons i 5 de fons que segueix un camí «par file» (cada home on ha passat el de davant) i, arribada a la seva àrea, fa front en línia
+  function armyPath(sx, sy) {
+    const dir = sy > 31 ? 1 : -1, r = 2.4, pts = [[26, 31], [sx - 8, 31], [sx - r, 31]];
+    for (let a = 1; a <= 5; a++) { const t = a / 6 * Math.PI / 2; pts.push([sx - r + r * Math.sin(t), 31 + dir * r * (1 - Math.cos(t))]); }
+    pts.push([sx, 31 + dir * r], [sx, sy]); return pts;
+  }
+  function pathAt(u, s) {                                                         // punt i direcció del camí a la distància s (abans de l'inici, es prolonga cap enrere)
+    const P = u.pts, C = u.cum; if (s <= 0) return { x: P[0][0] + s, y: P[0][1], tx: 1, ty: 0 };
+    if (s >= C[C.length - 1]) { const a = P[P.length - 2], b = P[P.length - 1], d = Math.hypot(b[0] - a[0], b[1] - a[1]); return { x: b[0], y: b[1], tx: (b[0] - a[0]) / d, ty: (b[1] - a[1]) / d }; }
+    let i = 1; while (C[i] < s) i++; const a = P[i - 1], b = P[i], k = (s - C[i - 1]) / (C[i] - C[i - 1]), d = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    return { x: a[0] + (b[0] - a[0]) * k, y: a[1] + (b[1] - a[1]) * k, tx: (b[0] - a[0]) / d, ty: (b[1] - a[1]) / d };
+  }
+  function layMarch(u) {
+    u.men.forEach((v, i) => { const lane = i % 4, row = (i - lane) / 4, q = pathAt(u, u.s - row * 1.0), l = (1.5 - lane) * 0.8; v.x = q.x - q.ty * l; v.y = q.y + q.tx * l; });
+    const h = pathAt(u, u.s); u.h = Math.atan2(h.ty, h.tx); u.cx = u.men.reduce((t, v) => t + v.x, 0) / u.men.length; u.cy = u.men.reduce((t, v) => t + v.y, 0) / u.men.length;
+  }
+  function startFront(u) {                                                        // fer front a l'est: cada parella de la columna ocupa un lloc de la línia, sense creuar-se
+    const srt = u.men.map((v, i) => i).sort((a, b) => u.men[a].y - u.men[b].y), E = u.slot;
+    srt.forEach((mi, j) => { const v = u.men[mi], file = Math.floor(j / 2), mate = srt[j ^ 1], rank = (v.x > u.men[mate].x || (v.x === u.men[mate].x && (j % 2 === 0))) ? 0 : 1;
+      v.fx = v.x; v.fy = v.y; v.tx = E[0] - rank * RANK_GAP; v.ty = E[1] + (4.5 - file) * FRONT; });
+    u.front = 0;
   }
   function banner(txt, sub) {
     let el = document.getElementById('p3Banner');
@@ -5935,14 +5948,14 @@ function buildCampaign1() {
   function startP3() {
     st.p3 = true; st.p3t = 0; st.army = 0; st.wave = 0; st.done = false; detShow(0); st.pend = [];
     for (let k = 0; k < NARMY; k++) {                                              // el gruix de l'exèrcit: unitats de 20 homes que van arribant en columna, creuen el gual i es desplegaran en línia a la riba est
-      const r = Math.floor(k / 5), c = k % 5, sy = 18 + 5.6 * c, sx = rivX(sy) + 3.5 + 3 * r;
-      st.pend.push({ t0: 4 + 5.5 * k, slot: [sx, sy] });
+      const r = 2 - Math.floor(k / 4), c = [0, 3, 1, 2][k % 4], sy = 19.5 + 7 * c, sx = rivX(sy) + 3.5 + 3.2 * r;
+      st.pend.push({ t0: 4 + 8 * k, slot: [sx, sy] });
     }
     banner('Protegeix la línia!', 'L\'exèrcit francès creua el gual: no deixis que els austríacs s\'hi acostin.');
     reac('assenyala', '<b>Capità Le Jay:</b> Ben fet, chasseur! Ara <b>protegeix la línia</b>: el gruix de l\'exèrcit creua el gual en columna. Desplega\'t en <b>tiradors</b> a la riba est, davant seu, i rebutja les avançades austríaques fins que hagin passat tots.', 11000);
   }
   function spawnWave(w) {
-    const u = buildEnemy({ name: 'Avançada austríaca', flag: 'aut', cx: 94, cy: w[1], h: Math.PI, nFiles: w[2], shoots: true, ai: true, hold: 26, off: 0 });
+    const u = buildEnemy({ name: 'Avançada austríaca', flag: 'aut', cx: 94, cy: w[1], h: Math.PI, nFiles: w[2], shoots: true, ai: true, hold: w[2] >= 6 ? 16 : 12, off: 0 });
     Object.assign(u, { reload: 5 + Math.random() * 4, supp: 0, state: '', last: { x: FORD.x + 2, y: FORD.y }, n0: u.men.length }); ENEMY.push(u);
     reac('assenyala', '<b>Capità Le Jay:</b> Atenció! Una avançada austríaca ve per l\'est!', 3800);
   }
@@ -5958,17 +5971,15 @@ function buildCampaign1() {
       if (u.state !== 'retreat' && Math.hypot(u.cx - FORD.x, u.cy - FORD.y) < 14) contested = true;
     }
     st.contested = contested; if (!contested) { st.army += dt;
-      while (st.pend.length && st.army >= st.pend[0].t0) { const q = st.pend.shift(), u = buildEnemy({ name: 'Exèrcit francès', flag: '9e', cx: 20, cy: 31, h: 0, nFiles: 10 });
-        Object.assign(u, { script: true, wi: 0, form: 0, arrived: false, supp: 0, state: '', path: [[FORD.x - 4, 31], [FORD.x + 3.5, 31], q.slot] }); layMen(u, 0); ALLY.push(u); }
+      while (st.pend.length && st.army >= st.pend[0].t0) { const q = st.pend.shift(), u = buildEnemy({ name: 'Exèrcit francès', flag: '9e', cx: 26, cy: 31, h: 0, nFiles: 10 });
+        const pts = armyPath(q.slot[0], q.slot[1]), cum = [0]; for (let i = 1; i < pts.length; i++) cum.push(cum[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]));
+        Object.assign(u, { script: true, arrived: false, supp: 0, state: '', pts, cum, s: 0, slot: q.slot, front: -1 }); layMarch(u); ALLY.push(u); }
       const spd = STEP * PACES.ordinari.cad / 60;                                  // el mateix pas ordinaire que els austríacs
       for (const u of ALLY) if (u.script && !u.arrived) {
-        const wp = u.path[u.wi];
-        if (!wp) { const df = wrapA(0 - u.h); u.h += Math.max(-2 * dt, Math.min(2 * dt, df)); layMen(u, 1); if (Math.abs(df) < 0.03) u.arrived = true; continue; }
-        const dx = wp[0] - u.cx, dy = wp[1] - u.cy, d = Math.hypot(dx, dy);
-        if (d < 0.4) { u.wi++; continue; }
-        const df = wrapA(Math.atan2(dy, dx) - u.h); u.h += Math.max(-1.3 * dt, Math.min(1.3 * dt, df));
-        if (Math.abs(df) < 0.6) { const sp = Math.min(d, spd * dt); u.cx += dx / d * sp; u.cy += dy / d * sp; }
-        u.form = u.wi >= 2 ? Math.min(1, u.form + dt / 6) : 0; layMen(u, u.form);
+        if (u.front < 0) { u.s += spd * dt; if (u.s >= u.cum[u.cum.length - 1] + 4.2) { u.s = u.cum[u.cum.length - 1] + 4.2; layMarch(u); startFront(u); } else layMarch(u); }
+        else { u.front = Math.min(1, u.front + dt / 4); const k = u.front * u.front * (3 - 2 * u.front);
+          for (const v of u.men) { v.x = v.fx + (v.tx - v.fx) * k; v.y = v.fy + (v.ty - v.fy) * k; }
+          u.h = 0; u.cx = u.slot[0]; u.cy = u.slot[1]; if (u.front >= 1) u.arrived = true; }
       } }
     const el = detBar();
     if (st.army >= ARMY_T && !st.pend.length && ALLY.every(u => !u.script || u.arrived)) { st.done = true; el.style.display = 'none'; reac('aprova', '<b>Louis:</b> Ja han creuat! El gruix de l\'exèrcit és a l\'altra riba. Ben fet, chasseur!', 5000); return; }
