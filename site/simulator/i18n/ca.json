@@ -3630,5 +3630,45 @@
  },
  {
   "k": "Activar els sons"
+ },
+ {
+  "k": "Prem el botó <b>Veu</b> (el micròfon sota el mapa) i accepta el permís del micròfon. La primera vegada es fa una petita prova.<br><button type=\"button\" class=\"btn-sec\" style=\"margin-top:6px;padding:4px 10px\" onclick=\"L9noMic()\">No puc fer servir el micròfon</button>",
+  "h": 1
+ },
+ {
+  "k": "Prem <b>Mosquet › Apprêtez</b>.",
+  "h": 1
+ },
+ {
+  "k": "Prem <b>Joue</b>.",
+  "h": 1
+ },
+ {
+  "k": "Prem <b>Feu!</b>.",
+  "h": 1
+ },
+ {
+  "k": "Estan descarregats: <b>Mosquet › Chargez</b>.",
+  "h": 1
+ },
+ {
+  "k": "Prem <b>En avant</b> al tauler de marxa.",
+  "h": 1
+ },
+ {
+  "k": "Ara atura'ls: prem <b>HALTE</b>.",
+  "h": 1
+ },
+ {
+  "k": "Mitja volta de tota la unitat: <b>Formacions › Contremarche</b>.",
+  "h": 1
+ },
+ {
+  "k": "Carrega els mosquets: <b>Mosquet › Chargez</b>.",
+  "h": 1
+ },
+ {
+  "k": "Atura't: prem <b>HALTE</b>.",
+  "h": 1
  }
 ]

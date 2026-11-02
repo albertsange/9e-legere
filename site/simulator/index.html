@@ -4161,7 +4161,7 @@ let autoStepT = 0;
 const VOICE = { on: false, rec: null, running: false, tested: false, seg: {}, interim: '', state: '', failT: 0, lastFail: null,
   learn: { phr: {}, ex: {} }, shared: { phr: {}, ex: {} }, opt: { mode: 'cont', vol: true, log: false, tele: true, engine: '' }, log: [], recentExec: null, ptt: false, db: false, loading: false };
 // Connexió amb Supabase (la mateixa de la web: si el joc s'obre dins la web, agafa window.APP_CONFIG) i fonts del motor local Vosk
-const GAME_VERSION = '1.7.4';
+const GAME_VERSION = '1.7.5';
 const CFG = Object.assign({
   SUPABASE_URL: 'https://ltopullwhasagnkuqaek.supabase.co',
   SUPABASE_ANON_KEY: 'sb_publishable_DhHFUh-UrbBrI0l476Vcnw_tSn-Gmkr',
@@ -4581,7 +4581,7 @@ function voiceStart() {
     if (VOICE.on && VOICE.rec === r && screen === 'game' && (VOICE.opt.mode === 'cont' || VOICE.ptt)) { try { r.start(); } catch (e) {} }
   };
   r.onerror = e => {
-    if (e.error === 'not-allowed' || e.error === 'service-not-allowed') { voiceSet(false); showMsg('El navegador no deixa fer servir el micròfon', 3500); }
+    if (e.error === 'not-allowed' || e.error === 'service-not-allowed') { voiceSet(false); showMsg('El navegador no deixa fer servir el micròfon', 3500); if (level && level.onMicFail) level.onMicFail(); }
     else if (e.error === 'network') showMsg('El reconeixement de veu necessita connexió a internet', 3500);
     if (e.error !== 'no-speech' && e.error !== 'aborted') vlog('error', e.error);
   };
@@ -5548,30 +5548,31 @@ function buildLevel9() {
     A.fence([[60, 28], [60, 34]]),
     A.label('Camp d\'instrucció', 18, 10, { kind: 'place', scale: 0.55 }), A.label('Les granges', 82, 4, { kind: 'place', scale: 0.5 })
   );
-  const st = { base: 0, amb: false, fin: false };
-  const ordOk = id => LASTORD.id === id && LASTORD.n > st.base && (LASTORD.voice || !voiceSupported());
+  const st = { base: 0, amb: false, fin: false, noMic: false };
+  window.L9noMic = () => { st.noMic = true; lastKey = ''; };               // sense micròfon: es pot completar el nivell amb els botons
+  const ordOk = id => LASTORD.id === id && LASTORD.n > st.base && (LASTORD.voice || !voiceSupported() || st.noMic);
   const fired = () => !!(co.volley && co.volley.ok);
-  const arm = () => co.arm === 'portez' ? 'Digues <b>«Apprêtez – vos armes!»</b>.' : co.arm === 'apprete' ? 'Digues <b>«Joue!»</b>.' : co.arm === 'joue' ? 'Digues <b>«Feu!»</b>.' : 'Estan descarregats: <b>«Chargez – vos armes!»</b>.';
+  const arm = () => st.noMic ? (co.arm === 'portez' ? 'Prem <b>Mosquet › Apprêtez</b>.' : co.arm === 'apprete' ? 'Prem <b>Joue</b>.' : co.arm === 'joue' ? 'Prem <b>Feu!</b>.' : 'Estan descarregats: <b>Mosquet › Chargez</b>.') : co.arm === 'portez' ? 'Digues <b>«Apprêtez – vos armes!»</b>.' : co.arm === 'apprete' ? 'Digues <b>«Joue!»</b>.' : co.arm === 'joue' ? 'Digues <b>«Feu!»</b>.' : 'Estan descarregats: <b>«Chargez – vos armes!»</b>.';
   const ALL = ['gir', 'mov', 'pace', 'parfile', 'bataille', 'align', 'obl', 'conv', 'tournez', 'ligne', 'form', 'repos', 'musket'];
   const steps = [
     { title: 'Ordres amb veu', pose: 'serios', hl: [], unlock: ALL, tag: 'Benvinguda', intro: true, btn: 'Endavant',
       text: ['Respira, <b>chasseur</b>: els austríacs han fugit, de moment. Aprofitem la calma per <b>entrenar maniobres</b>.',
         'I avui t\'ensenyaré un truc de debò: <b>pots parlar-me</b>. Els oficials no apretaven botons: cridaven les ordres. Fes-ho tu també.'],
       done: () => TUT.intro },
-    { title: 'Activa la veu', pose: 'assenyala', unlock: ALL, hl: [], hlMic: true, mini: () => voiceSupported() ? 'Prem el botó <b>Veu</b> (el micròfon sota el mapa) i accepta el permís del micròfon. La primera vegada es fa una petita prova.' : 'El teu navegador no admet la veu: practicarem amb els botons.',
-      done: () => VOICE.on || !voiceSupported() },
+    { title: 'Activa la veu', pose: 'assenyala', unlock: ALL, hl: [], hlMic: true, mini: () => voiceSupported() ? 'Prem el botó <b>Veu</b> (el micròfon sota el mapa) i accepta el permís del micròfon. La primera vegada es fa una petita prova.<br><button type="button" class="btn-sec" style="margin-top:6px;padding:4px 10px" onclick="L9noMic()">No puc fer servir el micròfon</button>' : 'El teu navegador no admet la veu: practicarem amb els botons.',
+      done: () => VOICE.on || !voiceSupported() || st.noMic },
     { title: 'Preventiva i executiva', pose: 'serios', tag: 'La veu', hl: [], unlock: ALL, btn: 'Entesos', ack: true,
       text: ['Una ordre té <b>dues parts</b>: la <b>preventiva</b> (<i>«En avant…»</i>), que avisa, i l\'<b>executiva</b> (<i>«…marche!»</i>), que fa moure la tropa. Digues la primera, fes una breu pausa i crida la segona.',
         'Parla <b>en francès</b>, clar i fort. Sota el mapa veuràs què t\'ha entès el joc. Si no ho encerta del tot, no passa res: ell va aprenent com parles.'],
       done() { return !!this.acked; } },
     { title: 'En avant', pose: 'assenyala', unlock: ALL, hl: [], enter() { st.base = LASTORD.n; },
-      mini: 'Digues en veu alta: <b>«En avant… marche!»</b>', done: () => ordOk('MA-01') },
+      mini: () => st.noMic ? 'Prem <b>En avant</b> al tauler de marxa.' : 'Digues en veu alta: <b>«En avant… marche!»</b>', done: () => ordOk('MA-01') },
     { title: 'Halte', pose: 'assenyala', unlock: ALL, hl: [], enter() { st.base = LASTORD.n; },
-      mini: 'Ara atura\'ls: <b>«Halte!»</b>', done: () => ordOk('HALTE') && co.state === 'parat' },
+      mini: () => st.noMic ? 'Ara atura\'ls: prem <b>HALTE</b>.' : 'Ara atura\'ls: <b>«Halte!»</b>', done: () => ordOk('HALTE') && co.state === 'parat' },
     { title: 'Contremarche', pose: 'assenyala', unlock: ALL, hl: [], enter() { st.base = LASTORD.n; },
-      mini: () => co.state !== 'parat' || busy() ? 'Espera que acabin de moure\'s…' : 'Mitja volta de tota la unitat: <b>«Contremarche!»</b>', done: () => ordOk('CD-06') && co.state === 'parat' && !busy() },
+      mini: () => co.state !== 'parat' || busy() ? 'Espera que acabin de moure\'s…' : (st.noMic ? 'Mitja volta de tota la unitat: <b>Formacions › Contremarche</b>.' : 'Mitja volta de tota la unitat: <b>«Contremarche!»</b>'), done: () => ordOk('CD-06') && co.state === 'parat' && !busy() },
     { title: 'Chargez', pose: 'assenyala', unlock: ALL, hl: [], enter() { st.base = LASTORD.n; },
-      mini: () => co.arm === 'charge' ? 'Carregant… espera que els rellotges es posin en <b>verd</b>.' : 'Carrega els mosquets: <b>«Chargez – vos armes!»</b>', done: () => ordOk('LS-01') && co.loaded },
+      mini: () => co.arm === 'charge' ? 'Carregant… espera que els rellotges es posin en <b>verd</b>.' : (st.noMic ? 'Carrega els mosquets: <b>Mosquet › Chargez</b>.' : 'Carrega els mosquets: <b>«Chargez – vos armes!»</b>'), done: () => ordOk('LS-01') && co.loaded },
     { title: 'Ens han tornat a atacar!', pose: 'louis', unlock: ALL, hl: [],
       enter() {
         const c = unitCentre(), h = co.members[0].h; st.amb = true;
@@ -5579,7 +5580,7 @@ function buildLevel9() {
         e.reload = 40; ENEMY.push(e);
         reac('louis', '<b>Louis:</b> Chasseur, ens han tornat a atacar!', 5000);
       },
-      mini: () => co.chaos ? '…' : co.state !== 'parat' ? 'Atura\'t: <b>«Halte!»</b>' : arm(), resetStep: () => 6, done: () => fired() },
+      mini: () => co.chaos ? '…' : co.state !== 'parat' ? (st.noMic ? 'Atura\'t: prem <b>HALTE</b>.' : 'Atura\'t: <b>«Halte!»</b>') : arm(), resetStep: () => 6, done: () => fired() },
     { title: 'Han fugit', pose: 'aprova', unlock: ALL, hl: [], mini: 'Els austríacs tornen a fugir!', done: () => false }
   ];
   return {
@@ -5587,6 +5588,7 @@ function buildLevel9() {
     enemies: [],
     tutorial: { steps, figs: [], startAtencio: true, resetStep: () => 3 },
     onReset() { st.amb = false; st.fin = false; },
+    onMicFail() { st.noMic = true; },
     tick(dt) {
       if (st.amb && !st.fin && fired() && ENEMY[0] && performance.now() - co.volley.t > 1800) { st.fin = true; routEnemy(ENEMY[0]); reac('louis', '<b>Louis:</b> Fugen! Així es fa, chasseur.', 4000); }
     },
