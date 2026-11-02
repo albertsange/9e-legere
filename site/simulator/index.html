@@ -4331,7 +4331,7 @@ let autoStepT = 0;
 const VOICE = { on: false, rec: null, running: false, tested: false, seg: {}, interim: '', state: '', failT: 0, lastFail: null,
   learn: { phr: {}, ex: {} }, shared: { phr: {}, ex: {} }, opt: { mode: 'cont', vol: true, log: false, tele: true, engine: '' }, log: [], recentExec: null, ptt: false, db: false, loading: false };
 // Connexió amb Supabase (la mateixa de la web: si el joc s'obre dins la web, agafa window.APP_CONFIG) i fonts del motor local Vosk
-const GAME_VERSION = '1.8.3';
+const GAME_VERSION = '1.8.4';
 const CFG = Object.assign({
   SUPABASE_URL: 'https://ltopullwhasagnkuqaek.supabase.co',
   SUPABASE_ANON_KEY: 'sb_publishable_DhHFUh-UrbBrI0l476Vcnw_tSn-Gmkr',
@@ -6028,7 +6028,7 @@ function campOpen(id) { const k = campIdx(id); return k === 0 || (k > 0 && !!CAM
 // Mapa de la campanya 1 (Flandes, Valònia i Renània): (lon, lat) de cada parada; es dibuixa amb MapKit i el recorregut per sobre
 const CAMP_MAP1 = {
   stops: { 1: [4.55, 50.2, 1, 0], 2: [5.07, 50.76, 1, 0], 3: [4.7, 50.92, -1, 0], 4: [2.85, 50.7, -1, 0], 5: [2.5, 51.02, 1, 0], 6: [4.22, 50.1, -1, 0], 7: [3.88, 50.36, -1, 0], 8: [4.5, 50.52, -1, 0], 9: [4.95, 50.5, 1, 0], 10: [8.0, 49.82, 1, 0], 11: [7.78, 50.06, -1, 0], 12: [10.32, 47.78, -1, 0] },
-  towns: [['Brussel·les', 4.35, 50.8, 1], ['Lille', 3.06, 50.63, 1], ['Namur', 4.87, 50.46, 1], ['Lieja', 5.57, 50.64, 1], ['Mainz', 8.27, 50.0, 1], ['Colònia', 6.96, 50.94, 1], ['Gant', 3.72, 51.05, 1], ['Luxemburg', 6.13, 49.61, 1], ['Metz', 6.17, 49.12, 1], ['Estrasburg', 7.75, 48.58, 1], ['Ulm', 9.99, 48.4, 1], ['Augsburg', 10.9, 48.37, 1], ['Dunkerque', 2.38, 51.03, 0], ['Maubeuge', 3.97, 50.28, 0], ['Charleroi', 4.44, 50.41, 0], ['Valenciennes', 3.52, 50.36, 0], ['Maastricht', 5.69, 50.85, 0], ['Frankfurt', 8.68, 50.11, 1], ['Trèveris', 6.64, 49.75, 0], ['Mannheim', 8.47, 49.49, 0], ['Estugarda', 9.18, 48.78, 1], ['Memmingen', 10.18, 47.98, 0], ['Karlsruhe', 8.4, 49.0, 0], ['Verdun', 5.38, 49.16, 0]]
+  towns: [['Brussel·les', 4.35, 50.8, 1], ['Lille', 3.06, 50.63, 1], ['Namur', 4.87, 50.46, 1], ['Lieja', 5.57, 50.64, 1], ['Mainz', 8.27, 50.0, 1], ['Colònia', 6.96, 50.94, 1], ['Gant', 3.72, 51.05, 1], ['Luxemburg', 6.13, 49.61, 1], ['Metz', 6.17, 49.12, 1], ['Estrasburg', 7.75, 48.58, 1], ['Ulm', 9.99, 48.4, 1], ['Augsburg', 10.9, 48.37, 1], ['Dunkerque', 2.38, 51.03, 0], ['Maubeuge', 3.97, 50.28, 0], ['Charleroi', 4.44, 50.41, 0], ['Valenciennes', 3.52, 50.36, 0], ['Maastricht', 5.69, 50.85, 0], ['Frankfurt', 8.68, 50.11, 1], ['Trèveris', 6.64, 49.75, 0], ['Mannheim', 8.47, 49.49, 0], ['Estugarda', 9.18, 48.78, 1], ['Memmingen', 10.18, 47.98, 0], ['Karlsruhe', 8.4, 49.0, 0], ['Verdun', 5.38, 49.16, 0], ['París', 2.35, 48.86, 1], ['Reims', 4.03, 49.25, 1], ['Amiens', 2.3, 49.9, 1], ['Saint-Quentin', 3.29, 49.85, 0], ['Châlons', 4.37, 48.96, 0], ['Compiègne', 2.83, 49.42, 0], ['Laó', 3.62, 49.56, 0], ['Sedan', 4.94, 49.7, 0], ['Troyes', 4.08, 48.3, 0], ['Orleans', 1.9, 47.9, 0]]
 };
 const campProj = (lon, lat) => [(lon - 1.2) * 15.4, (51.4 - lat) * 24.7];
 function campMap1Scene() {
@@ -6051,25 +6051,35 @@ function campMap1Scene() {
   sc.push(A.wood(L([[6.85, 48.2], [7.3, 48.15], [7.45, 48.95], [7.0, 48.95]]), { kind: 'broad', spacing: 3.8, seed: 65 }));
   sc.push(A.wood(L([[9.3, 48.6], [10.2, 48.7], [10.3, 49.1], [9.4, 49.1]]), { kind: 'broad', spacing: 3.8, seed: 66 }));
   const R2 = MapKit.rng(77), farm = (lon, lat, w, h, k) => { const [x, y] = P(lon, lat); return A.field([[x - w, y - h], [x + w * 0.8, y - h * 1.1], [x + w, y + h * 0.7], [x - w * 0.9, y + h]], { kind: k || 'arable', seed: Math.floor(R2() * 90) }); };
-  [[2.9, 50.85, 3.6, 2.4], [3.5, 50.92, 3.6, 2.2], [3.2, 50.55, 3.6, 2.4], [2.6, 50.45, 3.6, 2.6], [4.2, 51.0, 3.4, 2.2], [5.1, 50.95, 3.2, 2.2], [4.0, 50.62, 3.2, 2.2], [5.6, 50.3, 3.2, 2.2], [6.5, 50.65, 3.6, 2.4], [7.3, 49.5, 3.6, 2.6], [8.0, 49.3, 3.6, 2.2], [8.7, 49.8, 3.6, 2.4], [7.9, 48.6, 3.2, 2.6], [9.6, 48.1, 3.6, 2.6], [10.4, 48.6, 3.6, 2.6], [6.0, 49.3, 3.6, 2.2], [5.5, 49.85, 3.2, 2.2], [9.1, 49.4, 3.6, 2.6], [1.9, 50.3, 3.4, 2.8], [2.3, 50.7, 3.2, 2.2], [4.6, 49.8, 3.2, 2.2]].forEach(f => sc.push(farm(f[0], f[1], f[2], f[3])));
+  [[2.9, 50.85, 3.6, 2.4], [3.5, 50.92, 3.6, 2.2], [3.2, 50.55, 3.6, 2.4], [2.6, 50.45, 3.6, 2.6], [4.2, 51.0, 3.4, 2.2], [5.1, 50.95, 3.2, 2.2], [4.0, 50.62, 3.2, 2.2], [5.6, 50.3, 3.2, 2.2], [6.5, 50.65, 3.6, 2.4], [7.3, 49.5, 3.6, 2.6], [8.0, 49.3, 3.6, 2.2], [8.7, 49.8, 3.6, 2.4], [7.9, 48.6, 3.2, 2.6], [9.6, 48.1, 3.6, 2.6], [10.4, 48.6, 3.6, 2.6], [6.0, 49.3, 3.6, 2.2], [5.5, 49.85, 3.2, 2.2], [9.1, 49.4, 3.6, 2.6], [1.9, 50.3, 3.4, 2.8], [2.3, 50.7, 3.2, 2.2], [4.6, 49.8, 3.2, 2.2]].forEach((f, i) => { if (i % 3 !== 1) sc.push(farm(f[0], f[1], f[2], f[3])); });
   [[3.4, 50.72, 4, 2.6, 'meadow'], [5.3, 50.72, 4, 2.6, 'meadow'], [6.9, 49.9, 4, 2.6, 'meadow'], [3.9, 50.05, 4, 2.6, 'meadow'], [9.9, 48.8, 4, 2.6, 'marsh'], [2.3, 50.95, 4, 2.2, 'marsh'], [8.4, 48.3, 4, 3, 'orchard'], [10.3, 48.0, 4, 2.6, 'meadow']].forEach(f => sc.push(farm(f[0], f[1], f[2], f[3], f[4])));
   sc.push(A.wood(L([[3.35, 50.12], [3.75, 50.15], [3.8, 50.35], [3.4, 50.38]]), { kind: 'broad', spacing: 3.6, seed: 71 }), A.wood(L([[4.3, 50.72], [4.6, 50.74], [4.62, 50.86], [4.3, 50.85]]), { kind: 'broad', spacing: 3.4, seed: 72 }),
     A.wood(L([[4.85, 49.1], [5.25, 49.15], [5.3, 49.6], [4.9, 49.6]]), { kind: 'mixed', spacing: 3.6, seed: 73 }), A.wood(L([[6.3, 50.1], [6.9, 50.12], [6.95, 50.4], [6.35, 50.4]]), { kind: 'mixed', spacing: 3.6, seed: 74 }),
     A.wood(L([[8.75, 49.45], [9.2, 49.5], [9.3, 49.9], [8.8, 49.85]]), { kind: 'mixed', spacing: 3.6, seed: 75 }), A.wood(L([[7.7, 49.15], [8.15, 49.2], [8.2, 49.5], [7.75, 49.5]]), { kind: 'broad', spacing: 3.4, seed: 76 }),
     A.wood(L([[10.0, 47.85], [10.7, 47.95], [10.75, 48.25], [10.05, 48.2]]), { kind: 'mixed', spacing: 3.6, seed: 77 }), A.wood(L([[2.0, 50.55], [2.45, 50.6], [2.5, 50.9], [2.05, 50.85]]), { kind: 'broad', spacing: 3.6, seed: 78 }));
-  const peaks = []; [[9.0, 47.55, 1.9, 0.5, 26, 2], [7.0, 48.1, 0.4, 0.95, 12, 1.4], [8.0, 47.95, 0.35, 0.9, 12, 1.4], [6.5, 50.15, 0.6, 0.3, 6, 1.1], [8.2, 50.2, 0.5, 0.2, 5, 1.1], [7.4, 49.8, 0.5, 0.25, 5, 1.0], [5.0, 50.1, 0.8, 0.2, 5, 1.0], [10.6, 47.9, 0.6, 0.3, 6, 1.4]].forEach((g, gi) => { for (let k = 0; k < g[4]; k++) { const r = MapKit.rng(7 + gi * 31 + k); peaks.push([g[0] + r() * g[2], g[1] + r() * g[3], (1.3 + r() * 1.5) * g[5] / 1.6]); } });
+  const peaks = []; [[9.0, 47.55, 1.9, 0.5, 26, 2], [7.0, 48.1, 0.4, 0.95, 12, 1.4], [8.0, 47.95, 0.35, 0.9, 12, 1.4], [6.5, 50.15, 0.6, 0.3, 6, 1.1], [8.2, 50.2, 0.5, 0.2, 5, 1.1], [7.4, 49.8, 0.5, 0.25, 5, 1.0], [5.0, 50.1, 0.8, 0.2, 5, 1.0], [10.6, 47.9, 0.6, 0.3, 6, 1.4], [2.0, 47.7, 0.9, 0.35, 6, 1.1], [3.6, 47.6, 0.8, 0.3, 5, 1.0]].forEach((g, gi) => { for (let k = 0, kn = Math.round(g[4] * 0.7); k < kn; k++) { const r = MapKit.rng(7 + gi * 31 + k); peaks.push([g[0] + r() * g[2], g[1] + r() * g[3], (1.3 + r() * 1.5) * g[5] / 1.6]); } });
   sc.push({ layer: MapKit.LAYER.mark, draw(ctx, M) {
     ctx.save(); ctx.strokeStyle = '#2a2118'; ctx.fillStyle = '#e4d6b4'; ctx.lineWidth = Math.max(1, 0.12 * M); ctx.lineJoin = 'round';
     for (const q of peaks) { const [x, y] = P(q[0], q[1]), h = q[2]; ctx.beginPath(); ctx.moveTo((x - h) * M, y * M); ctx.lineTo(x * M, (y - h * 1.25) * M); ctx.lineTo((x + h) * M, y * M); ctx.closePath(); ctx.fill(); ctx.stroke();
       ctx.beginPath(); for (let k = 1; k <= 3; k++) { ctx.moveTo((x + h * k / 4) * M, (y - h * 1.25 * (1 - k / 4)) * M); ctx.lineTo((x + h * k / 5) * M, y * M); } ctx.lineWidth = Math.max(0.8, 0.07 * M); ctx.stroke(); ctx.lineWidth = Math.max(1, 0.12 * M); }
     ctx.restore(); } });
-  const city = (t, big) => { const [x, y] = P(t[1], t[2]), r = MapKit.rng(Math.floor(t[1] * 17 + t[2] * 5)), n = big ? 8 : 3; for (let k = 0; k < n; k++) { const a = r() * 6.28, d = (big ? 0.4 + r() * 2.2 : r() * 1.1); sc.push(A.building({ x: x + Math.cos(a) * d, y: y + Math.sin(a) * d * 0.8, w: 0.8 + r() * 0.7, h: 0.6 + r() * 0.5, rot: (r() - 0.5) * 0.6, kind: 'house' })); }
+  sc.push(A.river(L([[3.62, 49.9], [3.2, 49.55], [2.83, 49.4], [2.4, 49.1], [2.35, 48.86], [1.6, 48.7], [1.2, 48.6]]), { width: 1.0, water: true, arrow: false, seed: 21 }));
+  sc.push(A.river(L([[4.6, 48.3], [4.08, 48.3], [3.3, 48.4], [2.7, 48.65], [2.35, 48.86], [1.9, 49.0], [1.2, 49.15]]), { width: 1.3, water: true, arrow: false, seed: 22 }));
+  sc.push(A.river(L([[5.1, 48.9], [4.6, 48.95], [4.37, 48.96], [3.5, 49.0], [2.8, 48.95], [2.35, 48.86]]), { width: 0.9, water: true, arrow: false, seed: 23 }));
+  sc.push(A.river(L([[5.0, 49.4], [4.5, 49.4], [4.03, 49.35], [3.4, 49.4], [2.83, 49.42]]), { width: 0.8, water: true, arrow: false, seed: 24 }));
+  sc.push(A.river(L([[3.3, 49.85], [2.8, 49.85], [2.3, 49.9], [1.8, 50.05], [1.2, 50.15]]), { width: 0.9, water: true, arrow: false, seed: 25 }));
+  sc.push(A.wood(L([[2.65, 49.28], [3.1, 49.3], [3.15, 49.55], [2.7, 49.55]]), { kind: 'broad', spacing: 3.6, seed: 81 }), A.wood(L([[3.7, 48.45], [4.4, 48.5], [4.45, 48.8], [3.75, 48.75]]), { kind: 'mixed', spacing: 3.8, seed: 82 }),
+    A.wood(L([[2.45, 48.2], [2.9, 48.25], [2.95, 48.5], [2.5, 48.5]]), { kind: 'broad', spacing: 3.6, seed: 83 }), A.wood(L([[1.5, 48.1], [2.2, 48.05], [2.3, 48.4], [1.6, 48.4]]), { kind: 'mixed', spacing: 3.8, seed: 84 }),
+    A.wood(L([[3.9, 47.75], [4.6, 47.7], [4.7, 48.05], [4.0, 48.05]]), { kind: 'broad', spacing: 3.8, seed: 85 }), A.wood(L([[1.4, 49.2], [1.9, 49.25], [1.95, 49.55], [1.45, 49.5]]), { kind: 'mixed', spacing: 3.6, seed: 86 }));
+  [[3.3, 49.1, 3.6, 2.4], [3.9, 49.7, 3.4, 2.2], [1.9, 49.7, 3.4, 2.2], [2.5, 48.65, 3.4, 2.2], [4.9, 48.55, 3.6, 2.4], [3.2, 48.0, 3.6, 2.4], [1.6, 48.8, 3.4, 2.2], [4.4, 49.65, 3.2, 2.2], [2.7, 47.85, 3.6, 2.4], [5.2, 48.2, 3.6, 2.4], [1.7, 47.6, 3.4, 2.2]].forEach(f => sc.push(farm(f[0], f[1], f[2], f[3], f[4])));
+  [[4.5, 49.0, 4, 2.6, 'meadow'], [3.0, 48.2, 4, 2.6, 'orchard'], [2.2, 49.6, 4, 2.4, 'meadow']].forEach(f => sc.push(farm(f[0], f[1], f[2], f[3], f[4])));
+  const city = (t, big) => { const [x, y] = P(t[1], t[2]), r = MapKit.rng(Math.floor(t[1] * 17 + t[2] * 5)), n = big ? 5 : 2; for (let k = 0; k < n; k++) { const a = r() * 6.28, d = (big ? 0.4 + r() * 2.2 : r() * 1.1); sc.push(A.building({ x: x + Math.cos(a) * d, y: y + Math.sin(a) * d * 0.8, w: 0.8 + r() * 0.7, h: 0.6 + r() * 0.5, rot: (r() - 0.5) * 0.6, kind: 'house' })); }
     if (big) sc.push(A.building({ x, y: y - 0.2, w: 0.7, h: 1.4, kind: 'church' })); sc.push(A.label(t[0], x + (big ? 5.4 : 4.2), y + 0.4, { kind: 'place', scale: big ? 0.46 : 0.36 })); };
   CAMP_MAP1.towns.forEach(t => city(t, t[3]));
-  const roadsM = [[[3.06, 50.63], [3.9, 50.75], [4.35, 50.8], [4.87, 50.46]], [[4.87, 50.46], [5.57, 50.64], [6.96, 50.94]], [[8.27, 50.0], [8.68, 50.11]], [[8.27, 50.0], [8.4, 49.5], [8.4, 49.0]], [[9.99, 48.4], [10.18, 47.98], [10.32, 47.78]], [[6.13, 49.61], [6.64, 49.75]], [[6.17, 49.12], [6.13, 49.61]]].map(r => MapKit.smooth(L(r), 6));
+  const roadsM = [[[3.06, 50.63], [3.9, 50.75], [4.35, 50.8], [4.87, 50.46]], [[4.87, 50.46], [5.57, 50.64], [6.96, 50.94]], [[8.27, 50.0], [8.68, 50.11]], [[8.27, 50.0], [8.4, 49.5], [8.4, 49.0]], [[9.99, 48.4], [10.18, 47.98], [10.32, 47.78]], [[6.13, 49.61], [6.64, 49.75]], [[6.17, 49.12], [6.13, 49.61]], [[2.35, 48.86], [3.2, 49.0], [4.03, 49.25], [5.38, 49.16]], [[2.35, 48.86], [2.3, 49.4], [2.3, 49.9]], [[4.03, 49.25], [4.94, 49.7]], [[2.3, 49.9], [3.29, 49.85], [3.97, 50.28]]].map(r => MapKit.smooth(L(r), 6));
   sc.push({ layer: MapKit.LAYER.road, draw(ctx, M) { ctx.save(); ctx.strokeStyle = '#7a6a4a'; ctx.lineWidth = Math.max(1, 0.12 * M); ctx.setLineDash([Math.max(3, 0.9 * M), Math.max(2, 0.5 * M)]);
     for (const r of roadsM) { ctx.beginPath(); r.forEach((q, k) => k ? ctx.lineTo(q[0] * M, q[1] * M) : ctx.moveTo(q[0] * M, q[1] * M)); ctx.stroke(); } ctx.restore(); } });
-  sc.push(A.label('Mar del Nord', 34, 2.8, { kind: 'place', scale: 0.7 }), A.label('Les Ardenes', 56, 38, { kind: 'place', scale: 0.62 }), A.label('Riu Mosa', 72, 42, { kind: 'place', scale: 0.4 }), A.label('Rin', 96, 30, { kind: 'place', scale: 0.5 }), A.label('Alps d\'Algäu', 112, 93, { kind: 'place', scale: 0.55 }));
+  sc.push(A.label('Mar del Nord', 34, 2.8, { kind: 'place', scale: 0.7 }), A.label('Champanya', 40, 74, { kind: 'place', scale: 0.62 }), A.label('Les Ardenes', 56, 38, { kind: 'place', scale: 0.62 }), A.label('Riu Mosa', 72, 42, { kind: 'place', scale: 0.4 }), A.label('Rin', 96, 30, { kind: 'place', scale: 0.5 }), A.label('Alps d\'Algäu', 112, 93, { kind: 'place', scale: 0.55 }));
   sc.push(A.label('Campanya 1 · Forjant la República', 96, 5, { kind: 'town', scale: 0.9 }), A.label('1792 – 1797', 96, 10, { kind: 'place', scale: 0.6 }));
   return MapKit.scene(sc);
 }
@@ -6089,14 +6099,10 @@ function drawCampMap1(cv) {
   ctx.strokeStyle = '#b3261e'; ctx.lineWidth = Math.max(3, 0.55 * M); ctx.beginPath(); route.forEach((q, i) => i ? ctx.lineTo(q[0] * M, q[1] * M) : ctx.moveTo(q[0] * M, q[1] * M)); ctx.stroke(); ctx.setLineDash([]);
   const rows = CAMP_DATA[0].l;
   cv._stops = pts.map(q => { const id = campIdOf(q.n), has = !!CAMP_BY_ID[id], done = !!CAMP_PROG[id], open = has && campOpen(id), px = q.x * M / dpr, py = q.y * M / dpr;
-    const r = Math.max(9, 1.45 * M), x = q.x * M, y = q.y * M, col = done ? '#2e7d32' : open ? '#b3261e' : '#8d8676';
+    const r = Math.max(13, 2.15 * M), x = q.x * M, y = q.y * M, col = done ? '#2e7d32' : open ? '#b3261e' : '#8d8676';
     ctx.fillStyle = '#fff'; ctx.strokeStyle = col; ctx.lineWidth = Math.max(2, 0.3 * M); ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-    ctx.fillStyle = col; ctx.font = '700 ' + Math.round(r * 1.15) + 'px "Alegreya Sans SC", sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(done ? '✓' : q.n, x, y + r * 0.04);
+    ctx.fillStyle = col; ctx.font = '700 ' + Math.round(r * 1.2) + 'px "Alegreya Sans SC", sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(done ? '✓' : q.n, x, y + r * 0.04);
     if (open && !done) { ctx.strokeStyle = 'rgba(179,38,30,.35)'; ctx.lineWidth = Math.max(2, 0.4 * M); ctx.beginPath(); ctx.arc(x, y, r * 1.6, 0, Math.PI * 2); ctx.stroke(); }
-    const name = rows.find(z => z[0] === q.n)[1].replace(/\s*\(.*\)$/, ''), fs = Math.max(11, 1.55 * M);
-    ctx.font = '600 ' + Math.round(fs) + 'px "Alegreya Sans SC", sans-serif'; ctx.textAlign = q.dx < 0 ? 'right' : 'left'; ctx.textBaseline = 'middle';
-    const tx = q.dx < 0 ? x - r - 5 : x + r + 5, ty = y;
-    ctx.lineWidth = Math.max(3, 0.5 * M); ctx.strokeStyle = 'rgba(247,243,232,.92)'; ctx.strokeText(name, tx, ty); ctx.fillStyle = '#2a2118'; ctx.fillText(name, tx, ty);
     return { n: q.n, id, has, done, open, x: x / dpr, y: y / dpr, r: r / dpr, name: rows.find(z => z[0] === q.n)[1], date: rows.find(z => z[0] === q.n)[2] }; });
   ctx.restore();
 }
