@@ -2913,7 +2913,7 @@ function alignPickAt(sx, sy) {                   // clic sobre el selector d'ang
 }
 function alignPickButtons(p) {                  // botons en ventall al voltant de la línia actual, començant al seu extrem: l'angle és el gir de la línia
   const c = toScreen(p.x * M, p.y * M), R = Math.max(110, (FILES * FRONT + 1.5) * M), n = ALIGN_ANGLES.length, mid = (n - 1) / 2, base = p.h - p.dir * Math.PI / 2 + rot;
-  return ALIGN_ANGLES.map((ang, i) => { const a = base + (i - mid) * 0.235; return { ang, x: c.x + Math.cos(a) * R, y: c.y + Math.sin(a) * R, r: 14, cx: c.x, cy: c.y, near: Math.abs(ang) <= 10 }; });
+  return ALIGN_ANGLES.map((ang, i) => { const a = base + (i - mid) * 0.235; return { ang, x: c.x + Math.cos(a) * R, y: c.y + Math.sin(a) * R, r: 9, cx: c.x, cy: c.y, near: Math.abs(ang) <= 10 }; });
 }
 function drawAlignPick() {
   const p = co && co.alignPick; if (!p) return;
@@ -2925,11 +2925,10 @@ function drawAlignPick() {
     ctx.beginPath(); ctx.moveTo(c.x, c.y); ctx.lineTo(c.x + Math.cos(a) * L, c.y + Math.sin(a) * L); ctx.stroke();
   }
   for (const o of bs) {
-    ctx.strokeStyle = 'rgba(31,58,120,.3)'; ctx.lineWidth = 1; ctx.setLineDash([3, 4]);
+    ctx.strokeStyle = o.ang === 0 ? 'rgba(179,38,30,.55)' : 'rgba(31,58,120,.4)'; ctx.lineWidth = 1.5; ctx.setLineDash([3, 4]);
     ctx.beginPath(); ctx.moveTo(o.cx, o.cy); ctx.lineTo(o.x, o.y); ctx.stroke(); ctx.setLineDash([]);
     ctx.fillStyle = o.ang === 0 ? '#b3261e' : o.near ? '#2f6b3a' : '#1f3a78'; ctx.strokeStyle = '#fff'; ctx.lineWidth = 2;
     ctx.beginPath(); ctx.arc(o.x, o.y, o.r, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-    ctx.fillStyle = '#fff'; ctx.fillText((o.ang > 0 ? '+' : o.ang < 0 ? '−' : '') + Math.abs(o.ang) + '°', o.x, o.y);
   }
   ctx.restore();
 }
