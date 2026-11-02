@@ -319,6 +319,7 @@
       '<ol class="extra"><li><a href="#regulacions" data-sec="regulacions"><span class="n">§</span><span>' + esc(L((S.site.regs || {}).title) || t('regs_page')) + '</span></a></li>' +
       '<li><a href="#decisions" data-sec="decisions"><span class="n">·</span><span>' + esc(L((S.site.decisions || {}).title) || t('decisions')) + '</span></a></li>' +
       '<li><a href="#fonts" data-sec="fonts"><span class="n">·</span><span>' + esc(L((S.site.fonts || {}).title) || t('sources')) + '</span></a></li>' +
+      (isMember() ? '<li><a href="#campanya" data-sec="campanya"><span class="n">✦</span><span>' + esc(t('camp_title')) + '</span></a></li>' : '') +
       (isMember() ? '<li><a href="#simulator" data-sec="simulator"><span class="n">▶</span><span>' + esc(L((S.site.simulator || {}).title) || t('sim_title')) + '</span></a></li>' : '') +
       (isAdmin() ? '<li><a href="#nova" data-sec="nova"><span class="n">+</span><span>' + esc(t('new_page')) + '</span></a></li>' : '') + '</ol>';
 
@@ -470,6 +471,7 @@
     else if (id === 'decisions' || id === 'fonts') html = blockView(id);
     else if (id === 'regulacions') html = regsAllView();
     else if (id === 'simulator' && isMember()) html = simulatorView();
+    else if (id === 'campanya' && isMember()) html = campaignView();
     else if (id === 'registre') { html = homeView(); setTimeout(function () { history.replaceState(null, '', location.pathname); openRegister(); }, 0); }
     else if (id === 'compte') html = accountView();
     else if (id === 'gestio') html = adminView();
@@ -640,6 +642,15 @@
   }
 
   /* ------------------------------------------------------------------ 9e Simulator (game hosted in site/simulator/, notes editable like the other blocks) */
+function campaignView() {
+  const sp = ['camp_prep', 'camp_pending'];
+  const body = CAMPAIGNS.map(c => '<section class="camp-block" aria-labelledby="camp-' + c.n + '"><h3 id="camp-' + c.n + '" class="camp-h">' + esc(t('camp_n').replace('{n}', c.n)) + ' · ' + esc(L(c.title)) + '</h3><ol class="camp-list">' +
+    c.levels.map(l => '<li class="camp-lvl' + (l.n === 1 ? ' cur' : '') + '"><span class="camp-num">' + l.n + '</span><div><strong>' + esc(L(l.name)) + '</strong>' + (l.desc ? '<p class="muted">' + esc(L(l.desc)) + '</p>' : '') + '</div><span class="camp-tag">' + esc(t(l.n === 1 ? sp[0] : sp[1])) + '</span></li>').join('') +
+    '</ol></section>').join('');
+  return '<section class="view" data-view="campaign"><p class="crumb"><a href="#">' + esc(t('home')) + '</a> <span aria-hidden="true">/</span> ' + esc(t('camp_title')) + '</p>' +
+    '<h2 class="page-title" tabindex="-1">' + esc(t('camp_title')) + '</h2><p class="muted">' + esc(t('camp_intro')) + '</p>' + body + '</section>';
+}
+
   function simulatorView() {
     var site = S.edit && S.draft && S.draft.site ? S.draft.site : S.site;
     var b = site.simulator || {};
@@ -2671,7 +2682,111 @@
   /* ------------------------------------------------------------------ my squad (every approved member) */
   // a list per squad: people with a web account are added automatically, others are entered by hand
   var SQ_BASE = ['first_name', 'last_name', 'nom_guerre', 'rank', 'birth_date', 'joined_9e', 'email'];
-  var SQ_ROUTES = { esquadra: 'members', 'esquadra-assistencia': 'attend', 'esquadra-esdeveniments': 'events' };
+// Campanyes del 9e Légère (font: «Història i Disseny de Campanya»). Nivell 1 en preparació; la resta, pendents.
+  const CAMPAIGNS = [
+    { n: 1, title: {ca: "Forjant la República (1792-1797)", en: "Forging the Republic (1792–1797)"}, levels: [
+        { n: 1, name: {ca: "El Bateig de Foc (Philippeville)", en: "The Baptism of Fire (Philippeville)"}, desc: {ca: "Pilot de 20 homes contra una patrulla de 15 jägers en un bosc travessat per un rierol: flanqueig silenciós i sorpresa per l'esquena.", en: "A 20-man platoon against a 15-strong Jäger patrol in a forest crossed by a stream: a silent flanking movement and a surprise attack from behind."} },
+        { n: 2, name: {ca: "La Línia de Neerwinden", en: "The Neerwinden Line"} },
+        { n: 3, name: {ca: "Esgotar el Perseguidor", en: "Wearing Down the Pursuer"} },
+        { n: 4, name: {ca: "Avançada cap a Hondschoote", en: "Advance on Hondschoote"} },
+        { n: 5, name: {ca: "La Càrrega a Hondschoote", en: "The Charge at Hondschoote"} },
+        { n: 6, name: {ca: "Boscos de Wattignies", en: "The Woods of Wattignies"} },
+        { n: 7, name: {ca: "Trencament del Setge", en: "Breaking the Siege"} },
+        { n: 8, name: {ca: "L'Amalgama de Fleurus", en: "The Amalgam of Fleurus"} },
+        { n: 9, name: {ca: "La Defensa Implacable", en: "The Relentless Defence"} },
+        { n: 10, name: {ca: "Les Altures de Partenheim", en: "The Heights of Partenheim"} },
+        { n: 11, name: {ca: "Foc a Gaualgesheim", en: "Fire at Gaualgesheim"} },
+        { n: 12, name: {ca: "Consolidació a Kempten", en: "Consolidation at Kempten"} }
+    ] },
+    { n: 2, title: {ca: "La Forja de L'Incomparable (1798-1800)", en: "The Forge of L'Incomparable (1798–1800)"}, levels: [
+        { n: 13, name: {ca: "L'Espessor de la Vendée", en: "The Thickness of the Vendée"} },
+        { n: 14, name: {ca: "La Preparació a Dijon", en: "Preparation at Dijon"} },
+        { n: 15, name: {ca: "L'Infern de Gel (Valais)", en: "The Winter Hell (Valais)"} },
+        { n: 16, name: {ca: "Les Ribes de la Chiusella", en: "The Banks of the Chiusella"} },
+        { n: 17, name: {ca: "La cursa cap a Piacenza", en: "The Race to Piacenza"} },
+        { n: 18, name: {ca: "Captura d'Honor", en: "Captured with Honour"} },
+        { n: 19, name: {ca: "El Col·lapse del Matí (Marengo)", en: "The Collapse of the Morning (Marengo)"} },
+        { n: 20, name: {ca: "L'Ancora de Desaix", en: "Desaix's Anchor"} },
+        { n: 21, name: {ca: "La Mort del Comandant", en: "The Death of the Commander"} },
+        { n: 22, name: {ca: "La Càrrega Incomparable", en: "The Incomparable Charge"} },
+        { n: 23, name: {ca: "La Fama Sancionada", en: "The Fame Sanctioned"} }
+    ] },
+    { n: 3, title: {ca: "El Sol d'Austerlitz i les Ombres del Danubi (1803-1805)", en: "The Sun of Austerlitz and the Shadows of the Danube (1803–1805)"}, levels: [
+        { n: 24, name: {ca: "Exercicis a Boulogne", en: "Drills at Boulogne"} },
+        { n: 25, name: {ca: "La Marxa d'Àguiles", en: "The March of the Eagles"} },
+        { n: 26, name: {ca: "La Solitud de Haslach", en: "Solitude at Haslach"} },
+        { n: 27, name: {ca: "El Laberint de Jungingen", en: "The Labyrinth of Jungingen"} },
+        { n: 28, name: {ca: "Caça i Captura a Ulm", en: "Hunt and Capture at Ulm"} },
+        { n: 29, name: {ca: "L'Eixam del Danubi", en: "The Swarm on the Danube"} },
+        { n: 30, name: {ca: "Ombres de Dürenstein", en: "Shadows of Dürenstein"} },
+        { n: 31, name: {ca: "Acer fred a la Nit", en: "A Cold Night"} },
+        { n: 32, name: {ca: "Ocupació a Viena", en: "Occupation of Vienna"} },
+        { n: 33, name: {ca: "Recompte i Reforma", en: "Accounting and Reform"} }
+    ] },
+    { n: 4, title: {ca: "Triomf, Tragèdia i Redempció (1806-1807)", en: "Triumph, Tragedy and Redemption (1806–1807)"}, levels: [
+        { n: 34, name: {ca: "Avançant a Turíngia (Jena)", en: "Advance into Thuringia (Jena)"} },
+        { n: 35, name: {ca: "L'Obsolescència (Jena)", en: "Obsolescence (Jena)"} },
+        { n: 36, name: {ca: "La Rereguarda Esgotada", en: "The Exhausted Rearguard"} },
+        { n: 37, name: {ca: "Fam al Fang i la Neu", en: "Hunger in the Frost and Snow"} },
+        { n: 38, name: {ca: "Pànic a Mohrungen", en: "Panic at Mohrungen"} },
+        { n: 39, name: {ca: "L'Eclipsi de l'Àguila", en: "The Eclipse of the Eagle"} },
+        { n: 40, name: {ca: "Eylau: Esgotament Blanc", en: "Eylau: White Exhaustion"} },
+        { n: 41, name: {ca: "L'Error de Bennigsen", en: "Bennigsen's Error"} },
+        { n: 42, name: {ca: "El Càstig dels Canons", en: "The Punishment of the Guns"} },
+        { n: 43, name: {ca: "Purificats pel Foc", en: "Purified by Fire"} },
+        { n: 44, name: {ca: "Tilsit i Nou Equipament", en: "Tilsit and New Equipment"} }
+    ] },
+    { n: 5, title: {ca: "Sang a Espanya i Foc a Àustria (1808-1811)", en: "Blood in Spain and Fire in Austria (1808–1811)"}, levels: [
+        { n: 45, name: {ca: "Els Engorjats (Pirineus)", en: "The Gorges (Pyrenees)"} },
+        { n: 46, name: {ca: "La Marxa Furtiva (Talavera)", en: "The Stealthy March (Talavera)"} },
+        { n: 47, name: {ca: "L'Assalt a l'Alt de Medellín", en: "The Assault on the Medellín Heights"} },
+        { n: 48, name: {ca: "El Preu de la Foscor", en: "The Price of the Darkness"} },
+        { n: 49, name: {ca: "Suportant el Càstig", en: "Enduring the Punishment"} },
+        { n: 50, name: {ca: "Les Trinxeres de Badajoz", en: "The Trenches of Badajoz"} },
+        { n: 51, name: {ca: "Cobrint el Glacis", en: "Covering the Glacis"} },
+        { n: 52, name: {ca: "El Cap de Pont d'Essling", en: "The Bridgehead at Essling"} },
+        { n: 53, name: {ca: "L'Escorxador (Aspern-Essling)", en: "The Slaughterhouse (Aspern-Essling)"} },
+        { n: 54, name: {ca: "La Ruta a l'Illa de Lobau", en: "The Route to the Isle of Lobau"} },
+        { n: 55, name: {ca: "Tempesta a Lobau", en: "Storm on Lobau"} },
+        { n: 56, name: {ca: "Silenciant els Grenz", en: "Silencing the Grenadiers"} },
+        { n: 57, name: {ca: "L'Infern Lineal de l'Artilleria", en: "The Linear Hell of the Artillery"} },
+        { n: 58, name: {ca: "La Cacera i les Amputacions", en: "The Hunt and the Amputations"} }
+    ] },
+    { n: 6, title: {ca: "El Desastre i el Renaixement (1812-1813)", en: "Disaster and Renaissance (1812–1813)"}, levels: [
+        { n: 59, name: {ca: "La Pols del Niemen", en: "The Dust of the Niemen"} },
+        { n: 60, name: {ca: "Smolensk En Flames", en: "Smolensk in Flames"} },
+        { n: 61, name: {ca: "L'Ombra de Borodino", en: "The Shadow of Borodino"} },
+        { n: 62, name: {ca: "La Fletxa Trencada", en: "The Broken Arrow"} },
+        { n: 63, name: {ca: "L'Arrelament (Borodino)", en: "Rooting In (Borodino)"} },
+        { n: 64, name: {ca: "L'Infern de Cristall", en: "The Crystal Hell"} },
+        { n: 65, name: {ca: "Berezina Gelada", en: "The Frozen Berezina"} },
+        { n: 66, name: {ca: "La Generació \"Marie Louise\"", en: "The \"Marie Louise\" Generation"} },
+        { n: 67, name: {ca: "Desesperació a Lützen", en: "Despair at Lützen"} },
+        { n: 68, name: {ca: "Ganivetada a Bautzen", en: "Stabbed at Bautzen"} },
+        { n: 69, name: {ca: "Tancats a Dresden", en: "Trapped in Dresden"} },
+        { n: 70, name: {ca: "La Doctrina dels Dos Rangs", en: "The Doctrine of Two Ranks"} },
+        { n: 71, name: {ca: "La Gran Derrota (Leipzig)", en: "The Great Defeat (Leipzig)"} }
+    ] },
+    { n: 7, title: {ca: "La Defensa de França i la Descomposició (1814)", en: "The Defence of France and Its Collapse (1814)"}, levels: [
+        { n: 72, name: {ca: "La Guerrilla Imperial", en: "The Imperial Guerrilla"} },
+        { n: 73, name: {ca: "El Foc Cremant (Vauchamps)", en: "The Burning Fire (Vauchamps)"} },
+        { n: 74, name: {ca: "La Costa Carnissera (Craonne)", en: "The Butchers' Coast (Craonne)"} },
+        { n: 75, name: {ca: "Les Roques del Sud (Orthez)", en: "The Southern Rocks (Orthez)"} },
+        { n: 76, name: {ca: "Retrocés Destructiu", en: "Destructive Retreat"} },
+        { n: 77, name: {ca: "El Mur Ensangonat (Tolosa)", en: "The Bloodied Wall (Toulouse)"} },
+        { n: 78, name: {ca: "L'Amagatall i la Vergonya", en: "The Hiding Place and the Shame"} }
+    ] },
+    { n: 8, title: {ca: "El Vol de l'Àliga i l'Ocàs (1815)", en: "The Flight and Fall of the Eagle (1815)"}, levels: [
+        { n: 79, name: {ca: "L'Àliga a la Llum", en: "The Eagle in the Light"} },
+        { n: 80, name: {ca: "Oportunitat Furtiva", en: "A Furtive Opportunity"} },
+        { n: 81, name: {ca: "L'Infern Absolut (Ligny)", en: "Absolute Hell (Ligny)"} },
+        { n: 82, name: {ca: "L'Espasa Partida de Blücher", en: "Blücher's Broken Sword"} },
+        { n: 83, name: {ca: "La Ceguesa als Boscos", en: "Blindness in the Woods"} },
+        { n: 84, name: {ca: "Tancat entre les Aigües (Wavre)", en: "Trapped Between the Waters (Wavre)"} },
+        { n: 85, name: {ca: "L'Ordre de Llicenciament", en: "The Order of Discharge"} }
+    ] }
+  ];
+    var SQ_ROUTES = { esquadra: 'members', 'esquadra-assistencia': 'attend', 'esquadra-esdeveniments': 'events' };
   var SQ_SECS = ['equipement', 'petit-equipement', 'entretien'];
   var KIT_VALS = ['ok', 'missing', 'wrong'];
   function sqState() {
