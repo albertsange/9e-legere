@@ -509,7 +509,7 @@
   <h1 class="big-title">9<sup>e</sup> Simulator</h1>
   <p class="tagline">Instrucció de peu segons l'École du soldat</p>
   <button class="btn-main" id="btnLevels">Tutorial</button>
-  <button class="btn-main" id="btnCampaign" disabled title="Properament">Campanya <small>· properament</small></button>
+  <button class="btn-main" id="btnCampaign">Campanya</button>
   <button class="btn-main alt" id="btnFree">Mode lliure</button>
   <button class="btn-main alt" id="btnRank">Rànquing</button>
   <img class="avtitle" alt="Capitaine Le Jay">
@@ -521,6 +521,11 @@
   <div class="lvl-head"><button class="btn-sec" id="btnBackTitle">‹ Enrere</button><h2>Tutorial</h2></div>
   <p id="lvlNote"></p>
   <div class="lvl-grid" id="lvlGrid"></div>
+</section>
+<section id="screenCamp" class="screen">
+  <div class="lvl-head"><button class="btn-sec" id="btnCampBack">‹ Enrere</button><h2>Campanya</h2></div>
+  <p id="campNote">Campanya 1 · Forjant la República (1792-1797)</p>
+  <div class="lvl-grid" id="campGrid"></div>
 </section>
 <section id="screenRank" class="screen">
   <div class="lvl-head"><button class="btn-sec" id="btnRankBack">‹ Enrere</button><h2>Rànquing</h2></div>
@@ -848,21 +853,40 @@ const MapKit = (() => {
 
   // ---- AIGUA ---------------------------------------------------------------
   // Riu (width >= 3): dues ribes + línies de corrent. Rierol (width < 3): una línia que s'engrosseix. Fletxa de corrent.
-  A.river = (pts, { width = 6, arrow = true } = {}) => {
+  A.river = (pts, { width = 6, arrow = true, water = false, seed = 5 } = {}) => {
     const line = smooth(pts, 8), L = offset(line, -width / 2), R = offset(line, width / 2), mid = along(line, 40, 20);
+    // water: aspecte d'aigua (tint blavós, vora de sorra, ondulacions al llarg del corrent i joncs a les ribes)
+    const W = water ? (() => { const Rn = rng(seed), Lb = offset(line, -width / 2 - 0.8), Rb = offset(line, width / 2 + 0.8);
+      return { Lb, Rb, rip: [-0.36, -0.14, 0.08, 0.3].map(k => ({ p: offset(line, width * k + (Rn() - 0.5) * 0.3), d: [0.7 + Rn() * 1.1, 1.3 + Rn() * 2.4] })),
+        reeds: along(Lb, 3.1, 0.7).concat(along(Rb, 3.4, 1.4)).map(q => ({ x: q.x, y: q.y, a: Rn() * TAU, h: 0.5 + Rn() * 0.5 })) }; })() : null;
     return { layer: LAYER.water, line, width, draw(ctx, M) {
+      if (W) {
+        ctx.save(); ctx.fillStyle = '#eadfbf'; path(ctx, W.Lb.concat(W.Rb.slice().reverse()), M, true); ctx.fill();
+        ctx.fillStyle = '#b9d2db'; path(ctx, L.concat(R.slice().reverse()), M, true); ctx.fill(); ctx.restore();
+        stroke(ctx, L, M, 0.13, { color: '#3f6675' }); stroke(ctx, R, M, 0.13, { color: '#3f6675' });
+        for (const r of W.rip) stroke(ctx, r.p, M, 0.06, { dash: r.d, color: '#5b8696' });
+        ctx.save(); ctx.strokeStyle = '#6b7a45'; ctx.lineWidth = lw(0.06, M); ctx.beginPath();
+        for (const q of W.reeds) { const dx = Math.cos(q.a) * 0.18, dy = -q.h; ctx.moveTo(q.x * M, q.y * M); ctx.lineTo((q.x + dx) * M, (q.y + dy) * M); ctx.moveTo(q.x * M, q.y * M); ctx.lineTo((q.x - dx) * M, (q.y + dy * 0.8) * M); }
+        ctx.stroke(); ctx.restore();
+      } else {
       ctx.save(); ctx.fillStyle = PAPER; path(ctx, L.concat(R.slice().reverse()), M, true); ctx.fill(); ctx.restore();
       if (width >= 3) {
         stroke(ctx, L, M, 0.14); stroke(ctx, R, M, 0.14);
         // línies d'aigua: traços curts paral·lels a la ribera esquerra (ombrejat característic)
         const inner = offset(line, -width / 2 + 0.9); stroke(ctx, inner, M, 0.05, { dash: [3.5, 2.5], color: SOFT });
       } else { stroke(ctx, line, M, Math.max(0.12, width * 0.5)); }
+      }
       if (arrow) for (const p of mid) {
-        ctx.save(); ctx.translate(p.x * M, p.y * M); ctx.rotate(p.a); ctx.strokeStyle = INK; ctx.lineWidth = lw(0.08, M); ctx.beginPath();
+        ctx.save(); ctx.translate(p.x * M, p.y * M); ctx.rotate(p.a); ctx.strokeStyle = water ? '#3f6675' : INK; ctx.lineWidth = lw(0.08, M); ctx.beginPath();
         const s = Math.max(5, 2.2 * M); ctx.moveTo(-s, 0); ctx.lineTo(s, 0); ctx.moveTo(s * 0.35, -s * 0.3); ctx.lineTo(s, 0); ctx.lineTo(s * 0.35, s * 0.3); ctx.stroke(); ctx.restore();
       }
     } };
   };
+  // Gual: fila de pedres planes que travessen el rierol (de (x,y) en la direcció «angle», amb «n» pedres)
+  A.ford = (x, y, angle, { n = 6, step = 0.85, seed = 3 } = {}) => { const Rn = rng(seed), c = Math.cos(angle), s = Math.sin(angle), st = [];
+    for (let k = 0; k < n; k++) st.push({ x: x + c * (k - (n - 1) / 2) * step + (Rn() - 0.5) * 0.25, y: y + s * (k - (n - 1) / 2) * step + (Rn() - 0.5) * 0.25, rx: 0.3 + Rn() * 0.18, ry: 0.22 + Rn() * 0.12, a: Rn() * TAU });
+    return { layer: LAYER.road, draw(ctx, M) { ctx.save(); ctx.fillStyle = '#d8cdb0'; ctx.strokeStyle = '#3f3a30'; ctx.lineWidth = lw(0.06, M);
+      for (const q of st) { ctx.beginPath(); ctx.ellipse(q.x * M, q.y * M, q.rx * M, q.ry * M, q.a, 0, TAU); ctx.fill(); ctx.stroke(); } ctx.restore(); } }; };
   // Estany: contorn més gruixut i línies horitzontals fines (aigua en repòs)
   A.pond = (poly) => ({ layer: LAYER.water, draw(ctx, M) {
     ctx.save(); ctx.fillStyle = PAPER; path(ctx, smooth(poly.concat([poly[0]]), 6), M, true); ctx.fill(); ctx.restore();
@@ -1255,6 +1279,13 @@ const TUNE = {
               tolMarxa: 0.5,                  // rad: només avança si l'error d'angle és menor
               evita: { girar: 0.55, vel: 0.6, encallat: 9, ignora: 5, sonda1: 5, sonda2: 9, ample: 3.2, marge: 1.2 },   // esquivar cases i arbres
               retirada: { gir: 1.2, tol: 0.06, mitja: 0.5 } },   // retirada: rad/s de gir, rad de tolerància; fracció de baixes que la dispara (nivell 10)
+  sigil:    { abast: 32,                      // m: distància màxima a la qual una patrulla enemiga et veu
+              mig: 1.0,                       // rad: semiangle del con de visió (±57°) respecte a on mira la patrulla
+              omple: 4.5,                     // s que triga l'indicador a omplir-se (a distància mitjana) i a donar l'alarma
+              decau: 1.5,                     // × velocitat de baixada de l'indicador quan ja no et veu (1/omple per s)
+              corre: 1.6,                     // multiplicador de detecció si avances a pas accelerat o de càrrega
+              fraccio: 0.15,                  // fracció d'homes de la unitat que han de ser vistos perquè compti
+              groc: 0.4, vermell: 0.75 },     // llindars de color de l'indicador
   puntuacio: { part: 250,                     // punts de cadascun dels 4 apartats (temps, baixes, ordres, ordre mitjà)
               marge: 2 },                     // amb referència × (1 + marge) el temps/les ordres puntuen 0
   mort:     { obstacle: 0.15, arbre: 0.22,    // m: marge de col·lisió amb obstacles i arbres (mort → punt de control)
@@ -2394,7 +2425,7 @@ function updateEnemies(dt) {                     // els regiments enemics es gir
     e.supp = Math.max(0, (e.supp || 0) - T.supDecau * dt);
     if (e.supp > T.supMax && !e.suppMsg) { e.suppMsg = true; reac('aprova', '<b>Louis:</b> El <b>' + e.name + '</b> està sota una pressió de foc tan forta que <b>ja no gosa disparar</b>!', 4000); }
     const seen = !losBlocked(e.cx, e.cy, c.x, c.y);
-    if (!e.alert && (e.volleys > 0 || (seen && Math.hypot(c.x - e.cx, c.y - e.cy) <= T.enAlerta))) {
+    if (!e.alert && (e.volleys > 0 || (!e.stealth && seen && Math.hypot(c.x - e.cx, c.y - e.cy) <= T.enAlerta))) {
       e.alert = true; reac('louis', '<b>Louis:</b> Ens han vist! El <b>' + e.name + '</b> gira cap a nosaltres.', 4500);
     }
     if (e.alert && seen) {                                                   // gira sobre el seu centre per encarar-nos
@@ -4180,6 +4211,7 @@ function drawTent(t) {                              // tenda de campanya, estil 
 function drawLevel(ctx, M, mini) {
   if (!level) return;
   level.scene.draw(ctx, M, { noLabels: !!mini });
+  if (level.over) level.over(ctx, M, !!mini);
   const z = level.zone;
   if (z) {
   ctx.setLineDash([8, 6]); ctx.strokeStyle = T.ecarlate; ctx.lineWidth = 2;
@@ -4296,7 +4328,7 @@ let autoStepT = 0;
 const VOICE = { on: false, rec: null, running: false, tested: false, seg: {}, interim: '', state: '', failT: 0, lastFail: null,
   learn: { phr: {}, ex: {} }, shared: { phr: {}, ex: {} }, opt: { mode: 'cont', vol: true, log: false, tele: true, engine: '' }, log: [], recentExec: null, ptt: false, db: false, loading: false };
 // Connexió amb Supabase (la mateixa de la web: si el joc s'obre dins la web, agafa window.APP_CONFIG) i fonts del motor local Vosk
-const GAME_VERSION = '1.7.10';
+const GAME_VERSION = '1.8.0';
 const CFG = Object.assign({
   SUPABASE_URL: 'https://ltopullwhasagnkuqaek.supabase.co',
   SUPABASE_ANON_KEY: 'sb_publishable_DhHFUh-UrbBrI0l476Vcnw_tSn-Gmkr',
@@ -5817,6 +5849,152 @@ function buildLevel10() {
   };
 }
 
+// ---------- CAMPANYA 1 · Nivell 1 «El Bateig de Foc» (Philippeville, 23 de maig de 1793) ----------
+// Flanqueig sigil·lós: una patrulla de 15 jägers vigila el gual. Veuen dins d'un con davant seu (tapat pels arbres i les cases);
+// si et veuen prou estona, un indicador es posa vermell i donen l'alarma (es torna al darrer punt de control). Cal voltar-los pel bosc i aixafar-los per l'esquena.
+function buildCampaign1() {
+  const A = MapKit.A, W = 96, H = 60, sc = [], obs = [], walls = [], R = MapKit.rng(51);
+  const MSG_H = 'Has tocat una casa: torna-ho a provar';
+  const house = (x, y, w, h, rot, kind) => { sc.push(A.building({ x, y, w, h, rot, kind })); const m = Math.max(w, h) / 2 * 0.9, r = { x0: x - m * (w >= h ? 1 : 0.7), y0: y - m * (w >= h ? 0.7 : 1), x1: x + m * (w >= h ? 1 : 0.7), y1: y + m * (w >= h ? 0.7 : 1) }; obs.push(Object.assign({ msg: MSG_H }, r)); walls.push(r); };
+  // Philippeville, al nord-oest: carrer principal, plaça, branques i cases a l'atzar
+  const main = [[1, 21], [11, 19], [22, 19.5], [33, 17], [44, 18.5]], branches = [[[24, 15], [27, 11], [31, 8], [38, 5]], [[14, 19.6], [13, 24], [11, 27]], [[30, 18.2], [32, 24], [34, 30.5]]];
+  const plaza = { x: 22, y: 15.8, w: 9, h: 6 }, roads = [main, ...branches], placed = [[plaza.x - plaza.w / 2 - 2.4, plaza.y, 4.5], [12, 5.5, 4.5]];
+  const segD = (x, y, a, b) => { const dx = b[0] - a[0], dy = b[1] - a[1], k = Math.max(0, Math.min(1, ((x - a[0]) * dx + (y - a[1]) * dy) / (dx * dx + dy * dy))); return Math.hypot(x - a[0] - dx * k, y - a[1] - dy * k); };
+  const free = (x, y, r) => {
+    if (x < 3 + r || x > 46 - r || y < 2.5 + r || y > 28 - r) return false;
+    if (Math.abs(x - plaza.x) < plaza.w / 2 + r + 1 && Math.abs(y - plaza.y) < plaza.h / 2 + r + 1) return false;
+    for (const rd of roads) for (let i = 1; i < rd.length; i++) if (segD(x, y, rd[i - 1], rd[i]) < 2 + r) return false;
+    for (const q of placed) if (Math.hypot(x - q[0], y - q[1]) < q[2] + r) return false;
+    return true;
+  };
+  sc.push(A.field([[0, 0], [W, 0], [W, H], [0, H]], { kind: 'meadow' }));
+  // el rierol (Viroin) amb aspecte d'aigua i dos guals; camí que el travessa pel gual del nord
+  sc.push(A.river([[54, -2], [50, 8], [54, 19], [49, 29], [51, 39], [46, 49], [49, 58], [48, 63]], { width: 3.4, water: true, seed: 8, arrow: false }));
+  sc.push(A.road(main, { kind: 'lane' }));
+  for (const br of branches) sc.push(A.road(br, { kind: 'track' }));
+  sc.push(A.plaza(plaza.x, plaza.y, plaza.w, plaza.h));
+  sc.push(A.road([[0, 31], [12, 30], [24, 32], [36, 30.5], [47, 31.4]], { kind: 'track' }), A.road([[53, 30.8], [62, 29.8], [76, 31], [96, 29]], { kind: 'track' }));
+  sc.push(A.ford(50.2, 30.9, 0, { n: 6, seed: 4 }), A.ford(47.6, 49.2, 0, { n: 6, seed: 5 }));
+  for (let n = 0, t = 0; n < 20 && t < 20000; t++) {
+    const x = 4 + R() * 42, y = 3 + R() * 25, w = 4.2 + R() * 1.6, h = 3 + R() * 1.2, rot = (R() - 0.5) * 0.35;
+    if (!free(x, y, Math.hypot(w, h) / 2 + 0.3)) continue;
+    n++; placed.push([x, y, Math.hypot(w, h) / 2 - 0.2]); house(x, y, w, h, rot, 'house');
+  }
+  house(plaza.x - plaza.w / 2 - 2.4, plaza.y, 3.6, 6, 0, 'church');
+  // boscos: franges irregulars amb clarianes (el bosc del sud és per on es voreja la patrulla)
+  const wd = (pts, kind, seed, gaps) => A.wood(pts, { kind, spacing: 2.5, seed, gaps: gaps || [] });
+  const woods = [
+    wd([[56, 2], [74, 1], [92, 4], [95, 20], [82, 25], [66, 22], [58, 14]], 'broad', 31),
+    wd([[3, 38], [14, 35], [28, 38], [38, 36], [43, 44], [41, 59], [20, 59], [4, 56], [1, 46]], 'mixed', 32),
+    wd([[54, 40], [66, 36], [80, 39], [93, 37], [95, 58], [72, 59], [56, 58], [53, 49]], 'broad', 33, [{ x: 74, y: 47, r: 4.5 }]),
+    wd([[26, 40], [34, 44], [32, 52], [24, 50]], 'mixed', 34),
+    wd([[78, 8], [90, 9], [92, 18], [80, 20]], 'mixed', 35)
+  ];
+  sc.push(...woods);
+  house(86, 28, 7, 4.5, 0.1, 'house');
+  sc.push(A.hedge([[60, 22], [70, 24], [80, 22]], { seed: 9 }), A.fence([[8, 33], [18, 34]]),
+    A.tree(30, 33.5, { r: 1.2, seed: 41 }), A.tree(68, 33, { kind: 'con', r: 1.1, seed: 42 }), A.tree(72, 26, { r: 1.2, seed: 43 }), A.tree(58, 36, { r: 1.1, seed: 44 }),
+    A.label('Philippeville', 12, 5.5, { kind: 'town', scale: 0.6 }), A.label('Le Viroin', 54.5, 54, { kind: 'place', scale: 0.5 }), A.label('Bosc de Philippeville', 22, 49, { kind: 'place', scale: 0.5 }), A.label('El gual', 50, 27, { kind: 'place', scale: 0.45 }));
+  const cover = woods.flatMap(w => w.trees);
+  const P = { x: 62, y: 31, h: Math.PI };                                       // la patrulla de jägers, de cara a l'oest (vigilant el gual)
+  const st = { det: 0, behind: false, cp: 0, cone: null, alarmed: false };
+  const SG = TUNE.sigil;
+  function cone() {                                                              // polígon de visió de la patrulla (tapat per arbres i cases): es calcula un cop
+    if (st.cone) return st.cone;
+    const pts = [{ x: P.x, y: P.y }], N = 40;
+    for (let k = -N; k <= N; k++) { const a = P.h + k / N * SG.mig; let r = 0;
+      while (r < SG.abast) { const nr = Math.min(SG.abast, r + 0.5); if (losBlocked(P.x, P.y, P.x + Math.cos(a) * nr, P.y + Math.sin(a) * nr)) break; r = nr; }
+      pts.push({ x: P.x + Math.cos(a) * r, y: P.y + Math.sin(a) * r }); }
+    return st.cone = pts;
+  }
+  function detBar() {
+    let el = document.getElementById('detBar');
+    if (!el) {
+      const css = document.createElement('style'); css.textContent = '#detBar{position:fixed;left:50%;top:70px;transform:translateX(-50%);z-index:26;display:none;min-width:230px;background:var(--sheet,#fff);border:1px solid var(--line,#999);border-radius:6px;padding:6px 10px 8px;font-family:var(--label,sans-serif);text-align:center;box-shadow:0 2px 8px rgba(0,0,0,.18)}#detBar b{display:block;font-size:13px;letter-spacing:.05em;margin-bottom:4px}#detBar .tr{height:9px;border-radius:5px;background:rgba(0,0,0,.12);overflow:hidden}#detBar i{display:block;height:100%;width:0;border-radius:5px;transition:background .2s}#detBar.pulse{animation:detp .5s infinite alternate}@keyframes detp{from{box-shadow:0 0 0 0 rgba(192,38,27,.0)}to{box-shadow:0 0 14px 3px rgba(192,38,27,.75)}}';
+      document.head.appendChild(css);
+      el = document.createElement('div'); el.id = 'detBar'; el.innerHTML = '<b></b><div class="tr"><i></i></div>'; document.body.appendChild(el);
+    }
+    return el;
+  }
+  function detShow(d) {
+    const el = detBar();
+    if (d <= 0.001 || screen !== 'game') { el.style.display = 'none'; el.classList.remove('pulse'); return; }
+    const col = d < SG.groc ? '#d4b030' : d < SG.vermell ? '#e07b24' : '#c0261b';
+    el.style.display = 'block'; el.classList.toggle('pulse', d >= SG.vermell);
+    el.querySelector('b').textContent = d < SG.groc ? 'Et veuen…' : d < SG.vermell ? 'Et reconeixen!' : 'Estan a punt de donar l\'alarma!';
+    el.querySelector('b').style.color = col; const f = el.querySelector('i'); f.style.width = Math.min(100, d * 100) + '%'; f.style.background = col;
+  }
+  const UN = ['gir', 'mov', 'pace', 'parfile', 'bataille', 'align', 'obl', 'conv', 'tournez', 'ligne', 'form', 'repos', 'musket'];
+  const steps = [
+    { title: 'El Bateig de Foc', pose: 'serios', hl: [], unlock: UN, tag: 'Philippeville · 23 de maig de 1793', intro: true, btn: 'Endavant',
+      text: ['«Acabem d\'arribar a Philippeville, <b>chasseur</b>, i ja tenim la primera feina. Hem avistat una <b>patrulla de quinze jägers</b> austríacs al gual del riu. Si descobreixen el gruix del nostre exèrcit, l\'artilleria enemiga ens farà miques abans de començar.»',
+        '«No els ataquem de cara. <b>Fiqueu-vos a l\'espessor, voregeu-los per la dreta</b> aprofitant els arbres i aixafeu-los per l\'esquena abans que puguin disparar un sol tret d\'avís!»',
+        'Els jägers veuen en un <b>con davant seu</b> (el veuràs marcat al mapa; els arbres i les cases el tapen). Si hi ets massa estona, apareix un <b>indicador</b> que passa de groc a vermell: si s\'omple, donen l\'alarma i has de tornar al darrer <b>punt de control</b>. Anar de pressa fa que et vegin abans.'],
+      done: () => TUT.intro },
+    { title: 'Voreja la patrulla', pose: 'assenyala', hl: [], unlock: UN,
+      mini: () => st.behind ? 'Ja els tens per l\'esquena: carrega i <b>aixafa la patrulla</b>.' : 'Vareja pel bosc del sud, creua el rierol i surt per <b>darrere</b> dels jägers.', resetStep: () => 1, done: () => false }
+  ];
+  return {
+    w: W, h: H, start: { x: 8, y: 31 }, obstacles: obs, scene: MapKit.scene(sc), zone: null, musket: true, driftScale: 0.5, goalHeading: 0, minMen: 8,
+    cover, walls,
+    enemies: [{ name: 'Patrulla de jägers', flag: 'aut', cx: P.x, cy: P.y, h: P.h, nFiles: 8, shoots: true, stealth: true }],
+    tutorial: { steps, figs: [], startAtencio: true, resetStep: () => 1 },
+    over(ctx, M, mini) {
+      if (mini || !ENEMY.length || ENEMY[0].alert || enAlive(ENEMY[0]) === 0) return;
+      const c = cone(), a = 0.14 + 0.32 * st.det, col = st.det >= SG.vermell ? '192,38,27' : st.det >= SG.groc ? '224,123,36' : '212,176,48';
+      ctx.save(); ctx.beginPath(); c.forEach((q, i) => i ? ctx.lineTo(q.x * M, q.y * M) : ctx.moveTo(q.x * M, q.y * M)); ctx.closePath();
+      ctx.fillStyle = 'rgba(' + col + ',' + a.toFixed(3) + ')'; ctx.fill(); ctx.setLineDash([7, 6]); ctx.strokeStyle = 'rgba(' + col + ',.75)'; ctx.lineWidth = 1.6; ctx.stroke(); ctx.restore();
+    },
+    onReset() {
+      st.det = 0; st.behind = false; st.cp = 0; st.alarmed = false; st.cone = null; detShow(0);
+      const e = ENEMY[0]; if (e) { e.men.pop(); e.stealth = true; e.reload = 3; }                    // 16 → 15 jägers
+    },
+    tick(dt) {
+      if (screen !== 'game' || paused || tutOpen() || co.lost) return;
+      const e = ENEMY[0]; if (!e || TUT.step < 1) { detShow(0); return; }
+      const c = unitCentre(), live = enAlive(e) > 0;
+      if (c.x > P.x + 4 && Math.abs(c.y - P.y) < 22) st.behind = true;
+      let seen = 0, dmin = 1e9;
+      if (live && !e.alert) for (const m of co.members) {
+        const d = Math.hypot(m.x - e.cx, m.y - e.cy);
+        if (d <= SG.abast && Math.abs(wrapA(Math.atan2(m.y - e.cy, m.x - e.cx) - e.h)) <= SG.mig && !losBlocked(e.cx, e.cy, m.x, m.y)) { seen++; dmin = Math.min(dmin, d); }
+      }
+      if (seen / Math.max(1, co.members.length) >= SG.fraccio) st.det += dt / SG.omple * (1.7 - dmin / SG.abast) * (co.state === 'marxa' && co.pace !== 'ordinari' ? SG.corre : 1);
+      else st.det = Math.max(0, st.det - dt / SG.omple * SG.decau);
+      detShow(st.det);
+      if (st.det >= 1 && !st.alarmed) {
+        st.alarmed = true; st.det = 0; detShow(0); SFX.hit();
+        reac('decebut', '<b>Louis:</b> Ens han vist! Han donat l\'alarma!', 3000);
+        setTimeout(() => deathRetry('Els jägers han donat l\'alarma: torna-ho a provar'), 600); return;
+      }
+      if (st.det === 0 && !live === false) {                                                 // punts de control en zones segures
+        const prev = TUT.snap, zone = c.x > 64 && c.y > 36 ? 2 : c.x > 22 && c.y > 36 ? 1 : 0;
+        if (zone > st.cp && co.state === 'parat') { tutSnap(); if (TUT.snap !== prev) { st.cp = zone; reac('assenyala', 'Punt de control desat.', 2200); } }
+      }
+    },
+    win: () => ENEMY.length > 0 && ENEMY.every(e => e.routed || enAlive(e) === 0),
+    objectives: [
+      { t: 'Voltar la patrulla per la dreta sense ser vist', ok: () => st.behind },
+      { t: 'Aixafar els quinze jägers', ok: () => ENEMY.length > 0 && ENEMY.every(e => e.routed || enAlive(e) === 0) },
+      { t: 'Mantenir la unitat amb almenys 8 homes', ok: () => co.members.length >= 8 }
+    ],
+    goalText: 'Voreja la patrulla de jägers pel bosc, sense que et vegin, i aixafa-la per l\'esquena.',
+    endText: 'Molt bé, chasseur: la patrulla ha caigut sense donar l\'alarma i l\'exèrcit continua ocult. Aquest ha estat el teu bateig de foc!'
+  };
+}
+const CAMP = [{ id: 'c1n1', n: 1, title: 'El Bateig de Foc', desc: 'Philippeville, 23 de maig de 1793. Voreja pel bosc una patrulla de quinze jägers austríacs sense que et vegin i aixafa-la per l\'esquena.', build: buildCampaign1 }];
+const CAMP_BY_ID = {}; for (const L of CAMP) CAMP_BY_ID[L.id] = L;
+function renderCampList() {
+  const grid = document.getElementById('campGrid'); grid.innerHTML = '';
+  for (const L of CAMP) {
+    const b = document.createElement('button'); b.className = 'lvl';
+    b.innerHTML = '<span class="img ph"><i></i></span><span class="n">' + L.n + '</span><span class="t">' + L.title + '</span><span class="d">' + L.desc + '</span><span class="tag">Disponible</span>';
+    b.onclick = () => startLevel(L.id); grid.appendChild(b);
+  }
+  const more = document.createElement('div'); more.className = 'lvl'; more.style.opacity = '.55'; more.style.cursor = 'default';
+  more.innerHTML = '<span class="img ph"><i>Properament</i></span><span class="n">2–85</span><span class="t">Nivells 2 a 85</span><span class="d">La resta de la campanya arribarà més endavant.</span><span class="tag">Bloquejat</span>'; grid.appendChild(more);
+}
+
 const LEVELS = [{ n: 1, title: 'Sortir de la plaça', desc: 'Tutorial: surt d\'una plaça tancada, passa un corredor de tendes i torna a formar.', build: buildLevel1 },
   { n: 2, title: 'La porta i la cantonada', desc: 'Oblics, Tournez i Par peloton: passa una porta en diagonal, gira una cantonada sense trencar la línia i fes front des d\'aturat.', build: buildLevel2 }];
 LEVELS.push({ n: 3, title: 'Exercici de síntesi', desc: 'Practica el que has après: porta en oblic, camí estret en fila i formació final alineada, sense ajuda.', build: buildLevel3 });
@@ -5902,8 +6080,10 @@ function showScreen(name) {
   document.getElementById('screenTitle').classList.toggle('show', name === 'title');
   document.getElementById('screenLevels').classList.toggle('show', name === 'levels');
   document.getElementById('screenRank').classList.toggle('show', name === 'rank'); if (name === 'rank') rankLoad();
+  document.getElementById('screenCamp').classList.toggle('show', name === 'camp'); if (name === 'camp') renderCampList();
   if (name === 'levels') { renderLevelGrid(); progSync(); }
   const g = name === 'game';
+  { const db = document.getElementById('detBar'); if (db && !g) db.style.display = 'none'; }
   document.getElementById('controls').style.display = g ? 'grid' : 'none';
   document.getElementById('goal').style.display = g ? 'block' : 'none';
   document.getElementById('info').style.display = 'none';
@@ -5917,9 +6097,9 @@ function showScreen(name) {
 }
 let curLevel = 0;
 function startLevel(i) {
-  if (i !== 'free' && !levelUnlocked(i)) return;
+  if (i !== 'free' && !CAMP_BY_ID[i] && !levelUnlocked(i)) return;
   curLevel = i; openMenu(null); closeSide(true);
-  const L = i === 'free' ? FREE : LEVELS[i];
+  const L = i === 'free' ? FREE : CAMP_BY_ID[i] || LEVELS[i];
   level = L.build();
   paused = false; lastKey = '';
   document.getElementById('endmsg').classList.remove('show');
@@ -5988,6 +6168,8 @@ function updateRot(dt) {
 window.addEventListener('keydown', e => { if (tutOpen() && (e.key === 'Escape' || e.key === 'Enter')) { e.preventDefault(); document.getElementById('tutOk').click(); } });
 document.getElementById('btnLevels').onclick = () => showScreen('levels');
 document.getElementById('btnBackTitle').onclick = () => showScreen('title');
+document.getElementById('btnCampaign').onclick = () => showScreen('camp');
+document.getElementById('btnCampBack').onclick = () => showScreen('title');
 // Menú lateral (estil Age of Empires): continuar, repetir el pas, reiniciar, ajustos i sortir. Pausa el joc mentre és obert.
 let sideOpen = false, sidePaused = false;
 function openSide() {
@@ -6009,7 +6191,7 @@ document.getElementById('sideBack').onclick = () => closeSide();
 document.querySelector('#side .bk').onclick = () => closeSide();
 document.getElementById('sideRetry').onclick = () => { closeSide(); retryStep(); };
 document.getElementById('sideRestart').onclick = () => { closeSide(); startLevel(curLevel); };
-document.getElementById('sideLevels').onclick = () => { const f = level && level.free; closeSide(); showScreen(f ? 'title' : 'levels'); };
+document.getElementById('sideLevels').onclick = () => { const f = level && level.free; closeSide(); showScreen(f ? 'title' : typeof curLevel === 'string' ? 'camp' : 'levels'); };
 window.addEventListener('keydown', e => {
   if (e.key !== 'Escape' || screen !== 'game') return;
   if (sideOpen) { e.preventDefault(); closeSide(); return; }
