@@ -86,7 +86,7 @@
   .btn-main:focus-visible,.btn-sec:focus-visible,.lvl:focus-visible{outline:2px solid var(--ecarlate);outline-offset:3px;}
   .btn-sec{font-family:var(--label);letter-spacing:.05em;font-size:.95rem;color:var(--bleu);background:var(--sheet);border:1px solid var(--bleu);border-radius:3px;padding:.4rem 1rem;cursor:pointer;}
   .btn-sec:hover{background:var(--quote-bg);}
-  #screenLevels,#screenRank{padding:2.4rem 1.2rem 3rem;}
+  #screenLevels,#screenRank,#screenCamp{padding:2.4rem 1.2rem 3rem;}
   #rankBody{width:min(760px,100%);}
   #rankMsg{color:var(--muted);text-align:center;margin:2rem 0;}
   .podium{display:flex;align-items:flex-end;justify-content:center;gap:.6rem;margin:.4rem 0 1.6rem;}
@@ -4331,7 +4331,7 @@ let autoStepT = 0;
 const VOICE = { on: false, rec: null, running: false, tested: false, seg: {}, interim: '', state: '', failT: 0, lastFail: null,
   learn: { phr: {}, ex: {} }, shared: { phr: {}, ex: {} }, opt: { mode: 'cont', vol: true, log: false, tele: true, engine: '' }, log: [], recentExec: null, ptt: false, db: false, loading: false };
 // Connexió amb Supabase (la mateixa de la web: si el joc s'obre dins la web, agafa window.APP_CONFIG) i fonts del motor local Vosk
-const GAME_VERSION = '1.8.4';
+const GAME_VERSION = '1.8.5';
 const CFG = Object.assign({
   SUPABASE_URL: 'https://ltopullwhasagnkuqaek.supabase.co',
   SUPABASE_ANON_KEY: 'sb_publishable_DhHFUh-UrbBrI0l476Vcnw_tSn-Gmkr',
@@ -6074,13 +6074,13 @@ function campMap1Scene() {
   [[3.3, 49.1, 3.6, 2.4], [3.9, 49.7, 3.4, 2.2], [1.9, 49.7, 3.4, 2.2], [2.5, 48.65, 3.4, 2.2], [4.9, 48.55, 3.6, 2.4], [3.2, 48.0, 3.6, 2.4], [1.6, 48.8, 3.4, 2.2], [4.4, 49.65, 3.2, 2.2], [2.7, 47.85, 3.6, 2.4], [5.2, 48.2, 3.6, 2.4], [1.7, 47.6, 3.4, 2.2]].forEach(f => sc.push(farm(f[0], f[1], f[2], f[3], f[4])));
   [[4.5, 49.0, 4, 2.6, 'meadow'], [3.0, 48.2, 4, 2.6, 'orchard'], [2.2, 49.6, 4, 2.4, 'meadow']].forEach(f => sc.push(farm(f[0], f[1], f[2], f[3], f[4])));
   const city = (t, big) => { const [x, y] = P(t[1], t[2]), r = MapKit.rng(Math.floor(t[1] * 17 + t[2] * 5)), n = big ? 5 : 2; for (let k = 0; k < n; k++) { const a = r() * 6.28, d = (big ? 0.4 + r() * 2.2 : r() * 1.1); sc.push(A.building({ x: x + Math.cos(a) * d, y: y + Math.sin(a) * d * 0.8, w: 0.8 + r() * 0.7, h: 0.6 + r() * 0.5, rot: (r() - 0.5) * 0.6, kind: 'house' })); }
-    if (big) sc.push(A.building({ x, y: y - 0.2, w: 0.7, h: 1.4, kind: 'church' })); sc.push(A.label(t[0], x + (big ? 5.4 : 4.2), y + 0.4, { kind: 'place', scale: big ? 0.46 : 0.36 })); };
+    if (big) sc.push(A.building({ x, y: y - 0.2, w: 0.7, h: 1.4, kind: 'church' })); sc.push(A.label(t[0], x + (big ? 6.4 : 5.2), y + 0.4, { kind: 'place', scale: big ? 0.8 : 0.66 })); };
   CAMP_MAP1.towns.forEach(t => city(t, t[3]));
   const roadsM = [[[3.06, 50.63], [3.9, 50.75], [4.35, 50.8], [4.87, 50.46]], [[4.87, 50.46], [5.57, 50.64], [6.96, 50.94]], [[8.27, 50.0], [8.68, 50.11]], [[8.27, 50.0], [8.4, 49.5], [8.4, 49.0]], [[9.99, 48.4], [10.18, 47.98], [10.32, 47.78]], [[6.13, 49.61], [6.64, 49.75]], [[6.17, 49.12], [6.13, 49.61]], [[2.35, 48.86], [3.2, 49.0], [4.03, 49.25], [5.38, 49.16]], [[2.35, 48.86], [2.3, 49.4], [2.3, 49.9]], [[4.03, 49.25], [4.94, 49.7]], [[2.3, 49.9], [3.29, 49.85], [3.97, 50.28]]].map(r => MapKit.smooth(L(r), 6));
   sc.push({ layer: MapKit.LAYER.road, draw(ctx, M) { ctx.save(); ctx.strokeStyle = '#7a6a4a'; ctx.lineWidth = Math.max(1, 0.12 * M); ctx.setLineDash([Math.max(3, 0.9 * M), Math.max(2, 0.5 * M)]);
     for (const r of roadsM) { ctx.beginPath(); r.forEach((q, k) => k ? ctx.lineTo(q[0] * M, q[1] * M) : ctx.moveTo(q[0] * M, q[1] * M)); ctx.stroke(); } ctx.restore(); } });
-  sc.push(A.label('Mar del Nord', 34, 2.8, { kind: 'place', scale: 0.7 }), A.label('Champanya', 40, 74, { kind: 'place', scale: 0.62 }), A.label('Les Ardenes', 56, 38, { kind: 'place', scale: 0.62 }), A.label('Riu Mosa', 72, 42, { kind: 'place', scale: 0.4 }), A.label('Rin', 96, 30, { kind: 'place', scale: 0.5 }), A.label('Alps d\'Algäu', 112, 93, { kind: 'place', scale: 0.55 }));
-  sc.push(A.label('Campanya 1 · Forjant la República', 96, 5, { kind: 'town', scale: 0.9 }), A.label('1792 – 1797', 96, 10, { kind: 'place', scale: 0.6 }));
+  sc.push(A.label('Mar del Nord', 34, 2.8, { kind: 'place', scale: 1.2 }), A.label('Champanya', 40, 74, { kind: 'place', scale: 1.2 }), A.label('Les Ardenes', 56, 38, { kind: 'place', scale: 1.2 }), A.label('Riu Mosa', 72, 42, { kind: 'place', scale: 0.8 }), A.label('Rin', 96, 30, { kind: 'place', scale: 1.0 }), A.label('Alps d\'Algäu', 112, 93, { kind: 'place', scale: 1.1 }));
+  sc.push(A.label('Campanya 1 · Forjant la República', 111, 5, { kind: 'town', scale: 0.95 }), A.label('1792 – 1797', 111, 10.5, { kind: 'place', scale: 0.9 }));
   return MapKit.scene(sc);
 }
 let campMapCache = null;
@@ -6121,11 +6121,22 @@ function campCard(n, host, stop) {                       // targeta flotant d'un
   if (stop && host.querySelector('canvas')) { const off = host.querySelector('canvas').offsetLeft, offT = host.querySelector('canvas').offsetTop; el.style.left = Math.max(8, Math.min(hw - cw - 8, off + stop.x + 24 - (stop.x + 24 + cw > hw - 8 ? cw + 48 : 0))) + 'px'; el.style.top = Math.max(8, Math.min(hh - ch - 8, offT + stop.y - ch / 2)) + 'px'; }
   else { el.style.position = 'relative'; el.style.margin = '.5rem auto'; }
 }
+function campInfo(n, li) {                               // descripció d'un nivell just sota la seva fila de la llista
+  const had = li.nextElementSibling && li.nextElementSibling.classList.contains('campInfo'); campCardClose(); document.querySelectorAll('.campInfo').forEach(e => e.remove()); if (had) return;
+  const row = CAMP_DATA.flatMap(c => c.l).find(z => z[0] === n); if (!row) return;
+  const id = campIdOf(n), has = !!CAMP_BY_ID[id], done = !!CAMP_PROG[id], open = has && campOpen(id), D0 = CAMP_DESC[n] || {}, fx = t => (t || '').replace(/([A-Za-zÀ-ÿ])\d{1,2}(?=[\s.,;)]|$)/g, '$1'), D = { m: fx(D0.m), c: fx(D0.c), o: fx(D0.o) };
+  const el = document.createElement('li'); el.className = 'campInfo';
+  const state = done ? '<b>Completat ✓</b> · millor puntuació ' + CAMP_PROG[id].score + ' / 1000' : open ? 'Disponible' : has ? 'Bloquejat: completa el nivell anterior' : 'Properament';
+  el.innerHTML = '<div class="dt">' + (row[2] || '') + (D.m ? ' · ' + D.m : '') + '</div>' + (D.c ? '<p><b>Combatents:</b> ' + D.c + '</p>' : '') + (D.o ? '<p><b>Objectiu:</b> ' + D.o + '</p>' : '') + (!D.c && !D.o ? '<p>Descripció pendent.</p>' : '') + '<div class="st">' + state + '</div>' + (open ? '<button class="btn-main" style="font-size:1rem;padding:.45rem 1.3rem">' + (done ? 'Tornar a jugar' : 'Jugar') + '</button>' : '');
+  el.onclick = e => e.stopPropagation(); const pb = el.querySelector('.btn-main'); if (pb) pb.onclick = () => startLevel(id);
+  li.after(el);
+}
 function renderCampList() {
   if (!document.getElementById('campCss')) {
     const css = document.createElement('style'); css.id = 'campCss';
     css.textContent = '#campCard{position:absolute;z-index:5;width:330px;max-width:calc(100% - 16px);background:var(--sheet,#fbfaf6);border:1px solid var(--line,#cfc7b2);border-top:4px solid var(--chasseur,#2f6b3a);border-radius:8px;box-shadow:0 8px 28px rgba(20,24,40,.35);overflow:hidden;font-family:inherit}#campCard .im{height:130px;background:linear-gradient(135deg,#e8dcb9,#d9cba2);display:flex;align-items:center;justify-content:center;color:#8a7d58;font-size:2.6rem}#campCard .im img{width:100%;height:100%;object-fit:cover;display:block}#campCard .bd{padding:.6rem .85rem .8rem}#campCard h4{margin:0;font-size:1.15rem;color:var(--bleu,#1f3a78)}#campCard .dt{font-size:.85rem;opacity:.7;margin:.1rem 0 .4rem}#campCard p{margin:.25rem 0;font-size:.9rem;line-height:1.35}#campCard .st{margin:.5rem 0;font-size:.85rem;letter-spacing:.03em}#campCard .st b{color:#2e7d32}#campCard .bt{display:flex;gap:.5rem;justify-content:flex-end}#campCard .x{position:absolute;right:6px;top:6px;border:0;background:rgba(255,255,255,.85);border-radius:50%;width:24px;height:24px;cursor:pointer;font-size:14px;line-height:24px}#campBody{width:min(1040px,100%);margin:0 auto}.cmp{border:1px solid var(--line,#cfc7b2);border-radius:8px;background:var(--sheet,#fbfaf6);margin:0 0 .9rem;overflow:hidden}.cmp>summary{cursor:pointer;padding:.7rem 1rem;font-size:1.25rem;color:var(--bleu,#1f3a78);list-style:none}.cmp>summary small{font-size:.85rem;opacity:.7;margin-left:.5rem}.cmp[open]>summary{border-bottom:1px solid var(--line,#cfc7b2)}'
       + '.cmpMap{position:relative;padding:.7rem .7rem 0}.cmpMap canvas{position:static;left:auto;top:auto;display:block;border:1px solid var(--line,#cfc7b2);border-radius:6px;cursor:default;max-width:100%}.cmpCap{min-height:1.5rem;padding:.35rem .9rem;font-size:.95rem;color:var(--ink,#2a2118)}'
+      + '.campInfo{list-style:none;margin:.1rem .5rem .5rem 3.2rem;padding:.6rem .9rem;border-left:3px solid var(--ecarlate,#b3261e);background:rgba(31,58,120,.05);border-radius:0 6px 6px 0}.campInfo p{margin:.25rem 0;font-size:.95rem;line-height:1.4}.campInfo .dt{font-size:.85rem;opacity:.7}.campInfo .st{margin:.45rem 0;font-size:.85rem;letter-spacing:.03em}.campInfo .st b{color:#2e7d32}'
       + '.cmpRows{list-style:none;margin:0;padding:.4rem .7rem .8rem}.cmpRow{display:flex;gap:.7rem;align-items:baseline;padding:.45rem .5rem;border-radius:6px;border:0;background:none;width:100%;text-align:left;font:inherit;color:inherit}.cmpRow.on{cursor:pointer}.cmpRow.on:hover{background:rgba(31,58,120,.07)}.cmpRow .n{min-width:2rem;color:var(--ecarlate,#b3261e);font-size:1.15rem}.cmpRow .t{flex:1}.cmpRow .t small{display:block;opacity:.65}.cmpRow .g{font-size:.78rem;letter-spacing:.04em;text-transform:uppercase;border:1px solid currentColor;border-radius:4px;padding:.05rem .4rem;opacity:.75}.cmpRow.off{opacity:.55}.cmpRow .g.ok{color:#2e7d32;opacity:1}.cmpRow .g.go{color:#1f3a78;opacity:1}';
     document.head.appendChild(css);
   }
@@ -6140,7 +6151,7 @@ function renderCampList() {
       const li = document.createElement('li'), b = document.createElement('button'); b.className = 'cmpRow' + (open ? ' on' : ' off'); b.disabled = !open;
       const sc = done && CAMP_PROG[id].score ? ' · ' + CAMP_PROG[id].score + ' / 1000' : '';
       b.innerHTML = '<span class="n">' + r[0] + '</span><span class="t">' + r[1] + '<small>' + (r[2] || '') + sc + '</small></span><span class="g ' + (done ? 'ok' : open ? 'go' : '') + '">' + (done ? 'Completat ✓' : open ? 'Disponible' : has ? 'Bloquejat' : 'Properament') + '</span>';
-      b.disabled = false; b.className = 'cmpRow on'; b.onclick = e => { e.stopPropagation(); campCard(r[0], d.querySelector('.cmpMap') || d, null); };
+      b.disabled = false; b.className = 'cmpRow on'; b.onclick = e => { e.stopPropagation(); campInfo(r[0], li); };
       li.appendChild(b); ul.appendChild(li);
     }
     body.appendChild(d);
