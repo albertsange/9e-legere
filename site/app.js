@@ -2789,20 +2789,23 @@ function campaignView() {
     var SQ_ROUTES = { esquadra: 'members', 'esquadra-assistencia': 'attend', 'esquadra-esdeveniments': 'events' };
   var SQ_SECS = ['equipement', 'petit-equipement', 'entretien'];
   var KIT_VALS = ['ok', 'missing', 'wrong'];
+  // squads that work as one: their members see all of them together by default
+  var SQ_TOGETHER = [['5e Escouade - Catalonia', '7e Escouade - Catalonia 2']];
   function sqState() {
     if (!S.sq) {
       S.sq = { view: 'list', aview: 'grid', sec: '', loaded: '', rows: [], events: [], set: {} };
       var saved = [];
-      try { saved = JSON.parse(localStorage.getItem('sq-squads-' + (S.session ? S.session.user.id : '')) || '[]'); } catch (x) { saved = []; }
+      try { saved = JSON.parse(localStorage.getItem('sq-squads2-' + (S.session ? S.session.user.id : '')) || '[]'); } catch (x) { saved = []; }
       saved = (Array.isArray(saved) ? saved : []).filter(function (n) { return S.squads.some(function (s) { return s.name === n; }); });
-      sqSetSquads(saved.length ? saved : [(S.profile && S.profile.esquadra) || ((S.squads[0] || {}).name) || ''].filter(Boolean), false);
+      var own = (S.profile && S.profile.esquadra) || ((S.squads[0] || {}).name) || '', grp = SQ_TOGETHER.filter(function (g) { return g.indexOf(own) > -1; })[0];
+      sqSetSquads(saved.length ? saved : (grp ? grp.filter(function (n) { return S.squads.some(function (x) { return x.name === n; }); }) : [own]).filter(Boolean), false);
     }
     return S.sq;
   }
   // one or more squads shown together; the first is the one new rows go to, the combination has its own column settings
   function sqSetSquads(list, persist) {
     var Q = S.sq; Q.squads = list; Q.squad = list[0] || ''; Q.key = list.join(' + ');
-    if (persist) { try { localStorage.setItem('sq-squads-' + (S.session ? S.session.user.id : ''), JSON.stringify(list)); } catch (x) { /* optional */ } }
+    if (persist) { try { localStorage.setItem('sq-squads2-' + (S.session ? S.session.user.id : ''), JSON.stringify(list)); } catch (x) { /* optional */ } }
   }
   function sqName(m) { return sqv(m, 'nom_guerre') || ((sqv(m, 'first_name') || '') + ' ' + (sqv(m, 'last_name') || '')).trim() || '—'; }
   function sqFull(m) { return ((sqv(m, 'first_name') || '') + ' ' + (sqv(m, 'last_name') || '')).trim(); }
