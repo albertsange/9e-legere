@@ -1142,28 +1142,29 @@ const ZOOM_MIN = 0.3, ZOOM_MAX = 3;
 let zoom = 1;
 let M = BASE_M * zoom;         // píxels per metre (depèn del zoom)
 let MAP_W = 100, MAP_H = 90; // terreny en metres (gran, però finit)
-const STEP = 0.65;             // llargada del pas: 65 cm (2 peus)
-const FRONT = 0.5;             // separació lateral entre homes d'un mateix rengle (front per home)
-const ORD_CADENCE = 76;        // cadència del pas ordinari, passos per minut
 
-// Passos definits al manual (MA-04, MA-05, MA-06 del document)
-const PACES = {
-  ordinari:  { cad: 76,  nom: 'Pas ordinaire' },
-  accelerat: { cad: 100, nom: 'Pas accéléré' },
-  carrega:   { cad: 120, nom: 'Pas de charge' }
-};
-
-const TURN_T = 0.7;            // segons per girar 90 graus (tota la unitat)
-const PF_TURN_T = 0.5;         // segons per girar 90 graus (cada filera, par file)
 const FILES = 10;              // 10 files x 2 rengles = 20 soldats
-const RANK_GAP = 0.325;        // 1 peu entre rengles
 const CADRE_ROW = 2;           // tercer rengle: serre-files (oficials i sergents)
 const PAN_MARGIN = 80;         // píxels que es poden sortir del mapa en arrossegar
 
-// ---------- Cansament i desordre: tots els paràmetres del joc en un sol lloc ----------
+// ---------- TUNE: tots els paràmetres de les regles del joc en un sol lloc ----------
+// (Vegeu també docs/game-rules.md, que explica què fa cada clau.) Els valors per defecte són els del joc publicat; canviar-ne un canvia la regla.
+// Fora d'aquí només queden les taules de dades: «des»/«en» de cada ordre (ORDERS) i SCORE_REF (referències de puntuació per nivell).
 // Cada ordre d'ORDERS en porta dos de propis: «des» (quant desordena) i «en» (quant cansa; multiplicador, 1 si no hi és).
 // Per afegir una ordre nova n'hi ha prou amb donar-li «des» i, si cal, «en». Cada nivell pot escalar-ho amb driftScale i fatigueScale.
 const TUNE = {
+  moviment: { pas: 0.65,                      // m: llargada del pas (65 cm, 2 peus)
+              front: 0.5,                     // m: separació lateral entre homes d'un mateix rengle
+              rengle: 0.325,                  // m: distància entre rengles (1 peu)
+              cadOrdinari: 76, cadAccelerat: 100, cadCarrega: 120,   // passos per minut de cada pas (MA-04/05/06); endarrere sempre a la cadència ordinària
+              girUnitat: 0.7,                 // s per girar 90° tota la unitat (Demi-tour, Par le flanc, Front…)
+              girFilera: 0.5,                 // s per girar 90° cada filera en el par file
+              parFileTram: 2,                 // m que ha de fer la capçalera abans de poder encadenar un altre par file
+              retard: 0.78,                   // s entre la veu preventiva i l'executiva (ORDER_DELAY)
+              girCap: 1.5,                    // rad/s: velocitat de gir del cap (Alignement)
+              alineaVel: 0.6,                 // m/s: velocitat amb què cada home es corregeix en l'Alignement
+              buitVel: 1.3,                   // m/s: velocitat amb què es cobreix un buit
+              serrezT: 10 },                  // s que triga «Serrez les rangs» a deixar l'ordre al 100 %
   ordre:    { rmsZero: 0.2,                   // desviació mitjana (m) que equival a 0 % d'ordre
               verd: 85, groc: 60,             // colors de la barra (%)
               avis: 25, rearma: 50,         // el Louis surt per sota d'«avis» i torna a poder sortir per sobre de «rearma»
@@ -1174,6 +1175,7 @@ const TUNE = {
               cop: 0.06,                      // sacsejada d'una ordre instantània o d'arribada (× des)
               retorn: 0.012,                  // retorn natural de cada home al seu lloc, per pas
               columna: 0.5,                   // en columna es desordena menys
+              tiradors: 3,                    // en tiradors (files obertes) les conversions desordenen tantes vegades més
               cansats: 1.8, cansatsSota: 25 },// amb l'energia per sota de «cansatsSota», tot desordena «cansats» vegades més
   energia:  { repos: 1.5,                     // punts/s amb En place, repos!
               atencio: -0.05,                 // punts/s en atenció (nivells sense barra d'energia)
@@ -1208,7 +1210,16 @@ const TUNE = {
                                // supressió que afegeix cada tret de tirador que passa a prop d'un regiment
               supDescarrega: 0.5,             // supressió que afegeix una descàrrega que l'encerta
               supDecau: 0.06,                 // la supressió baixa tant per segon
-              supMax: 0.5 },                  // per sobre d'aquesta supressió, el regiment no gosa disparar
+              supMax: 0.5,                    // per sobre d'aquesta supressió, el regiment no gosa disparar
+              marge: 0.6,                     // m que s'afegeixen a l'amplada de la franja de foc (a cada banda)
+              maxMort: 0.95,                  // probabilitat màxima de caure per tret
+              escut: { davant: 0.3, ample: 0.6, lliures: 1, factor: 0.12 },   // empara en columna: un home amb més de «lliures» homes al davant (a més de «davant» m i dins de «ample» m de costat, sobre la mateixa línia de tir) té la probabilitat × factor^(homes − lliures)
+              arbreRadi2: 0.64,               // els arbres tapen la visual i les bales dins d'aquesta fracció del radi al quadrat (0,8² del radi)
+              tirCon: 0.17, tirConAmple: 0.9, // tiradors: semicon (rad) per triar enemic, recte (±10°) i amb «Feu!» apuntat (±50°)
+              tirRengle2: 0.6,                // tiradors: el segon rengle enemic rep aquest multiplicador
+              tirImpacteMs: 60,               // ms entre el tret i la caiguda de l'enemic tocat
+              tardaP: 0.12, tardaK: 1.6,      // probabilitat que un tret surti tard i quant (× escalf)
+              enInici: 4 },                   // s que triga a poder disparar un regiment enemic estàtic en començar
   tirailleurs: { files: 4,                    // SK-01/02: «Ouvrez les files par 4 pas» (distància entre fileres)
               rangs: 6,                       // SK-07/08: distància (en passos) que guanya o perd cada rengle a cada salt
               pas: 0.35,                      // desviació lateral (m) en passar pel costat esquerre de l'altre rengle
@@ -1220,8 +1231,44 @@ const TUNE = {
               vel: 90,                        // m/s de la bala (alentida perquè es vegi)
               errLong: 7, errLat: 2.5,        // error de punteria (m) en llargada i de costat
               rebot: 45,                      // metres que la bala continua rebotant després del primer cop a terra
-              ample: 0.35 }                   // semiamplada del passadís mortal de la bala
+              ample: 0.35,                    // semiamplada del passadís mortal de la bala
+              velMin: 25, frena: 60,          // m/s: velocitat mínima de la bala un cop ha tocat terra, i m/s² que frena
+              rasant: 8,                      // m abans del punt d'impacte on la bala toca terra
+              tol: 0.06 },                    // rad: tolerància d'encarament per poder disparar
+  capita:   { bonus: 5,                       // Le Jay (nivell 10): s menys de càrrega de mitjana quan és a prop
+              dist: 16 },                     // m: distància màxima del capità a la unitat per ajudar
+  ia:       { abast: 42,                      // m: a més distància no dispara
+              minHomes: 3, minFraccio: 0.3,   // homes enemics dins la franja necessaris: el màxim entre «minHomes» i aquesta fracció de la unitat objectiu
+              apunta: 2.5,                    // s que triga a apuntar quan té prou homes dins la franja
+              recMin: 0.85, recVar: 0.5,      // recàrrega = carrega × (recMin + aleatori × recVar)
+              nAu: 0.7, nFr: 1.0,             // punteria relativa dels austríacs i dels francesos
+              supMax: 0.9,                    // la supressió només redueix la punteria fins a aquest valor
+              supFrac: 0.6,                   // fracció de supDescarrega que afegeix una descàrrega d'IA
+              flanc: 0.9, flancBonus: 10,     // objectiu: si ens ensenya el flanc (angle rad), compta com a més proper
+              feble: 12, febleBonus: 4,       // …o si té menys d'aquests homes
+              jugadorBonus: 8,                // …o si és el jugador
+              holdMarge: 8,                   // m: més enllà de hold + marge, s'obre en angle (off)
+              holdSenseObj: 3,                // m: distància de parada sense objectiu
+              cercaDist: 30, cercaRadi: 6,    // m: sense memòria cap on avança; m: la memòria s'esborra en arribar-hi
+              girMarxa: 0.3,                  // rad/s: gir mentre s'acosta
+              girParat: 1.6,                  // × enGir: gir quan ja és a distància de tret
+              tolMarxa: 0.5,                  // rad: només avança si l'error d'angle és menor
+              evita: { girar: 0.55, vel: 0.6, encallat: 9, ignora: 5, sonda1: 5, sonda2: 9, ample: 3.2, marge: 1.2 },   // esquivar cases i arbres
+              retirada: { gir: 1.2, tol: 0.06, mitja: 0.5 } },   // retirada: rad/s de gir, rad de tolerància; fracció de baixes que la dispara (nivell 10)
+  puntuacio: { part: 250,                     // punts de cadascun dels 4 apartats (temps, baixes, ordres, ordre mitjà)
+              marge: 2 },                     // amb referència × (1 + marge) el temps/les ordres puntuen 0
+  mort:     { obstacle: 0.15, arbre: 0.22,    // m: marge de col·lisió amb obstacles i arbres (mort → punt de control)
+              destrossadaMs: 2600 }           // ms entre quedar sota minMen i tornar al punt de control
 };
+const STEP = TUNE.moviment.pas, FRONT = TUNE.moviment.front, RANK_GAP = TUNE.moviment.rengle, ORD_CADENCE = TUNE.moviment.cadOrdinari;
+// Passos definits al manual (MA-04, MA-05, MA-06 del document)
+const PACES = {
+  ordinari:  { cad: TUNE.moviment.cadOrdinari,  nom: 'Pas ordinaire' },
+  accelerat: { cad: TUNE.moviment.cadAccelerat, nom: 'Pas accéléré' },
+  carrega:   { cad: TUNE.moviment.cadCarrega,   nom: 'Pas de charge' }
+};
+const TURN_T = TUNE.moviment.girUnitat;       // segons per girar 90 graus (tota la unitat)
+const PF_TURN_T = TUNE.moviment.girFilera;    // segons per girar 90 graus (cada filera, par file)
 const CONV_ORDER = { stand: 'WH-01', move: 'WH-02', turn: 'WH-03', ligne: 'WH-04', cm: 'CD-06' };   // maniobra en curs → ordre que la descriu
 function orderPct() { return Math.round(100 * Math.max(0, 1 - disorderRms() / TUNE.ordre.rmsZero)); }
 function orderEn(id) { const o = ORDER_BY_ID[id]; return o && o.en != null ? o.en : 1; }
@@ -1555,9 +1602,9 @@ const STAT = { t: 0, ord: 0, dead: 0, oSum: 0, men0: 20 };
 const SCORE_REF = { 1: { t: 90, o: 12 }, 2: { t: 100, o: 14 }, 3: { t: 110, o: 16 }, 4: { t: 140, o: 20 }, 5: { t: 200, o: 25 }, 6: { t: 120, o: 14 }, 7: { t: 150, o: 20 }, 8: { t: 170, o: 30 }, 9: { t: 150, o: 10 }, 10: { t: 300, o: 35 } };   // temps (s) i ordres de referència: 250 punts; amb el triple, 0
 function statReset() { STAT.t = 0; STAT.ord = 0; STAT.dead = 0; STAT.oSum = 0; STAT.men0 = co ? co.members.length : 20; }
 function scoreCalc(n) {
-  const R = SCORE_REF[n] || { t: 150, o: 20 }, lin = (v, ref) => Math.max(0, Math.min(1, 1 - (v - ref) / (2 * ref)));
+  const R = SCORE_REF[n] || { t: 150, o: 20 }, P = TUNE.puntuacio, lin = (v, ref) => Math.max(0, Math.min(1, 1 - (v - ref) / (P.marge * ref)));
   const avg = STAT.t > 0 ? STAT.oSum / STAT.t : 100;
-  const p = { t: Math.round(250 * lin(STAT.t, R.t)), d: Math.round(250 * Math.max(0, 1 - STAT.dead / Math.max(1, STAT.men0))), o: Math.round(250 * lin(STAT.ord, R.o)), a: Math.round(250 * Math.max(0, Math.min(1, avg / 100))) };
+  const p = { t: Math.round(P.part * lin(STAT.t, R.t)), d: Math.round(P.part * Math.max(0, 1 - STAT.dead / Math.max(1, STAT.men0))), o: Math.round(P.part * lin(STAT.ord, R.o)), a: Math.round(P.part * Math.max(0, Math.min(1, avg / 100))) };
   return { total: p.t + p.d + p.o + p.a, parts: p, time: Math.round(STAT.t), dead: STAT.dead, orders: STAT.ord, avg: Math.round(avg) };
 }
 const fmtT = s => Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
@@ -1730,7 +1777,7 @@ function updateCo(dt) {
   if (formationName() === 'línia') co.lineH = co.members[0].h;           // darrera orientació en línia: «Front!» hi torna
   // Gir del cap (alineament, CD-03)
   for (const m of co.members) {
-    const d = (m.ht || 0) - (m.hd || 0), st = 1.5 * dt;
+    const d = (m.ht || 0) - (m.hd || 0), st = TUNE.moviment.girCap * dt;
     m.hd = (m.hd || 0) + Math.max(-st, Math.min(st, d));
   }
   if (co.state === 'auto') { updateAuto(dt); return; }
@@ -1828,7 +1875,7 @@ function buildEnemy(d) {
     const a = -rank * RANK_GAP, l = (nf / 2 - 0.5 - file) * FRONT;
     men.push({ x: d.cx + c * a - sn * l, y: d.cy + sn * a + c * l, alive: true, t: 0, rank });
   }
-  return Object.assign({}, d, { men, reload: 4, aimT: 0, volleys: 0, routed: false });
+  return Object.assign({}, d, { men, reload: TUNE.mosquet.enInici, aimT: 0, volleys: 0, routed: false });
 }
 const enAlive = e => e.men.filter(m => m.alive).length;
 const OWN_UNIT = { name: '9e Régiment d\'Infanterie Légère «L\'Incomparable»', flag: '9e', col: '#1f3a78' };
@@ -1933,7 +1980,7 @@ function makeStrip(men, h, a, open) {             // franja de foc d'un grup d'h
   let lo = 0, hi = 0, fr = -1e9;
   for (const m of men) { const q = (m.x - c.x) * px + (m.y - c.y) * py; lo = Math.min(lo, q); hi = Math.max(hi, q); fr = Math.max(fr, (m.x - c.x) * fw + (m.y - c.y) * fs); }
   const mid = (lo + hi) / 2;
-  return { a, ox: c.x + fw * fr + px * mid, oy: c.y + fs * fr + py * mid, hw: (hi - lo) / 2 + 0.6, tg: Math.tan(open), R: TUNE.mosquet.abast };
+  return { a, ox: c.x + fw * fr + px * mid, oy: c.y + fs * fr + py * mid, hw: (hi - lo) / 2 + TUNE.mosquet.marge, tg: Math.tan(open), R: TUNE.mosquet.abast };
 }
 // Foc oblic (Joue à droite / à gauche): si hi ha un enemic entre el front i l'angle oblic (45°) d'aquest costat, s'apunta cap a ell; si no, a 45°
 function oblAim(sd) {
@@ -1957,7 +2004,7 @@ function inStrip(S, x, y) {                      // retorna la distància al lla
 // escala amb el nombre de tiradors (n = fracció de la unitat que dispara). Cada home és independent: només s'aplica als que són dins la franja.
 function dieProb(u, rank, n) {
   const T = TUNE.mosquet, acc = T.punteria[0] + (T.punteria[1] - T.punteria[0]) * Math.min(1, u / T.abast);
-  return Math.min(0.95, acc * (rank ? T.rengle2 : T.rengle1) * n);
+  return Math.min(T.maxMort, acc * (rank ? T.rengle2 : T.rengle1) * n);
 }
 function segRect(x0, y0, x1, y1, w) {            // el segment toca el rectangle? (Liang–Barsky)
   let t0 = 0, t1 = 1; const dx = x1 - x0, dy = y1 - y0;
@@ -1971,15 +2018,15 @@ function losBlocked(x0, y0, x1, y1) {            // els arbres (level.cover) i l
   if (Wl) for (const w of Wl) if (segRect(x0, y0, x1, y1, w)) return true;
   if (!C) return false;
   const dx = x1 - x0, dy = y1 - y0, L2 = dx * dx + dy * dy || 1;
-  for (const t of C) { const k = Math.max(0, Math.min(1, ((t.x - x0) * dx + (t.y - y0) * dy) / L2)), ex = x0 + dx * k - t.x, ey = y0 + dy * k - t.y; if (ex * ex + ey * ey < t.r * t.r * 0.64) return true; }
+  for (const t of C) { const k = Math.max(0, Math.min(1, ((t.x - x0) * dx + (t.y - y0) * dy) / L2)), ex = x0 + dx * k - t.x, ey = y0 + dy * k - t.y; if (ex * ex + ey * ey < t.r * t.r * TUNE.mosquet.arbreRadi2) return true; }
   return false;
 }
 function hitMen(S, men, n) {                      // retorna { inside, dead } de la llista d'homes {x,y,rank}
-  const inside = [], dead = [], ca = Math.cos(S.a), sa = Math.sin(S.a);
+  const inside = [], dead = [], ca = Math.cos(S.a), sa = Math.sin(S.a), E = TUNE.mosquet.escut;
   for (const m of men) { const u = inStrip(S, m.x, m.y); if (u < 0 || losBlocked(S.ox, S.oy, m.x, m.y)) continue; m._u = u; m._v = -(m.x - S.ox) * sa + (m.y - S.oy) * ca; inside.push(m); }
   for (const m of inside) {
-    let b = 0; for (const o of inside) if (o !== m && o._u < m._u - 0.3 && Math.abs(o._v - m._v) < 0.6) b++;   // homes davant seu, en la mateixa línia de tir: l'empara
-    const cover = b <= 1 ? 1 : Math.pow(0.12, b - 1);                    // en columna només els dos primers rengles de cara reben els trets
+    let b = 0; for (const o of inside) if (o !== m && o._u < m._u - E.davant && Math.abs(o._v - m._v) < E.ample) b++;   // homes davant seu, en la mateixa línia de tir: l'empara
+    const cover = b <= E.lliures ? 1 : Math.pow(E.factor, b - E.lliures);                    // en columna només els dos primers rengles de cara reben els trets
     if (Math.random() < dieProb(m._u, m.rank, n) * cover) dead.push(m);
   }
   return { inside, dead };
@@ -2041,7 +2088,7 @@ function killOwn(m) {
 }
 function updateGlide(dt) {                       // els qui cobreixen un buit hi caminen (el desplaçament és relatiu: no depèn de si la unitat es mou)
   for (const m of co.members) if (m.gd) {
-    const d = Math.hypot(m.gd.x, m.gd.y), st = 1.3 * dt;
+    const d = Math.hypot(m.gd.x, m.gd.y), st = TUNE.moviment.buitVel * dt;
     if (d <= st) { m.x += m.gd.x; m.y += m.gd.y; m.gd = null; } else { const ax = m.gd.x / d * st, ay = m.gd.y / d * st; m.x += ax; m.y += ay; m.gd.x -= ax; m.gd.y -= ay; }
   }
 }
@@ -2135,7 +2182,7 @@ function skStart(mode) {
   co.loaded = false; co.reloading = false; co.arm = 'sk'; co.fireDir = null; co.fireSide = null; co.sk = { mode, step: 0, end: false, stage: 'fire', wait: 0.6 };
 }
 function manShot(m, delay, wide) {                // un tret apuntat d'un tirador. «wide»: tria ell mateix l'enemic més proper (±50°); si no en té, no dispara
-  const T = TUNE.mosquet, cone = wide ? 0.9 : 0.17;
+  const T = TUNE.mosquet, cone = wide ? T.tirConAmple : T.tirCon;
   let best = null;
   for (const e of ENEMY) for (const v of e.men) {
     if (!v.alive) continue;
@@ -2151,7 +2198,7 @@ function manShot(m, delay, wide) {                // un tret apuntat d'un tirado
   if (!best) return null;
   best.e.supp = Math.min(1, (best.e.supp || 0) + T.supTret);
   const acc = (T.punteria[0] + (T.punteria[1] - T.punteria[0]) * best.u / T.abast) * (wide ? T.apuntat : 1);
-  if (Math.random() < acc * (best.v.rank ? 0.6 : 1) && !(level && level.keepMin && best.e === ENEMY[0] && enAlive(best.e) <= level.keepMin)) setTimeout(() => { if (best.v.alive) killEnemy(best.v, best.e); }, delay * 1000 + 60);
+  if (Math.random() < acc * (best.v.rank ? T.tirRengle2 : 1) && !(level && level.keepMin && best.e === ENEMY[0] && enAlive(best.e) <= level.keepMin)) setTimeout(() => { if (best.v.alive) killEnemy(best.v, best.e); }, delay * 1000 + T.tirImpacteMs);
   return best.e;
 }
 function skRanks() {                              // els rengles, amb la posició mitjana cap endavant
@@ -2216,7 +2263,7 @@ function updateSkirm(dt) {
 const GUNS = [], BALLS = [];
 function updateGuns(dt) {
   for (let i = BALLS.length - 1; i >= 0; i--) {
-    const b = BALLS[i], s0 = b.s; b.s += b.v * dt; b.v = b.s > b.graze ? Math.max(25, b.v - 60 * dt) : b.v;
+    const b = BALLS[i], s0 = b.s; b.s += b.v * dt; b.v = b.s > b.graze ? Math.max(TUNE.art.velMin, b.v - TUNE.art.frena * dt) : b.v;
     if (s0 < b.graze && b.s >= b.graze) FX.push({ k: 'dust', x: b.ox + b.dx * b.graze, y: b.oy + b.dy * b.graze, t: 0, life: 1.2 });
     const a0 = Math.max(s0, b.graze), a1 = Math.min(b.s, b.end);
     if (a1 > a0) for (const m of co.members.slice()) {
@@ -2233,11 +2280,11 @@ function updateGuns(dt) {
     const d = Math.hypot(c.x - g.x, c.y - g.y);
     if (d > A.abast || losBlocked(g.x, g.y, c.x, c.y)) { g.aimT = 0; continue; }
     const dh = wrapA(Math.atan2(c.y - g.y, c.x - g.x) - g.h); g.h += Math.max(-A.gir * dt, Math.min(A.gir * dt, dh));
-    if (Math.abs(dh) > 0.06 || g.reload > 0) continue;
+    if (Math.abs(dh) > A.tol || g.reload > 0) continue;
     g.aimT += dt; if (g.aimT < A.apunta) continue;
     const along = d + (Math.random() - 0.5) * 2 * A.errLong, lat = (Math.random() - 0.5) * 2 * A.errLat, ux = (c.x - g.x) / d, uy = (c.y - g.y) / d;
     const tx = g.x + ux * along - uy * lat, ty = g.y + uy * along + ux * lat, L = Math.hypot(tx - g.x, ty - g.y);
-    BALLS.push({ ox: g.x, oy: g.y, dx: (tx - g.x) / L, dy: (ty - g.y) / L, s: 1.2, v: A.vel, graze: L - 8, end: L + A.rebot, kills: 0 });
+    BALLS.push({ ox: g.x, oy: g.y, dx: (tx - g.x) / L, dy: (ty - g.y) / L, s: 1.2, v: A.vel, graze: L - A.rasant, end: L + A.rebot, kills: 0 });
     FX.push({ k: 'shot', x: g.x + Math.cos(g.h) * 1.9, y: g.y + Math.sin(g.h) * 1.9, a: g.h, t: -0.001, big: true });
     SFX.cannon(); g.reload = g.rt || A.recarrega; g.aimT = 0;
   }
@@ -2271,7 +2318,7 @@ function drawFireStrip() {
 function feuTiradors() {                          // en tiradors cada home tria l'enemic més proper i hi apunta: els trets no surten alhora, però no es perden a l'aire
   const T = TUNE.mosquet, hit = new Set(); let n = 0, tMax = 0;
   for (const m of co.members) {
-    const d = Math.random() * T.escalf * (Math.random() < 0.12 ? 1.6 : 1), e = manShot(m, d, true);
+    const d = Math.random() * T.escalf * (Math.random() < T.tardaP ? T.tardaK : 1), e = manShot(m, d, true);
     if (e) { hit.add(e); n++; tMax = Math.max(tMax, d); }
   }
   for (const e of hit) { e.volleys++; }
@@ -2283,7 +2330,7 @@ function feu() {
   say('Feu!'); co.loaded = false; lastKey = '';
   const T = TUNE.mosquet; let tMax = 0;
   for (const m of co.members) {
-    const d = Math.random() * T.escalf * (Math.random() < 0.12 ? 1.6 : 1);   // no tots alhora: alguns trets surten tard
+    const d = Math.random() * T.escalf * (Math.random() < T.tardaP ? T.tardaK : 1);   // no tots alhora: alguns trets surten tard
     tMax = Math.max(tMax, d);
     const a = fdir(m.h), len = 1.25;
     FX.push({ k: 'shot', x: m.x + Math.cos(a) * len, y: m.y + Math.sin(a) * len, a, t: -d });
@@ -2323,14 +2370,14 @@ function updateBayonet() {                      // càrrega a la baioneta: amb l
 }
 function enemyVolley(e, S, live) {
   const T = TUNE.mosquet;
-  for (const v of live) { const d = Math.random() * T.escalf * (Math.random() < 0.12 ? 1.6 : 1); FX.push({ k: 'shot', x: v.x + Math.cos(e.h) * 1.25, y: v.y + Math.sin(e.h) * 1.25, a: e.h, t: -d }); SFX.shot(d); }
+  for (const v of live) { const d = Math.random() * T.escalf * (Math.random() < T.tardaP ? T.tardaK : 1); FX.push({ k: 'shot', x: v.x + Math.cos(e.h) * 1.25, y: v.y + Math.sin(e.h) * 1.25, a: e.h, t: -d }); SFX.shot(d); }
   SFX.rumble(0.08, T.escalf + 1.2);
   const r = hitMen(S, co.members, live.length / 20 * T.enPunteria * (1 - (e.supp || 0))), n = r.dead.length;
   for (const m of r.dead) killOwn(m);
   e.reload = T.enRecarrega; e.aimT = 0; lastKey = '';
   setTimeout(() => reac(n ? 'decebut' : 'aprova', '<b>Louis:</b> ' + (n ? 'Ens disparen! Hem perdut <b>' + n + '</b> homes.' : 'Ens han disparat, però han errat!'), 4600), 700);
   if (level && level.minMen && co.members.length < level.minMen && !co.lost) {
-    co.lost = true; setTimeout(() => deathRetry('La unitat ha quedat destrossada: torna-ho a provar'), 2600);
+    co.lost = true; setTimeout(() => deathRetry('La unitat ha quedat destrossada: torna-ho a provar'), TUNE.mort.destrossadaMs);
   }
 }
 function updateEnemies(dt) {                     // els regiments enemics es giren cap a nosaltres quan ens veuen i disparen a qui tinguin al davant
@@ -2370,31 +2417,31 @@ function aiGroups(side) {                       // contra qui lluita una unitat:
 }
 function aiVolley(u, g, side) {
   const T = TUNE.mosquet, live = u.men.filter(v => v.alive);
-  for (const v of live) { const d = Math.random() * T.escalf * (Math.random() < 0.12 ? 1.6 : 1); FX.push({ k: 'shot', x: v.x + Math.cos(u.h) * 1.25, y: v.y + Math.sin(u.h) * 1.25, a: u.h, t: -d }); SFX.shot(d); }
+  for (const v of live) { const d = Math.random() * T.escalf * (Math.random() < T.tardaP ? T.tardaK : 1); FX.push({ k: 'shot', x: v.x + Math.cos(u.h) * 1.25, y: v.y + Math.sin(u.h) * 1.25, a: u.h, t: -d }); SFX.shot(d); }
   SFX.rumble(0.08, T.escalf + 1.2);
-  const S = makeStrip(live, u.h, u.h, T.enOberta), n = live.length / 20 * (side === 'au' ? 0.7 : 1.0) * (1 - Math.min(0.9, u.supp || 0));
+  const S = makeStrip(live, u.h, u.h, T.enOberta), n = live.length / 20 * (side === 'au' ? TUNE.ia.nAu : TUNE.ia.nFr) * (1 - Math.min(TUNE.ia.supMax, u.supp || 0));
   const r = hitMen(S, g.men, n);
   if (g.own) {
     const k = r.dead.length; for (const m of r.dead) killOwn(m); lastKey = '';
     setTimeout(() => reac(k ? 'decebut' : 'aprova', '<b>Louis:</b> ' + (k ? 'Ens disparen! Hem perdut <b>' + k + '</b> homes.' : 'Ens han disparat, però han errat!'), 4600), 700);
-    if (level && level.minMen && co.members.length < level.minMen && !co.lost) { co.lost = true; setTimeout(() => deathRetry('La unitat ha quedat destrossada: torna-ho a provar'), 2600); }
+    if (level && level.minMen && co.members.length < level.minMen && !co.lost) { co.lost = true; setTimeout(() => deathRetry('La unitat ha quedat destrossada: torna-ho a provar'), TUNE.mort.destrossadaMs); }
   } else if (g.ally) {
     for (const v of r.dead) { v.alive = false; addCorpse(v.x, v.y, g.ally.h, true, v.rank); }
-    if (r.inside.length) g.ally.supp = Math.min(1, (g.ally.supp || 0) + T.supDescarrega * 0.6);
+    if (r.inside.length) g.ally.supp = Math.min(1, (g.ally.supp || 0) + T.supDescarrega * TUNE.ia.supFrac);
   } else {
     for (const v of r.dead) killEnemy(v, g.en);
-    if (r.inside.length) { g.en.supp = Math.min(1, (g.en.supp || 0) + T.supDescarrega * 0.6); g.en.volleys++; }
+    if (r.inside.length) { g.en.supp = Math.min(1, (g.en.supp || 0) + T.supDescarrega * TUNE.ia.supFrac); g.en.volleys++; }
   }
-  u.reload = T.carrega * (0.85 + Math.random() * 0.5); u.aimT = 0;
+  u.reload = T.carrega * (TUNE.ia.recMin + Math.random() * TUNE.ia.recVar); u.aimT = 0;
 }
 function aiUnitTick(u, side, dt) {
-  const T = TUNE.mosquet, live = u.men.filter(v => v.alive); if (!live.length) return;
+  const T = TUNE.mosquet, A = TUNE.ia, live = u.men.filter(v => v.alive); if (!live.length) return;
   u.supp = Math.max(0, (u.supp || 0) - T.supDecau * dt);
   if (u.reload > 0) u.reload -= dt;
   if (u.state === 'retreat') {                                              // demi-tour i es retira al pas accéléré
-    const diff = wrapA(u.awayH - u.h), st = Math.max(-1.2 * dt, Math.min(1.2 * dt, diff));
+    const diff = wrapA(u.awayH - u.h), st = Math.max(-A.retirada.gir * dt, Math.min(A.retirada.gir * dt, diff));
     if (Math.abs(st) > 1e-5) aiRot(u, st);
-    if (Math.abs(diff) < 0.06) { const sp = STEP * PACES.accelerat.cad / 60 * dt; aiMove(u, Math.cos(u.h) * sp, Math.sin(u.h) * sp); }
+    if (Math.abs(diff) < A.retirada.tol) { const sp = STEP * PACES.accelerat.cad / 60 * dt; aiMove(u, Math.cos(u.h) * sp, Math.sin(u.h) * sp); }
     return;
   }
   const gs = aiGroups(side); if (!gs.length) return;
@@ -2402,28 +2449,28 @@ function aiUnitTick(u, side, dt) {
   let best = null, bs = 1e9;                                                // tria objectiu: el més proper; compta com a més proper el que ens ensenya el flanc o és més feble
   for (const g of vis) {
     const d = Math.hypot(g.cx - u.cx, g.cy - u.cy), face = Math.abs(wrapA(Math.atan2(u.cy - g.cy, u.cx - g.cx) - g.h));
-    const sc = d - (face > 0.9 ? 10 : 0) - (g.men.length < 12 ? 4 : 0) - (g.own ? 8 : 0); if (sc < bs) { bs = sc; best = g; }
+    const sc = d - (face > A.flanc ? A.flancBonus : 0) - (g.men.length < A.feble ? A.febleBonus : 0) - (g.own ? A.jugadorBonus : 0); if (sc < bs) { bs = sc; best = g; }
   }
   let tx, ty;
   if (best) { u.last = { x: best.cx, y: best.cy }; tx = best.cx; ty = best.cy; }
-  else if (u.last) { tx = u.last.x; ty = u.last.y; if (Math.hypot(tx - u.cx, ty - u.cy) < 6) u.last = null; }   // no el veu: va on el va veure per darrera vegada
-  else { tx = u.cx + Math.cos(u.h) * 30; ty = u.cy + Math.sin(u.h) * 30; }
-  const d = Math.hypot(tx - u.cx, ty - u.cy), want = Math.atan2(ty - u.cy, tx - u.cx), hold = best ? u.hold : 3;
-  const diff = wrapA(want + (best && d > u.hold + 8 ? (u.off || 0) : 0) - u.h), rate = (d > hold ? 0.3 : T.enGir * 1.6) * dt, st = Math.max(-rate, Math.min(rate, diff));
+  else if (u.last) { tx = u.last.x; ty = u.last.y; if (Math.hypot(tx - u.cx, ty - u.cy) < A.cercaRadi) u.last = null; }   // no el veu: va on el va veure per darrera vegada
+  else { tx = u.cx + Math.cos(u.h) * A.cercaDist; ty = u.cy + Math.sin(u.h) * A.cercaDist; }
+  const d = Math.hypot(tx - u.cx, ty - u.cy), want = Math.atan2(ty - u.cy, tx - u.cx), hold = best ? u.hold : A.holdSenseObj;
+  const diff = wrapA(want + (best && d > u.hold + A.holdMarge ? (u.off || 0) : 0) - u.h), rate = (d > hold ? A.girMarxa : T.enGir * A.girParat) * dt, st = Math.max(-rate, Math.min(rate, diff));
   const av = d > hold && !(u.ign > 0) ? aiAvoid(u) : null;
   if (u.ign > 0) u.ign -= dt;
   if (av) {                                                                  // casa o arbre al davant: gira per esquivar-lo
-    u.stk = (u.stk || 0) + dt; if (u.stk > 9) { u.ign = 5; u.stk = 0; }
-    aiRot(u, av.turn * 0.55 * dt);
-    if (!av.stop) { const sp = STEP * PACES.ordinari.cad / 60 * dt * 0.6; aiMove(u, Math.cos(u.h) * sp, Math.sin(u.h) * sp); }
+    u.stk = (u.stk || 0) + dt; if (u.stk > A.evita.encallat) { u.ign = A.evita.ignora; u.stk = 0; }
+    aiRot(u, av.turn * A.evita.girar * dt);
+    if (!av.stop) { const sp = STEP * PACES.ordinari.cad / 60 * dt * A.evita.vel; aiMove(u, Math.cos(u.h) * sp, Math.sin(u.h) * sp); }
   } else {
     u.stk = Math.max(0, (u.stk || 0) - dt);
     if (Math.abs(st) > 1e-5) aiRot(u, st);
-    if (d > hold && Math.abs(diff) < 0.5) { const sp = STEP * PACES.ordinari.cad / 60 * dt; aiMove(u, Math.cos(u.h) * sp, Math.sin(u.h) * sp); }
+    if (d > hold && Math.abs(diff) < A.tolMarxa) { const sp = STEP * PACES.ordinari.cad / 60 * dt; aiMove(u, Math.cos(u.h) * sp, Math.sin(u.h) * sp); }
   }
-  if (best && d <= 42 && u.reload <= 0 && (u.supp || 0) <= T.supMax) {      // dispara quan té prou homes enemics dins la franja
+  if (best && d <= A.abast && u.reload <= 0 && (u.supp || 0) <= T.supMax) {      // dispara quan té prou homes enemics dins la franja
     const S = makeStrip(live, u.h, u.h, T.enOberta), inside = best.men.filter(m => inStrip(S, m.x, m.y) >= 0 && !losBlocked(S.ox, S.oy, m.x, m.y)).length;
-    if (inside >= Math.max(3, best.men.length * 0.3)) { u.aimT = (u.aimT || 0) + dt; if (u.aimT >= 2.5) aiVolley(u, best, side); } else u.aimT = 0;
+    if (inside >= Math.max(A.minHomes, best.men.length * A.minFraccio)) { u.aimT = (u.aimT || 0) + dt; if (u.aimT >= A.apunta) aiVolley(u, best, side); } else u.aimT = 0;
   }
 }
 function aiHit(x, y, m) {                       // hi ha una casa o un arbre en aquest punt?
@@ -2432,10 +2479,10 @@ function aiHit(x, y, m) {                       // hi ha una casa o un arbre en 
   return false;
 }
 function aiAvoid(u) {                           // sondeja davant la unitat: null si està lliure, o cap a on girar (+1 dreta, −1 esquerra) i si cal parar
-  const c = Math.cos(u.h), s = Math.sin(u.h), P = (f, l) => aiHit(u.cx + c * f - s * l, u.cy + s * f + c * l, 1.2);
-  const l = P(5, -3.2) || P(9, -3.2), r = P(5, 3.2) || P(9, 3.2), m = P(5, 0) || P(9, 0);
+  const V = TUNE.ia.evita, c = Math.cos(u.h), s = Math.sin(u.h), P = (f, l) => aiHit(u.cx + c * f - s * l, u.cy + s * f + c * l, V.marge);
+  const l = P(V.sonda1, -V.ample) || P(V.sonda2, -V.ample), r = P(V.sonda1, V.ample) || P(V.sonda2, V.ample), m = P(V.sonda1, 0) || P(V.sonda2, 0);
   if (!l && !r && !m) return null;
-  return { turn: l && !r ? 1 : r && !l ? -1 : (u.avSide || (u.avSide = Math.random() < 0.5 ? 1 : -1)), stop: P(5, 0) || (l && r) };
+  return { turn: l && !r ? 1 : r && !l ? -1 : (u.avSide || (u.avSide = Math.random() < 0.5 ? 1 : -1)), stop: P(V.sonda1, 0) || (l && r) };
 }
 function aiTickAll(dt) {
   if (screen !== 'game' || paused || tutOpen() || co.lost) return;
@@ -2645,7 +2692,7 @@ function halte() {
 
 // Par file à droite / à gauche (CD-01): només en columna i en marxa recta.
 // La primera filera gira en arribar a la línia de gir, i després la següent, etc.
-const PF_MIN_LEG = 2;                                   // m que ha de fer la capçalera abans de poder fer un segon par file (ziga-zaga)
+const PF_MIN_LEG = TUNE.moviment.parFileTram;                                   // m que ha de fer la capçalera abans de poder fer un segon par file (ziga-zaga)
 function parFile(dir) {
   if (co.state !== 'marxa' || co.mode !== 'direct' || co.flank || (!co.pf && formationName() !== 'columna')) return;
   say(dir > 0 ? 'Par file à droite, marche!' : 'Par file à gauche, marche!');
@@ -2701,7 +2748,7 @@ function disorderRms() {
 function processFix(dt) {
   const f = co.fix, h = co.members[0].h;
   const fx = Math.cos(h), fy = Math.sin(h), rx = -fy, ry = fx;
-  const rate = 0.6 * dt;
+  const rate = TUNE.moviment.alineaVel * dt;
   const g = f.mode === 'f' ? f.guide.dx * fx + f.guide.dy * fy : 0;
   let left = 0;
   for (const m of co.members) {
@@ -3023,7 +3070,7 @@ function updateTurn(c, dt) {
 }
 function wheelDrift(c) {          // més desordre com més lluny del pivot (cada pas)
   const ks = TUNE.desordre.roda * driftK(), R = TUNE.desordre.retorn;
-  const F = ORDER_BY_ID[CONV_ORDER[c.kind] || 'WH-01'].des * (c.kind === 'stand' ? 1 : paceMul(c.pace || co.pace)) * (co.open ? 3 : 1);   // en tiradors es desendrecen molt més
+  const F = ORDER_BY_ID[CONV_ORDER[c.kind] || 'WH-01'].des * (c.kind === 'stand' ? 1 : paceMul(c.pace || co.pace)) * (co.open ? TUNE.desordre.tiradors : 1);   // en tiradors es desendrecen molt més
   for (const m of co.members) {
     const k = Math.hypot(m.x - c.px, m.y - c.py) / c.R;
     const ax = (Math.random() - 0.5) * k * ks * F - R * m.dx, ay = (Math.random() - 0.5) * k * ks * F - R * m.dy;
@@ -3565,7 +3612,7 @@ const ORDERS = [
     avail: () => co.sk && co.sk.mode === 'arriere' ? true : 'no estan fent foc en reculant', run: () => skGo() },
   { id: 'SR-01', des: 0, fam: 'form', k: 'align', sec: 'Línia en marxa', fr: 'Serrez les rangs', full: 'Serrez les rangs!', gl: 'caminant, en 10 segons es van alineant fins a l\'ordre perfecte; qualsevol altra ordre ho atura', icon: 'align', cmds: ['serrezRangs'],
     avail: () => { const r = pre(); if (r) return r; if (co.state !== 'marxa' || co.mode !== 'direct') return 'cal estar caminant endavant'; const f = formationName(); return f !== 'línia' && f !== 'tiradors' ? 'cal estar en línia' : co.serrez ? 'ja s\'estan alineant' : true; },
-    run: () => { say('Serrez les rangs!'); co.serrez = { t: 0, T: 10 }; } }
+    run: () => { say('Serrez les rangs!'); co.serrez = { t: 0, T: TUNE.moviment.serrezT }; } }
 ];
 // Camps interns de cada ordre (vegeu TUNE, a dalt):
 //  «des» = quant desordena. Ordres contínues (marxa, conversions): multiplicador del soroll per pas; el pas l'escala amb desOpt.
@@ -3632,7 +3679,7 @@ const PACE_FR = { ordinari: 'ordinaire', accelerat: 'accéléré', carrega: 'de 
 const orderTitle = (o, arg) => o.fullS && arg !== undefined ? o.fullS[String(arg)] : o.id === 'FI-02' && arg ? 'Oblique à ' + SIDE_FR[String(arg)] + ' – joue!' : o.full ? o.full.replace(/\{s\}/g, SIDE_FR[String(arg)] || '').replace('{o}', PACE_FR[arg] || arg || '') : o.fr;
 // Ordres en dues veus (reglament): primer la veu PREVENTIVA («Par le flanc droite») i, passat ORDER_DELAY, l'EXECUTIVA («droite!»), que és
 // quan la unitat executa. Les ordres d'una sola paraula (Fixe!, Contremarche!) i Halte s'executen al moment.
-const ORDER_DELAY = 0.78;                 // s entre la veu preventiva i l'executiva (en tots els botons d'ordre)
+const ORDER_DELAY = TUNE.moviment.retard;                 // s entre la veu preventiva i l'executiva (en tots els botons d'ordre)
 let pendingCmd = null, speakOverride = null;
 function splitOrder(o, arg) { const t = orderTitle(o, arg), i = t.indexOf(' – '); return i < 0 ? null : [t.slice(0, i), t.slice(i + 3)]; }
 function runOrder(o, arg, exec) {
@@ -4106,7 +4153,7 @@ function drawLevel(ctx, M, mini) {
 function checkLevel() {
   if (!level || paused) return;
   for (const o of level.obstacles) for (const m of co.members)
-    if (m.x > o.x0 - 0.15 && m.x < o.x1 + 0.15 && m.y > o.y0 - 0.15 && m.y < o.y1 + 0.15) {
+    if (m.x > o.x0 - TUNE.mort.obstacle && m.x < o.x1 + TUNE.mort.obstacle && m.y > o.y0 - TUNE.mort.obstacle && m.y < o.y1 + TUNE.mort.obstacle) {
       SFX.hit(); deathRetry(o.msg); return;
     }
   if (level.win) { if (!level.win()) return; }
@@ -4130,7 +4177,7 @@ function checkLevel() {
 }
 function checkTrees() {
   for (const t of trees) for (const m of co.members)
-    if (Math.hypot(m.x - t.x, m.y - t.y) < t.r + 0.22) {
+    if (Math.hypot(m.x - t.x, m.y - t.y) < t.r + TUNE.mort.arbre) {
       SFX.hit(); deathRetry('Has tocat un arbre: torna-ho a provar');
       return;
     }
@@ -4200,7 +4247,7 @@ let autoStepT = 0;
 const VOICE = { on: false, rec: null, running: false, tested: false, seg: {}, interim: '', state: '', failT: 0, lastFail: null,
   learn: { phr: {}, ex: {} }, shared: { phr: {}, ex: {} }, opt: { mode: 'cont', vol: true, log: false, tele: true, engine: '' }, log: [], recentExec: null, ptt: false, db: false, loading: false };
 // Connexió amb Supabase (la mateixa de la web: si el joc s'obre dins la web, agafa window.APP_CONFIG) i fonts del motor local Vosk
-const GAME_VERSION = '1.7.7';
+const GAME_VERSION = '1.7.8';
 const CFG = Object.assign({
   SUPABASE_URL: 'https://ltopullwhasagnkuqaek.supabase.co',
   SUPABASE_ANON_KEY: 'sb_publishable_DhHFUh-UrbBrI0l476Vcnw_tSn-Gmkr',
@@ -5699,10 +5746,10 @@ function buildLevel10() {
       if (screen !== 'game' || paused || tutOpen() || co.lost) return;
       const c = unitCentre(), h = co.members[0].h, tx = c.x - Math.cos(h) * 7, ty = c.y - Math.sin(h) * 7, k = Math.min(1, 2.2 * dt);
       cap.x += (tx - cap.x) * k; cap.y += (ty - cap.y) * k;
-      cap.near = co.members.length > 0 && Math.hypot(cap.x - c.x, cap.y - c.y) <= 16;
-      co.ldBoost = cap.near ? TUNE.mosquet.carrega / (TUNE.mosquet.carrega - 5) : 1;          // recarrega uns 5 s més de pressa de mitjana
+      cap.near = co.members.length > 0 && Math.hypot(cap.x - c.x, cap.y - c.y) <= TUNE.capita.dist;
+      co.ldBoost = cap.near ? TUNE.mosquet.carrega / (TUNE.mosquet.carrega - TUNE.capita.bonus) : 1;          // recarrega uns 5 s més de pressa de mitjana
       if (TUT.step >= 2 && !st.ret) aiTickAll(dt);
-      if (TUT.step >= 2 && !st.ret && auLeft() <= st.au0 * 0.5) {
+      if (TUT.step >= 2 && !st.ret && auLeft() <= st.au0 * TUNE.ia.retirada.mitja) {
         st.ret = true; st.retAt = performance.now();
         for (const e of ENEMY) if (e.ai) { e.state = 'retreat'; e.awayH = Math.atan2(e.cy - c.y, e.cx - c.x); }
         reac('louis', '<b>Louis:</b> Han perdut la meitat dels homes: es retiren!', 5000);
