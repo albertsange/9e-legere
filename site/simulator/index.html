@@ -3373,7 +3373,7 @@ function buildMapControls() {
     cb.onchange = () => { SFX.S[key] = cb.checked; SFX.save(); if (after) after(); };
     pop.appendChild(l);
   };
-  tog('So', 'on', 'Activar o silenciar tots els sons', () => { if (SFX.S.on) { if (screen === 'game') SFX.ambientStart(); } else SFX.ambientStop(); });
+  tog('So', 'on', 'Activar o silenciar tots els sons', () => { MUSIC.sync(); if (SFX.S.on) { if (screen === 'game') SFX.ambientStart(); } else SFX.ambientStop(); });
   tog('Tambor', 'drum', 'Tambor de marxa al ritme dels passos');
   tog('Moviment', 'move', 'So de moviment de la tropa cada cop que es crida una ordre');
   buildVoiceOpts(pop);
@@ -4157,7 +4157,7 @@ let autoStepT = 0;
 const VOICE = { on: false, rec: null, running: false, tested: false, seg: {}, interim: '', state: '', failT: 0, lastFail: null,
   learn: { phr: {}, ex: {} }, shared: { phr: {}, ex: {} }, opt: { mode: 'cont', vol: true, log: false, tele: true, engine: '' }, log: [], recentExec: null, ptt: false, db: false, loading: false };
 // Connexió amb Supabase (la mateixa de la web: si el joc s'obre dins la web, agafa window.APP_CONFIG) i fonts del motor local Vosk
-const GAME_VERSION = '1.7.2';
+const GAME_VERSION = '1.7.3';
 const CFG = Object.assign({
   SUPABASE_URL: 'https://ltopullwhasagnkuqaek.supabase.co',
   SUPABASE_ANON_KEY: 'sb_publishable_DhHFUh-UrbBrI0l476Vcnw_tSn-Gmkr',
@@ -5722,6 +5722,39 @@ async function rankLoad() {
   body.innerHTML = h + '</table>';
   body.querySelectorAll('tr.row').forEach(tr => { tr.onclick = () => { const d = document.getElementById('rdet' + tr.dataset.i); d.style.display = d.style.display === 'none' ? '' : 'none'; }; });
 }
+// ---- Música del menú: en bucle des que acaba la càrrega fins que entres en un nivell (fosa suau al sortir; torna en tornar al menú) ----
+const MUSIC = (() => {
+  const VOL = 0.45, FADE_IN = 1.8, FADE_OUT = 3;
+  let ac = null, gain = null, buf = null, src = null, loading = false, want = false, tm = null;
+  const ensure = () => {
+    if (ac) return true;
+    const C = window.AudioContext || window.webkitAudioContext; if (!C) return false;
+    ac = new C(); gain = ac.createGain(); gain.gain.value = 0; gain.connect(ac.destination); return true;
+  };
+  const load = async () => {
+    if (buf || loading) return; loading = true;
+    try { const r = await fetch('audio/menu.mp3'); buf = await ac.decodeAudioData(await r.arrayBuffer()); } catch (e) {}
+    loading = false;
+  };
+  const ramp = (to, sec) => { const t = ac.currentTime; gain.gain.cancelScheduledValues(t); gain.gain.setValueAtTime(gain.gain.value, t); gain.gain.linearRampToValueAtTime(to, t + sec); };
+  function sync() {
+    want = screen !== 'game' && !document.getElementById('boot') && !!SFX.S.on;
+    clearTimeout(tm);
+    if (want) {
+      if (!ensure()) return;
+      if (ac.state === 'suspended') ac.resume().catch(() => {});
+      if (!buf) { load().then(() => { if (buf && want) sync(); }); return; }
+      if (!src) { src = ac.createBufferSource(); src.buffer = buf; src.loop = true; src.connect(gain); src.start(); }
+      ramp(VOL, FADE_IN);
+    } else if (ac && src) {
+      ramp(0, FADE_OUT);
+      tm = setTimeout(() => { if (!want && src) { try { src.stop(); } catch (e) {} src.disconnect(); src = null; } }, FADE_OUT * 1000 + 150);
+    }
+  }
+  for (const ev of ['pointerdown', 'keydown']) document.addEventListener(ev, () => { if (want || (screen !== 'game' && !document.getElementById('boot'))) sync(); }, true);
+  return { sync, dbg: () => ({ state: ac && ac.state, g: gain && +gain.gain.value.toFixed(2), playing: !!src, want }) };
+})();
+
 function showScreen(name) {
   screen = name;
   if (name === 'title') newsShow(); else document.getElementById('news').classList.remove('show');
@@ -5736,6 +5769,7 @@ function showScreen(name) {
   canvas.style.display = g ? 'block' : 'none';
   document.getElementById('compass').style.display = g ? 'block' : 'none';
   if (g) SFX.ambientStart(); else SFX.ambientStop();
+  MUSIC.sync();
   if (g && VOICE.on) voiceStart(); else voiceStop();
   updVoicePill(); updVoiceTitle(); renderVoiceLog();
   if (!g) { document.getElementById('reac').classList.remove('show'); document.getElementById('tut').classList.remove('show'); document.getElementById('tmini').classList.remove('show'); msgEl.style.display = 'none'; document.getElementById('endmsg').classList.remove('show'); }
@@ -5935,7 +5969,7 @@ async function bootGame(dicP) {
   const wait = 700 - (performance.now() - t0); if (wait > 0) await new Promise(r => setTimeout(r, wait));
   try { sessionStorage.removeItem(SK.reload); } catch (e) {}
   syncVoiceOpts(); updVoiceTitle();
-  el.classList.add('out'); setTimeout(() => el.remove(), 500);
+  el.classList.add('out'); setTimeout(() => { el.remove(); MUSIC.sync(); }, 500);
 }
 const dicP = vShareInit();
 if (/[?&]noboot\b/.test(location.search)) { document.getElementById('boot').remove(); dicP.then(syncVoiceOpts); } else bootGame(dicP);          // sempre, abans de mostrar la pantalla d'inici (noboot: només per a les proves)
