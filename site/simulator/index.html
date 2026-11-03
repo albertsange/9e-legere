@@ -2379,9 +2379,10 @@ function advGunTick(g, dt) {                     // bateria d'IA: tria objectiu 
   const angP = c ? Math.abs(wrapA(Math.atan2(c.y - g.y, c.x - g.x) - g.h)) : 9, clear = c && !losBlocked(g.x, g.y, c.x, c.y);
   let allies = ALLY.filter(a => !a.script && a.men.some(v => v.alive));
   if (g.vil) allies = allies.filter(a => Math.hypot(a.cx - g.vil.x, a.cy - g.vil.y) < g.vil.r);          // g.vil: només bombardegen els aliats que són al poble (no els dels camps de sota)
+  if (g.vil && level && !level.gunsSee && alive < g.crew) { level.gunsSee = true; reac('alerta', '<b>Louis:</b> Ens han vist! Els canons deixen el poble i giren contra <b>nosaltres</b>!', 5000); }   // atacar un canó els avisa: tots passen a disparar-te a tu
   const distr = !!g.vil && allies.length > 0 && !(level && level.gunsSee);                                // distrets pel poble: no et veuen mentre no disparis (o no tardis massa)
   const sees = !distr && clear && dP <= g.vis && angP <= g.cone, heard = clear && now - (co.lastShot || 0) < 9000 && dP <= g.vis + 30;
-  g.alertT = sees || heard ? 6 : Math.max(0, g.alertT - dt);
+  g.alertT = sees || heard || (g.vil && level && level.gunsSee && clear) ? 6 : Math.max(0, g.alertT - dt);
   if (g.vil && !g.vilOn && allies.length) g.vilOn = true;
   let tgt = null;
   if (clear && g.alertT > 0 && dP <= g.range) tgt = { x: c.x, y: c.y, p: true, d: dP };
@@ -2394,7 +2395,7 @@ function advGunTick(g, dt) {                     // bateria d'IA: tria objectiu 
     if (co.state !== 'parat') { g.aimT = 0; g.pWait = 2.2; return; }
     if (g.pWait > 0) { g.pWait -= dt; g.aimT = 0; return; }
   } else g.prevP = false;
-  if (tgt.a && g.alt && level && level.houseTarget) { const hh = level.houseTarget(tgt.x, tgt.y); if (hh) tgt = { x: hh.x, y: hh.y, d: Math.hypot(hh.x - g.x, hh.y - g.y), a: tgt.a, house: true }; }   // un tret de cada dos, a les cases del poble
+  if (false && tgt.a && g.alt && level && level.houseTarget) { const hh = level.houseTarget(tgt.x, tgt.y); if (hh) tgt = { x: hh.x, y: hh.y, d: Math.hypot(hh.x - g.x, hh.y - g.y), a: tgt.a, house: true }; }   // un tret de cada dos, a les cases del poble
   const ang = Math.atan2(tgt.y - g.y, tgt.x - g.x), dh = wrapA(ang - g.h), rot = (g.rot || A.gir) * dt;
   g.h += Math.max(-rot, Math.min(rot, dh));
   g.blocked = gunBlocked(g, tgt.x, tgt.y);
@@ -4596,7 +4597,7 @@ let autoStepT = 0;
 const VOICE = { on: false, rec: null, running: false, tested: false, seg: {}, interim: '', state: '', failT: 0, lastFail: null,
   learn: { phr: {}, ex: {} }, shared: { phr: {}, ex: {} }, opt: { mode: 'cont', vol: true, log: false, tele: true, engine: '' }, log: [], recentExec: null, ptt: false, db: false, loading: false };
 // Connexió amb Supabase (la mateixa de la web: si el joc s'obre dins la web, agafa window.APP_CONFIG) i fonts del motor local Vosk
-const GAME_VERSION = '1.8.30';
+const GAME_VERSION = '1.8.31';
 const CFG = Object.assign({
   SUPABASE_URL: 'https://ltopullwhasagnkuqaek.supabase.co',
   SUPABASE_ANON_KEY: 'sb_publishable_DhHFUh-UrbBrI0l476Vcnw_tSn-Gmkr',
