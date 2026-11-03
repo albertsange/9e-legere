@@ -3079,23 +3079,18 @@ function processFix(dt) {
   }
 }
 
-// ---- Quadre contra la cavalleria (nivell 3): els homes formen un anell buit mirant enfora; mentre estan en quadre no es mouen ni disparen ----
-function squareSlots(n, c, h) {
-  const side = Math.max(3.4, n * FRONT / 4), half = side / 2, cs = Math.cos(h), sn = Math.sin(h), out = [];
-  for (let i = 0; i < n; i++) {
-    const tt = i / n * 4, s = Math.floor(tt), f = tt - s; let lx, ly, nh;
-    if (s === 0) { lx = half; ly = -half + f * side; nh = 0; } else if (s === 1) { lx = half - f * side; ly = half; nh = Math.PI / 2; }
-    else if (s === 2) { lx = -half; ly = half - f * side; nh = Math.PI; } else { lx = -half + f * side; ly = -half; nh = -Math.PI / 2; }
-    out.push({ x: c.x + cs * lx - sn * ly, y: c.y + sn * lx + cs * ly, h: h + nh });
-  }
+// ---- Ralliement contra la cavalleria (nivell 3, SK-09): els homes s'apinyen en una bola mirant enfora; mentre hi són no es mouen ni disparen ----
+function squareSlots(n, c, h) {               // bola: els homes s'apinyen al voltant del centre (disposició en espiral) i miren cap enfora
+  const out = [];
+  for (let i = 0; i < n; i++) { const r = 0.52 * Math.sqrt(i + 0.3), a = i * 2.39996 + h; out.push({ x: c.x + Math.cos(a) * r, y: c.y + Math.sin(a) * r, h: i ? a : h }); }
   return out;
 }
 function formSquare() {
   const n = co.members.length, c = unitCentre(), h = co.members[0].h, slots = squareSlots(n, c, h);
-  const ord = co.members.map(m => { let a = wrapA(Math.atan2(m.y - c.y, m.x - c.x) - h); if (a < -Math.PI / 4) a += Math.PI * 2; return { m, a }; }).sort((p, q) => p.a - q.a);
+  const ord = co.members.map(m => ({ m, a: wrapA(Math.atan2(m.y - c.y, m.x - c.x) - h) })).sort((p, q) => p.a - q.a); slots.sort((p, q) => wrapA(Math.atan2(p.y - c.y, p.x - c.x) - h) - wrapA(Math.atan2(q.y - c.y, q.x - c.x) - h));
   co.sqForming = true;
   startAuto([{ list: ord.map((o, i) => ({ m: o.m, tasks: [{ path: [{ x: slots[i].x, y: slots[i].y }], i: 0 }, { rot: slots[i].h }] })) }], false, ORD_SPEED * 1.5, true);
-  co.auto.onEnd = () => { co.sq = { h0: h }; co.sqForming = false; lastKey = ''; reac('aprova', '<b>Louis:</b> Quadre format! Baionetes enfora!', 2500); };
+  co.auto.onEnd = () => { co.sq = { h0: h }; co.sqForming = false; lastKey = ''; reac('aprova', '<b>Louis:</b> Reagrupats! Baionetes enfora!', 2500); };
 }
 function breakSquare() {
   const h = co.sq.h0, c = unitCentre(), fw = { x: Math.cos(h), y: Math.sin(h) }, lt = { x: -Math.sin(h), y: Math.cos(h) }, n = co.members.length, nf = Math.ceil(n / 2);
@@ -3869,7 +3864,7 @@ const FAMILIES = [
   { id: 'tir',  name: 'Tiradors',    icon: 'skirm', lvl: 'skirm' }
 ];
 function pre(o = {}) {                         // condicions comunes: retorna el motiu o null
-  if (co.sq && !o.sq && !o.arm) return 'estan en quadre: Rompez le carré per tornar a moure\'s';
+  if (co.sq && !o.sq && !o.arm) return 'estan reagrupats: Formez le peloton per tornar a moure\'s';
   if (co.state === 'auto') return 'hi ha una maniobra en curs';
   if (co.state === 'gir') return 'la unitat està girant';
   if (co.state === 'conv' && !o.conv) return co.conv.kind === 'ligne' ? 's\'està formant la línia' : co.conv.kind === 'turn' ? 'la tropa està fent el Tournez' : co.conv.kind === 'cm' ? 'la tropa fa la contramarxa' : 'hi ha una conversió en curs';
@@ -3928,10 +3923,10 @@ const ORDERS = [
     avail: () => pre() || (co.state !== 'marxa' ? 'cal estar en marxa' : co.mode !== 'direct' ? 'cal marxar recte (no en oblic ni reculant)' : busyHard() ? 'espera que acabi la maniobra' : (co.pf || formationName() === 'columna') ? true : 'cal estar en fila'), run: sd => parFile(sd) },
   { id: 'CD-05', des: 0, fam: 'form', k: 'bataille', sec: 'Fila en marxa', fr: 'Sur la droite, par file en bataille', full: 'Sur la droite, par file en bataille – marche!', gl: 'de fila a línia, cap a la dreta', icon: 'batR', cmds: ['bat'],
     avail: marxaColumna, run: () => surLaDroite(1) },
-  { id: 'CD-20', des: 2, fam: 'form', k: 'carre', lvl: 'square', sec: 'Contra la cavalleria', fr: 'Formez le carré', full: 'Formez le carré!', gl: 'els homes formen un quadre buit amb les 4 cares cap enfora: atura una càrrega de cavalleria', icon: 'attention', cmds: ['carre'],
-    avail: () => co.sq ? 'ja estan en quadre' : aturat(), run: () => formSquare() },
-  { id: 'CD-21', des: 1.5, fam: 'form', k: 'carre', lvl: 'square', sec: 'Contra la cavalleria', fr: 'Rompez le carré', full: 'Rompez le carré – en ligne!', gl: 'desfer el quadre i tornar a la línia', icon: 'attention', cmds: ['ligne'],
-    avail: () => !co.sq ? 'no estan en quadre' : co.state !== 'parat' ? 'espera que acabi la maniobra' : true, run: () => breakSquare() },
+  { id: 'SK-09', des: 2, fam: 'form', k: 'carre', lvl: 'square', sec: 'Contra la cavalleria', fr: 'Ralliement', full: 'Ralliement!', gl: 'les fileres es reagrupen tan ràpid com poden: s\'apinyen al centre de la unitat formant una bola amb la cara cap enfora (atura una càrrega de cavalleria)', icon: 'attention', cmds: ['carre'],
+    avail: () => co.sq ? 'ja estan reagrupats' : aturat(), run: () => formSquare() },
+  { id: 'SK-10', des: 1.5, fam: 'form', k: 'carre', lvl: 'square', sec: 'Contra la cavalleria', fr: 'Formez le peloton', full: 'Formez le peloton!', gl: 'desfer la bola i tornar a la línia', icon: 'attention', cmds: ['ligne'],
+    avail: () => !co.sq ? 'no estan reagrupats' : co.state !== 'parat' ? 'espera que acabi la maniobra' : true, run: () => breakSquare() },
   { id: 'WH-04', des: 0, fam: 'form', k: 'ligne', sec: 'Fila en marxa', fr: 'Par peloton en ligne', full: 'Par peloton en ligne – marche!', gl: 'de fila a línia sense aturar-se', icon: 'ligne', cmds: ['ligne'],
     avail: marxaColumna, run: () => parPelotonEnLigne() },
   { id: 'CD-03', des: 0, fam: 'form', k: 'align', sec: 'Línia aturada', fr: 'Alignement', full: 'À {s} – alignement!', gl: 'el guia surt mig pas i els altres s\'hi alineen', sides: true, icons: ['left', 'right'], cmdsS: { '-1': ['alignG', 'align'], '1': ['alignD', 'align'] },
@@ -4620,7 +4615,7 @@ let autoStepT = 0;
 const VOICE = { on: false, rec: null, running: false, tested: false, seg: {}, interim: '', state: '', failT: 0, lastFail: null,
   learn: { phr: {}, ex: {} }, shared: { phr: {}, ex: {} }, opt: { mode: 'cont', vol: true, log: false, tele: true, engine: '' }, log: [], recentExec: null, ptt: false, db: false, loading: false };
 // Connexió amb Supabase (la mateixa de la web: si el joc s'obre dins la web, agafa window.APP_CONFIG) i fonts del motor local Vosk
-const GAME_VERSION = '1.8.41';
+const GAME_VERSION = '1.8.42';
 const CFG = Object.assign({
   SUPABASE_URL: 'https://ltopullwhasagnkuqaek.supabase.co',
   SUPABASE_ANON_KEY: 'sb_publishable_DhHFUh-UrbBrI0l476Vcnw_tSn-Gmkr',
@@ -6555,11 +6550,11 @@ function buildCampaign3() {
   const steps = [
     { title: 'Esgotar el Perseguidor', pose: 'serios', hl: [], unlock: ['gir', 'mov', 'pace', 'parfile', 'bataille', 'align', 'obl', 'conv', 'tournez', 'ligne', 'form', 'repos', 'musket', 'skirm', 'carre'], tag: 'Després de Neerwinden · capvespre', intro: true, btn: 'Endavant',
       text: ['«Neerwinden s\'ha perdut, chasseur. L\'exèrcit es retira i la cavalleria lleugera austríaca ens pica els talons. El nostre <b>carro de municions</b> s\'ha quedat enrere amb els ferits: <b>l\'hem d\'escortar fins al pont</b>.»',
-        '«Els genets són ràpids, però no poden res contra un <b>mur de baionetes</b>. Quan els vegis carregar, no corris: <b>forma el quadre</b> amb <b>Formez le carré</b>. Esquena contra esquena, quatre cares cap enfora. Un cavall no es llança mai contra una baioneta.»',
-        '«Si et pesquen en marxa, la <b>polseguera</b> del galop et cobrirà abans que ho vegis. Fes-los perdre la sang freda, repeteix-ho cada cop que tornin, i quan hagin recuperat el seny, <b>Rompez le carré</b> i tornem a avançar. Guanya temps pels carros. <b>Vive le 9e!</b>»'],
+        '«Els genets són ràpids, però no poden res contra un <b>mur de baionetes</b>. Quan els vegis carregar, no corris: <b>Ralliement!</b> Tots al voltant del centre, esquena contra esquena, baionetes cap enfora. Un cavall no es llança mai contra una baioneta.»',
+        '«Si et pesquen en marxa, la <b>polseguera</b> del galop et cobrirà abans que ho vegis. Fes-los perdre la sang freda, repeteix-ho cada cop que tornin, i quan hagin recuperat el seny, <b>Formez le peloton</b> i tornem a avançar. Guanya temps pels carros. <b>Vive le 9e!</b>»'],
       done: () => TUT.intro },
     { title: 'Escorta el carro', pose: 'assenyala', hl: [], unlock: ['gir', 'mov', 'pace', 'parfile', 'bataille', 'align', 'obl', 'conv', 'tournez', 'ligne', 'form', 'repos', 'musket', 'skirm', 'carre'],
-      mini: () => 'Carro: <b>' + Math.max(0, Math.round((BX + 5 - st.cart.x))) + ' m</b> del pont · Càrregues parades: <b>' + st.repulsed + '</b>. ' + (!cartOk() ? '<b>El carro s\'ha perdut!</b>' : st.cav && ['charge'].includes(st.cav.cstate) ? '<b>Càrrega de cavalleria!</b> Forma el <b>quadre</b> ara!' : Math.hypot(unitCentre().x - st.cart.x, unitCentre().y - st.cart.y) > 14 ? 'Torna a prop del carro: sense escorta s\'atura.' : co.sq ? 'Quadre format. Quan hagin fugit, <b>Rompez le carré</b>.' : 'Avança amb el carro i vigila la cavalleria.'),
+      mini: () => 'Carro: <b>' + Math.max(0, Math.round((BX + 5 - st.cart.x))) + ' m</b> del pont · Càrregues parades: <b>' + st.repulsed + '</b>. ' + (!cartOk() ? '<b>El carro s\'ha perdut!</b>' : st.cav && ['charge'].includes(st.cav.cstate) ? '<b>Càrrega de cavalleria!</b> <b>Ralliement!</b> Ara!' : Math.hypot(unitCentre().x - st.cart.x, unitCentre().y - st.cart.y) > 14 ? 'Torna a prop del carro: sense escorta s\'atura.' : co.sq ? 'Reagrupats. Quan hagin fugit, <b>Formez le peloton</b>.' : 'Avança amb el carro i vigila la cavalleria.'),
       resetStep: () => 1, done: () => false }
   ];
   const moveCav = (u, vx, vy, dt) => { for (const m of u.men) { m.x += vx * dt; m.y += vy * dt; } u.cx += vx * dt; u.cy += vy * dt; if (vx || vy) u.h = Math.atan2(vy, vx); };
@@ -6606,7 +6601,7 @@ function buildCampaign3() {
           if (alive.length <= 3 && u.cstate !== 'leave') { u.cstate = 'leave'; u.ct = 0; reac('aprova', '<b>Capità Le Jay:</b> Els genets que queden es retiren! Segueix cap al pont!', 5000); }
           if (u.cstate === 'trot') {
             if (dist > 58 || st.t >= st.next) moveCav(u, ux * 2.8, uy * 2.8, dt); else moveCav(u, 1.6, 0, dt);                 // espera a distància fins que toca carregar
-            if (dist < 56 && st.t >= st.next) { u.cstate = 'charge'; u.ct = 0; st.charges++; st.hitSq = false; u.cdir = Math.atan2(dy, dx); reac('alerta', '<b>Capità Le Jay:</b> Cavalleria al galop! <b>Formez le carré!</b>', 6500); }
+            if (dist < 56 && st.t >= st.next) { u.cstate = 'charge'; u.ct = 0; st.charges++; st.hitSq = false; u.cdir = Math.atan2(dy, dx); reac('alerta', '<b>Capità Le Jay:</b> Cavalleria al galop! <b>Ralliement!</b>', 6500); }
           } else if (u.cstate === 'charge') {
             if (dist > 14) u.cdir = Math.atan2(dy, dx);
             const vx = Math.cos(u.cdir) * 7.5, vy = Math.sin(u.cdir) * 7.5;
@@ -6634,18 +6629,18 @@ function buildCampaign3() {
     },
     win: () => st.done && cartOk(),
     objectives: [
-      { t: 'Parar una càrrega de cavalleria formant el quadre', ok: () => st.repulsed >= 1 },
+      { t: 'Parar una càrrega de cavalleria reagrupant-se (Ralliement)', ok: () => st.repulsed >= 1 },
       { t: 'Escortar el carro fins al pont', ok: () => arrived() && cartOk() },
       { t: 'Mantenir la unitat amb almenys 8 homes', ok: () => co.members.length >= 8 }
     ],
-    goalText: 'Escorta el carro fins al pont. Quan la cavalleria carregui, forma el quadre.',
-    endText: 'Molt bé, chasseur: has parat la cavalleria amb un mur de baionetes i el carro ha passat el pont. La retirada ha guanyat el temps que necessitava. Recorda-ho: un quadre ben format no es pren de cara.'
+    goalText: 'Escorta el carro fins al pont. Quan la cavalleria carregui, fes un Ralliement.',
+    endText: 'Molt bé, chasseur: has parat la cavalleria amb un mur de baionetes i el carro ha passat el pont. La retirada ha guanyat el temps que necessitava. Recorda-ho: una bola de baionetes ben tancada no es pren de cara.'
   };
 }
 const campFull = f => () => Object.assign(f(), { advanced: true });                   // a tota la campanya hi ha l'indicador de cansament i el d'ordre
 const CAMP = [{ id: 'c1n1', n: 1, title: 'El Bateig de Foc', desc: 'Philippeville, 23 de maig de 1793. Navega en sigil pel bosc, aixafa una patrulla de quinze jägers austríacs sense que donin l\'alarma i defensa la riba del rierol fins que l\'exèrcit creui.', build: campFull(buildCampaign1) },
   { id: 'c1n2', n: 2, title: 'La Línia de Neerwinden', desc: 'Neerwinden, 18 de març de 1793. Creua els camps sota el foc de la bateria austríaca, aixafa els jägers del prat i desarma tres canons abans que caiguin els aliats.', build: campFull(buildCampaign2) },
-  { id: 'c1n3', n: 3, title: 'Esgotar el Perseguidor', desc: 'Després de Neerwinden, al capvespre. Escorta un carro de municions fins al pont i para les càrregues de la cavalleria lleugera austríaca formant el quadre.', build: campFull(buildCampaign3) }].filter(L => L.id !== 'c1n3' || UNLOCK_ALL);          // el nivell 3 encara és ocult al web: només es veu a la còpia de proves
+  { id: 'c1n3', n: 3, title: 'Esgotar el Perseguidor', desc: 'Després de Neerwinden, al capvespre. Escorta un carro de municions fins al pont i para les càrregues de la cavalleria lleugera austríaca fent un Ralliement.', build: campFull(buildCampaign3) }].filter(L => L.id !== 'c1n3' || UNLOCK_ALL);          // el nivell 3 encara és ocult al web: només es veu a la còpia de proves
 const CAMP_BY_ID = {}; for (const L of CAMP) CAMP_BY_ID[L.id] = L;
 // ---- Campanyes: les 8 campanyes amb els 85 nivells; la campanya 1 té mapa il·lustrat amb el recorregut ----
 const CAMP_DATA = [{"n":1,"t":"Forjant la República (1792-1797)","l":[[1,"El Bateig de Foc (Philippeville)","23 maig 1793"],[2,"La Línia de Neerwinden","18 març 1793"],[3,"Esgotar el Perseguidor","Post-Neerwinden"],[4,"Avançada cap a Hondschoote","Setembre 1793"],[5,"La Càrrega a Hondschoote","6 setembre 1793"],[6,"Boscos de Wattignies","15 octubre 1793"],[7,"Trencament del Setge","16 octubre 1793"],[8,"L'Amalgama de Fleurus","Maig 1794"],[9,"La Defensa Implacable","26 juny 1794"],[10,"Les Altures de Partenheim","1796"],[11,"Foc a Gaualgesheim","6 octubre 1796"],[12,"Consolidació a Kempten","Tardor 1796"]]},{"n":2,"t":"La Forja de L'Incomparable (1798-1800)","l":[[13,"L'Espessor de la Vendée","1799"],[14,"La Preparació a Dijon","Abril 1800"],[15,"L'Infern de Gel (Valais)","Primavera 1800"],[16,"Les Ribes de la Chiusella","26 maig 1800"],[17,"La cursa cap a Piacenza","Juny 1800"],[18,"Captura d'Honor","5-7 juny 1800"],[19,"El Col·lapse del Matí (Marengo)","14 juny 1800"],[20,"L'Ancora de Desaix","14 juny 1800"],[21,"La Mort del Comandant","14 juny 1800"],[22,"La Càrrega Incomparable","14 juny 1800"],[23,"La Fama Sancionada","Juny 1802"]]},{"n":3,"t":"El Sol d'Austerlitz i les Ombres del Danubi (1803-1805)","l":[[24,"Exercicis a Boulogne","1803-1805"],[25,"La Marxa d'Àguiles","Tardor 1805"],[26,"La Solitud de Haslach","11 octubre 1805"],[27,"El Laberint de Jungingen","11 octubre 1805"],[28,"Caça i Captura a Ulm","Octubre 1805"],[29,"L'Eixam del Danubi","Novembre 1805"],[30,"Ombres de Dürenstein","11 novembre 1805"],[31,"Acer fred a la Nit","11 novembre 1805"],[32,"Ocupació a Viena","Desembre 1805"],[33,"Recompte i Reforma","Entre 1805 i 1808"]]},{"n":4,"t":"Triomf, Tragèdia i Redempció (1806-1807)","l":[[34,"Avançant a Turíngia (Jena)","Octubre 1806"],[35,"L'Obsolescència (Jena)","14 octubre 1806"],[36,"La Rereguarda Esgotada","Octubre 1806"],[37,"Fam al Fang i la Neu","Hivern 1806-1807"],[38,"Pànic a Mohrungen","25 gener 1807"],[39,"L'Eclipsi de l'Àguila","25 gener 1807"],[40,"Eylau: Esgotament Blanc","8 febrer 1807"],[41,"L'Error de Bennigsen","14 juny 1807"],[42,"El Càstig dels Canons","14 juny 1807"],[43,"Purificats pel Foc","14 juny 1807"],[44,"Tilsit i Nou Equipament","Final 1807"]]},{"n":5,"t":"Sang a Espanya i Foc a Àustria (1808-1811)","l":[[45,"Els Engorjats (Pirineus)","1808"],[46,"La Marxa Furtiva (Talavera)","27 juliol 1809"],[47,"L'Assalt a l'Alt de Medellín","Nit 27 juliol 1809"],[48,"El Preu de la Foscor","Matinada 28 juliol 1809"],[49,"Suportant el Càstig","28 juliol 1809"],[50,"Les Trinxeres de Badajoz","1812"],[51,"Cobrint el Glacis","Final setge 1812"],[52,"El Cap de Pont d'Essling","Maig 1809"],[53,"L'Escorxador (Aspern-Essling)","Maig 1809"],[54,"La Ruta a l'Illa de Lobau","Final d'Essling"],[55,"Tempesta a Lobau","Juliol 1809"],[56,"Silenciant els Grenz","5 juliol 1809 (Wagram)"],[57,"L'Infern Lineal de l'Artilleria","6 juliol 1809 (Wagram)"],[58,"La Cacera i les Amputacions","Post-Wagram"]]},{"n":6,"t":"El Desastre i el Renaixement (1812-1813)","l":[[59,"La Pols del Niemen","Estiu 1812"],[60,"Smolensk En Flames","Agost 1812"],[61,"L'Ombra de Borodino","Pre-7 Setembre 1812"],[62,"La Fletxa Trencada","7 Setembre 1812 (Borodino)"],[63,"L'Arrelament (Borodino)","Final de Borodino"],[64,"L'Infern de Cristall","Hivern 1812 (Moscou)"],[65,"Berezina Gelada","Novembre 1812"],[66,"La Generació \"Marie Louise\"","Primavera 1813"],[67,"Desesperació a Lützen","2 maig 1813"],[68,"Ganivetada a Bautzen","20-21 maig 1813"],[69,"Tancats a Dresden","Agost 1813"],[70,"La Doctrina dels Dos Rangs","Octubre 1813"],[71,"La Gran Derrota (Leipzig)","16-19 Octubre 1813"]]},{"n":7,"t":"La Defensa de França i la Descomposició (1814)","l":[[72,"La Guerrilla Imperial","Gener 1814"],[73,"El Foc Cremant (Vauchamps)","14 febrer 1814"],[74,"La Costa Carnissera (Craonne)","Març 1814"],[75,"Les Roques del Sud (Orthez)","27 febrer 1814"],[76,"Retrocés Destructiu","Post-Orthez"],[77,"El Mur Ensangonat (Tolosa)","Abril 1814"],[78,"L'Amagatall i la Vergonya","Estiu 1814"]]},{"n":8,"t":"El Vol de l'Àliga i l'Ocàs (1815)","l":[[79,"L'Àliga a la Llum","Març 1815"],[80,"Oportunitat Furtiva","Juny 1815"],[81,"L'Infern Absolut (Ligny)","16 juny 1815"],[82,"L'Espasa Partida de Blücher","16 juny 1815"],[83,"La Ceguesa als Boscos","18 juny 1815"],[84,"Tancat entre les Aigües (Wavre)","18-19 juny 1815"],[85,"L'Ordre de Llicenciament","Estiu 1815"]]}];   // [{ n, t: títol, l: [[nivell, nom, data], …] }]
