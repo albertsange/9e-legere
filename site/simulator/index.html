@@ -2336,7 +2336,7 @@ function updateGuns(dt) {
     }
     if (a1 > a0 && b.ally) for (const u of ALLY) if (!u.script) for (const v of u.men) if (v.alive) {
       const rx = v.x - b.ox, ry = v.y - b.oy, uu = rx * b.dx + ry * b.dy, w = Math.abs(-rx * b.dy + ry * b.dx);
-      if (uu >= a0 && uu <= a1 && w < TUNE.art.ample && Math.random() < 0.55) { v.alive = false; addCorpse(v.x, v.y, u.h, true, v.rank); }
+      if (uu >= a0 && uu <= a1 && w < TUNE.art.ample && Math.random() < 0.3) { v.alive = false; addCorpse(v.x, v.y, u.h, true, v.rank); }
     }
     if (b.s >= b.end) { BALLS.splice(i, 1); if (b.kills) reac('decebut', '<b>Louis:</b> Una bala de canó s\'ha endut <b>' + b.kills + '</b> homes!', 3500); lastKey = ''; }
   }
@@ -2375,11 +2375,12 @@ function advGunTick(g, dt) {                     // bateria d'IA: tria objectiu 
   const sees = clear && dP <= g.vis && angP <= g.cone, heard = clear && now - (co.lastShot || 0) < 9000 && dP <= g.vis + 30;
   g.alertT = sees || heard ? 6 : Math.max(0, g.alertT - dt);
   let allies = ALLY.filter(a => !a.script && a.men.some(v => v.alive));
-  if (g.vil && !g.vilOn) { if (allies.some(a => Math.hypot(a.cx - g.vil.x, a.cy - g.vil.y) < g.vil.r)) g.vilOn = true; else allies = []; }          // g.vil: no bombardegen fins que els aliats arriben al poble
+  if (g.vil) allies = allies.filter(a => Math.hypot(a.cx - g.vil.x, a.cy - g.vil.y) < g.vil.r);          // g.vil: només bombardegen els aliats que són al poble (no els dels camps de sota)
+  if (g.vil && !g.vilOn && allies.length) g.vilOn = true;
   let tgt = null;
   if (clear && g.alertT > 0 && dP <= g.range) tgt = { x: c.x, y: c.y, p: true, d: dP };
   if (!tgt && allies.length) { let bd = 1e9; for (const a of allies) { const d = Math.hypot(a.cx - g.x, a.cy - g.y); if (d < bd && d <= g.range) { bd = d; tgt = { x: a.cx, y: a.cy, d, a }; } } }
-  if (!tgt && clear && !allies.length && !(g.vil && !g.vilOn && ALLY.some(a => !a.script && a.men.some(v => v.alive))) && dP <= g.range) tgt = { x: c.x, y: c.y, p: true, d: dP };
+  if (!tgt && clear && !allies.length && !(g.vil && ALLY.some(a => !a.script && a.men.some(v => v.alive))) && dP <= g.range) tgt = { x: c.x, y: c.y, p: true, d: dP };
   g.tgt = tgt;
   if (!tgt) { g.aimT = 0; return; }
   if (tgt.a && g.alt && level && level.houseTarget) { const hh = level.houseTarget(tgt.x, tgt.y); if (hh) tgt = { x: hh.x, y: hh.y, d: Math.hypot(hh.x - g.x, hh.y - g.y), a: tgt.a, house: true }; }   // un tret de cada dos, a les cases del poble
@@ -2657,13 +2658,26 @@ function aiUnitTick(u, side, dt) {
     if (Math.abs(diff) < A.retirada.tol) { const sp = STEP * PACES.accelerat.cad / 60 * dt; aiMove(u, Math.cos(u.h) * sp, Math.sin(u.h) * sp); }
     return;
   }
-  const gs = aiGroups(side).filter(g => !u.onlyPlayer || g.own); if (!gs.length) return;       // onlyPlayer: la unitat només persegueix el jugador (els jägers del nivell 2)
+  const fo = u.focus && enAlive(u.focus) > 0 && !u.focus.routed ? u.focus : null;                       // focus: lluita només contra aquesta unitat mentre sigui viva (batalla dins del poble)
+  const gs = aiGroups(side).filter(g => (!u.onlyPlayer || g.own) && (!u.onlyAllies || g.ally) && (!fo || g.en === fo || g.ally === fo));
+  if (!gs.length) {
+    if (u.plaza) {                                                           // ha vençut: va a la plaça del poble i s'hi queda format (no persegueix el jugador)
+      const dx = u.plaza.x - u.cx, dy = u.plaza.y - u.cy, d = Math.hypot(dx, dy);
+      if (d > 1.5) {
+        const diff = wrapA(Math.atan2(dy, dx) - u.h), st = Math.max(-A.retirada.gir * dt, Math.min(A.retirada.gir * dt, diff));
+        if (Math.abs(st) > 1e-5) aiRot(u, st);
+        if (Math.abs(diff) < A.retirada.tol) { const sp = STEP * PACES.ordinari.cad / 60 * dt; aiMove(u, Math.cos(u.h) * sp, Math.sin(u.h) * sp); }
+      } else { const diff = wrapA(Math.PI - u.h); if (Math.abs(diff) > 0.02) aiRot(u, Math.max(-A.retirada.gir * dt, Math.min(A.retirada.gir * dt, diff))); }
+    }
+    return;
+  }       // onlyPlayer: la unitat només persegueix el jugador (els jägers del nivell 2)
   const vis = gs.filter(g => !losBlocked(u.cx, u.cy, g.cx, g.cy));              // només veu els qui no té tapats per una casa o el bosc
   let best = null, bs = 1e9;                                                // tria objectiu: el més proper; compta com a més proper el que ens ensenya el flanc o és més feble
   for (const g of vis) {
     const d = Math.hypot(g.cx - u.cx, g.cy - u.cy), face = Math.abs(wrapA(Math.atan2(u.cy - g.cy, u.cx - g.cx) - g.h));
     const sc = d - (face > A.flanc ? A.flancBonus : 0) - (g.men.length < A.feble ? A.febleBonus : 0) - (g.own ? A.jugadorBonus : 0); if (sc < bs) { bs = sc; best = g; }
   }
+  if (!best && fo) u.last = { x: fo.cx, y: fo.cy };                        // la unitat amb qui lluita no la veu (cases pel mig): sap on és
   if (!best && u.onlyPlayer) { const c0 = unitCentre(); u.last = { x: c0.x, y: c0.y }; }
   let tx, ty;
   if (best) { u.last = { x: best.cx, y: best.cy }; tx = best.cx; ty = best.cy; }
@@ -4542,7 +4556,7 @@ let autoStepT = 0;
 const VOICE = { on: false, rec: null, running: false, tested: false, seg: {}, interim: '', state: '', failT: 0, lastFail: null,
   learn: { phr: {}, ex: {} }, shared: { phr: {}, ex: {} }, opt: { mode: 'cont', vol: true, log: false, tele: true, engine: '' }, log: [], recentExec: null, ptt: false, db: false, loading: false };
 // Connexió amb Supabase (la mateixa de la web: si el joc s'obre dins la web, agafa window.APP_CONFIG) i fonts del motor local Vosk
-const GAME_VERSION = '1.8.27';
+const GAME_VERSION = '1.8.28';
 const CFG = Object.assign({
   SUPABASE_URL: 'https://ltopullwhasagnkuqaek.supabase.co',
   SUPABASE_ANON_KEY: 'sb_publishable_DhHFUh-UrbBrI0l476Vcnw_tSn-Gmkr',
@@ -6409,12 +6423,13 @@ function buildCampaign2() {
       for (const h of vil) h.dmg = 0;
       // els tres batallons austríacs i els dos de línia són «attrezzo» de la batalla: no es retiren mai. El 1r de cada bàndol lluita dins del poble; els altres, als camps de sota
       const lastA = [{ x: VC.x + 7, y: 16.5 }, { x: VC.x + 4, y: 24 }, { x: VC.x - 2, y: 29 }];
-      ENEMY.filter(e => e.ai).forEach((e, i) => { e.reload = 6 + Math.random() * 6; e.supp = 0; e.state = ''; e.last = lastA[i] || { x: VC.x + 8, y: VC.y }; e.n0 = e.men.length; e.noRetreat = true; if (i === 0) e.hold = 9; });
+      ENEMY.filter(e => e.ai).forEach((e, i) => { e.reload = 6 + Math.random() * 6; e.supp = 0; e.state = ''; e.last = lastA[i] || { x: VC.x + 8, y: VC.y }; e.n0 = e.men.length; e.noRetreat = true; e.onlyAllies = true; e.plaza = [{ x: VC.x + 3, y: VC.y - 2.5 }, { x: VC.x + 4, y: VC.y + 3 }, { x: VC.x - 3, y: VC.y + 3 }][i] || { x: VC.x, y: VC.y }; if (i === 0) e.hold = 9; });
       [['22e demi-brigade de ligne', 'f22', 16.5, { x: VC.x - 7, y: 16.5 }, 9], ['28e demi-brigade de ligne', 'f28', 24, { x: VC.x - 8, y: 29 }, 22]].forEach(([nm, fl, y, lst, hd]) => {
-        const u = Object.assign(buildEnemy({ name: nm, flag: fl, cx: 14, cy: y, h: 0, nFiles: 10 }), { ai: true, hold: hd, reload: 4 + Math.random() * 5, supp: 0, state: '', off: 0, last: lst, n0: 20, noRetreat: true, tough: 0.6 });
+        const u = Object.assign(buildEnemy({ name: nm, flag: fl, cx: 14, cy: y, h: 0, nFiles: 10 }), { ai: true, hold: hd, reload: 4 + Math.random() * 5, supp: 0, state: '', off: 0, last: lst, n0: 20, noRetreat: true, tough: 0.5 });
         if (y === 16.5) { aiSlots(u, 5); u.colRef = { x: VC.x - 11 }; }                                  // entra al poble en columna i es desplega en línia (par peloton en ligne)
         ALLY.push(u);
       });
+      { const au1 = ENEMY.find(e => e.ai), a1 = ALLY.find(a => a.colRef); if (au1 && a1) { au1.focus = a1; a1.focus = au1; } }
     },
     tick(dt) {
       if (screen !== 'game' || paused || tutOpen() || co.lost) return;
