@@ -4516,7 +4516,7 @@ let autoStepT = 0;
 const VOICE = { on: false, rec: null, running: false, tested: false, seg: {}, interim: '', state: '', failT: 0, lastFail: null,
   learn: { phr: {}, ex: {} }, shared: { phr: {}, ex: {} }, opt: { mode: 'cont', vol: true, log: false, tele: true, engine: '' }, log: [], recentExec: null, ptt: false, db: false, loading: false };
 // Connexió amb Supabase (la mateixa de la web: si el joc s'obre dins la web, agafa window.APP_CONFIG) i fonts del motor local Vosk
-const GAME_VERSION = '1.8.24';
+const GAME_VERSION = '1.8.25';
 const CFG = Object.assign({
   SUPABASE_URL: 'https://ltopullwhasagnkuqaek.supabase.co',
   SUPABASE_ANON_KEY: 'sb_publishable_DhHFUh-UrbBrI0l476Vcnw_tSn-Gmkr',
@@ -6745,7 +6745,7 @@ window.addEventListener('keydown', e => { if (tutOpen() && (e.key === 'Escape' |
 document.getElementById('btnLevels').onclick = () => showScreen('levels');
 document.getElementById('btnBackTitle').onclick = () => showScreen('title');
 // La campanya només s'obre un cop completat el tutorial; si no, en Louis t'hi envia
-const tutDone = () => /[?&]campok\b/.test(location.search) || LEVELS.filter(L => !L.locked).every(L => !!PROG.levels[L.n]);
+const tutDone = () => UNLOCK_ALL || /[?&]campok\b/.test(location.search) || LEVELS.filter(L => !L.locked).every(L => !!PROG.levels[L.n]);
 let campTry = 0;
 function louisGate() {
   let m = document.getElementById('louisGate');
