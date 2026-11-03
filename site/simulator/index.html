@@ -4406,7 +4406,7 @@ let autoStepT = 0;
 const VOICE = { on: false, rec: null, running: false, tested: false, seg: {}, interim: '', state: '', failT: 0, lastFail: null,
   learn: { phr: {}, ex: {} }, shared: { phr: {}, ex: {} }, opt: { mode: 'cont', vol: true, log: false, tele: true, engine: '' }, log: [], recentExec: null, ptt: false, db: false, loading: false };
 // Connexió amb Supabase (la mateixa de la web: si el joc s'obre dins la web, agafa window.APP_CONFIG) i fonts del motor local Vosk
-const GAME_VERSION = '1.8.16';
+const GAME_VERSION = '1.8.17';
 const CFG = Object.assign({
   SUPABASE_URL: 'https://ltopullwhasagnkuqaek.supabase.co',
   SUPABASE_ANON_KEY: 'sb_publishable_DhHFUh-UrbBrI0l476Vcnw_tSn-Gmkr',
@@ -6508,6 +6508,7 @@ function louisGate() {
     m = document.createElement('div'); m.id = 'louisGate';
     m.style.cssText = 'position:fixed;inset:0;z-index:400;display:none;align-items:center;justify-content:center;background:rgba(10,14,30,.6);padding:16px';
     m.innerHTML = '<div style="background:var(--sheet,#fff);border:2px solid var(--ecarlate,#b3261e);border-radius:8px;max-width:440px;width:100%;padding:18px;display:flex;flex-direction:column;gap:14px;box-shadow:0 10px 40px rgba(0,0,0,.5)">' +
+      '<h3 style="margin:0;font-family:var(--label);font-weight:400;letter-spacing:.06em;text-transform:uppercase;font-size:1.15rem;color:var(--ecarlate,#b3261e);text-align:center">No has completat el tutorial</h3>' +
       '<div style="display:flex;gap:12px;align-items:flex-end"><img id="lgImg" style="width:96px;flex:none"><div id="lgTxt" style="font-size:1.05rem;line-height:1.35"></div></div>' +
       '<div style="display:flex;gap:10px;justify-content:flex-end"><button class="btn-sec" id="lgRetry">Tornar-ho a intentar</button><button class="btn-main" id="lgTut">Anar al tutorial</button></div></div>';
     document.body.appendChild(m);
