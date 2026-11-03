@@ -2611,9 +2611,8 @@ function aiReformTick(u, dt) {                   // true mentre es desplega (ale
   if (!u.colRef) return false;
   if (!u.reforming) {
     if (u.cx < u.colRef.x) return false;
-    u.reforming = 0.001; if (u.colRef.say) reac('assenyala', '<b>Louis:</b> «Par peloton – en ligne!» El 22è es desplega al mig del poble.', 4500); const c = Math.cos(u.h), sn = Math.sin(u.h); let i = 0;
+    u.reforming = 0.001; const c = Math.cos(u.h), sn = Math.sin(u.h); let i = 0;
     for (const m of u.men) { const rk = Math.floor(i / 10), f = i % 10, a = -rk * RANK_GAP, l = (5 - 0.5 - f) * FRONT; m.x0 = m.x; m.y0 = m.y; m.x1 = u.cx + c * a - sn * l; m.y1 = u.cy + sn * a + c * l; i++; }
-    reac('louis', '<b>Louis:</b> Par peloton en ligne!', 2200);
   }
   u.reforming += dt / 3.5; const p = Math.min(1, u.reforming), e = p * p * (3 - 2 * p);
   for (const m of u.men) { m.x = m.x0 + (m.x1 - m.x0) * e; m.y = m.y0 + (m.y1 - m.y0) * e; }
@@ -4597,7 +4596,7 @@ let autoStepT = 0;
 const VOICE = { on: false, rec: null, running: false, tested: false, seg: {}, interim: '', state: '', failT: 0, lastFail: null,
   learn: { phr: {}, ex: {} }, shared: { phr: {}, ex: {} }, opt: { mode: 'cont', vol: true, log: false, tele: true, engine: '' }, log: [], recentExec: null, ptt: false, db: false, loading: false };
 // Connexió amb Supabase (la mateixa de la web: si el joc s'obre dins la web, agafa window.APP_CONFIG) i fonts del motor local Vosk
-const GAME_VERSION = '1.8.33';
+const GAME_VERSION = '1.8.34';
 const CFG = Object.assign({
   SUPABASE_URL: 'https://ltopullwhasagnkuqaek.supabase.co',
   SUPABASE_ANON_KEY: 'sb_publishable_DhHFUh-UrbBrI0l476Vcnw_tSn-Gmkr',
@@ -6421,7 +6420,7 @@ function buildCampaign2() {
   ];
   const ash = (v, i) => ((Math.sin(v * 12.9898 + i * 78.233) * 43758.5453) % 1 + 1) % 1;
   return {
-    w: W, h: H, pad: 16, freeStab: true, localStab: true, obertura: 0.1, start: { x: 22, y: 34 }, obstacles: obs, scene: MapKit.scene(sc), zone: null, musket: true, skirm: true, driftScale: 0.5, goalHeading: 0, minMen: 8,
+    w: W, h: H, pad: 16, freeStab: true, localStab: true, obertura: 0.1, start: { x: 22, y: 34 }, obstacles: obs, scene: MapKit.scene(sc), zone: null, musket: true, skirm: true, driftScale: 0.5, goalHeading: 0,
     cover, walls,
     guns: GYS.map((y, i) => ({ x: GX, y, h: Math.PI, name: 'Canó austríac ' + (i + 1), crew: 5, adv: true, half: true, range: 95, vis: 62, cone: 1.0, can: 25, rt: 14, rot: 0.3, vil: { x: VC.x, y: 14, r: 13 } })),
     enemies: [
@@ -6498,8 +6497,7 @@ function buildCampaign2() {
     win: () => st.done,
     objectives: [
       { t: 'Aixafar els jägers del prat (en perdre la meitat, es retiren)', ok: () => jagDone() },
-      { t: 'Desarmar els dos canons (matar-ne tres servidors de cada)', ok: () => downN() >= 2 },
-      { t: 'Mantenir la unitat amb almenys 8 homes', ok: () => co.members.length >= 8 }
+      { t: 'Desarmar els dos canons (matar-ne tres servidors de cada)', ok: () => downN() >= 2 }
     ],
     goalText: 'Creua els camps cap a la bateria austríaca abans que caiguin els aliats, aixafa els jägers del prat i desarma els dos canons matant-ne els servidors.',
     endText: 'Molt bé, chasseur: has creuat els camps sota el foc, has fet recular els jägers i has fet callar els dos canons de l\'Arxiduc. Neerwinden crema, però la línia francesa aguanta gràcies al 9e. Aquesta és la lliçó: l\'artilleria no s\'aguanta de cara, es pren pel flanc i amb pressa!'
