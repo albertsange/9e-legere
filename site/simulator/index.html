@@ -2341,7 +2341,7 @@ function updateGuns(dt) {
     }
     if (a1 > a0 && b.ally) for (const u of ALLY) if (!u.script) for (const v of u.men) if (v.alive) {
       const rx = v.x - b.ox, ry = v.y - b.oy, uu = rx * b.dx + ry * b.dy, w = Math.abs(-rx * b.dy + ry * b.dx);
-      if (uu >= a0 && uu <= a1 && w < TUNE.art.ample && Math.random() < 0.3) { v.alive = false; addCorpse(v.x, v.y, u.h, true, v.rank); }
+      if (uu >= a0 && uu <= a1 && w < TUNE.art.ample) { v.alive = false; addCorpse(v.x, v.y, u.h, true, v.rank); }
     }
     if (b.s >= b.end) { BALLS.splice(i, 1); if (b.kills) reac('decebut', '<b>Louis:</b> Una bala de canó s\'ha endut <b>' + b.kills + '</b> homes!', 3500); lastKey = ''; }
   }
@@ -2634,7 +2634,7 @@ function aiVolley(u, g, side) {
   if (!live.length) return;
   for (const v of live) { const d = Math.random() * T.escalf * (Math.random() < T.tardaP ? T.tardaK : 1); FX.push({ k: 'shot', x: v.x + Math.cos(u.h) * 1.25, y: v.y + Math.sin(u.h) * 1.25, a: u.h, t: -d }); SFX.shot(d); }
   SFX.rumble(0.08, T.escalf + 1.2);
-  const S = makeStrip(all, u.h, u.h, T.obertura), n = live.length / 20 * (side === 'au' ? TUNE.ia.nAu : TUNE.ia.nFr) * (1 - Math.min(TUNE.ia.supMax, u.supp || 0)) * (g.ally && g.ally.tough ? g.ally.tough : 1);
+  const S = makeStrip(all, u.h, u.h, T.obertura), n = live.length / 20 * (side === 'au' ? TUNE.ia.nAu : TUNE.ia.nFr) * (1 - Math.min(TUNE.ia.supMax, u.supp || 0));
   const r = hitMen(S, g.men, n);
   if (g.own) {
     const k = r.dead.length; for (const m of r.dead) killOwn(m); lastKey = '';
@@ -2667,6 +2667,12 @@ function aiUnitTick(u, side, dt) {
     const diff = wrapA(u.awayH - u.h), st = Math.max(-A.retirada.gir * dt, Math.min(A.retirada.gir * dt, diff));
     if (Math.abs(st) > 1e-5) aiRot(u, st);
     if (Math.abs(diff) < A.retirada.tol) { const sp = STEP * PACES.accelerat.cad / 60 * dt; aiMove(u, Math.cos(u.h) * sp, Math.sin(u.h) * sp); }
+    return;
+  }
+  if (u.colRef && !u.reforming && u.colRef.y !== undefined) {                 // columna d'entrada: avança recta pel carrer fins al lloc on es desplega (no es desvia ni busca enemics)
+    const dx = u.colRef.x + 3 - u.cx, dy = u.colRef.y - u.cy, diff = wrapA(Math.atan2(dy, dx) - u.h);
+    if (Math.abs(diff) > 0.02) aiRot(u, Math.max(-A.retirada.gir * dt, Math.min(A.retirada.gir * dt, diff)));
+    const sp = STEP * PACES.ordinari.cad / 60 * dt; aiMove(u, Math.cos(u.h) * sp, Math.sin(u.h) * sp);
     return;
   }
   const fo = u.focus && enAlive(u.focus) > 0 && !u.focus.routed ? u.focus : null;                       // focus: lluita només contra aquesta unitat mentre sigui viva (batalla dins del poble)
@@ -4596,7 +4602,7 @@ let autoStepT = 0;
 const VOICE = { on: false, rec: null, running: false, tested: false, seg: {}, interim: '', state: '', failT: 0, lastFail: null,
   learn: { phr: {}, ex: {} }, shared: { phr: {}, ex: {} }, opt: { mode: 'cont', vol: true, log: false, tele: true, engine: '' }, log: [], recentExec: null, ptt: false, db: false, loading: false };
 // Connexió amb Supabase (la mateixa de la web: si el joc s'obre dins la web, agafa window.APP_CONFIG) i fonts del motor local Vosk
-const GAME_VERSION = '1.8.34';
+const GAME_VERSION = '1.8.36';
 const CFG = Object.assign({
   SUPABASE_URL: 'https://ltopullwhasagnkuqaek.supabase.co',
   SUPABASE_ANON_KEY: 'sb_publishable_DhHFUh-UrbBrI0l476Vcnw_tSn-Gmkr',
@@ -6465,8 +6471,8 @@ function buildCampaign2() {
       const lastA = [{ x: VC.x + 7, y: 16.5 }, { x: VC.x + 4, y: 24 }, { x: VC.x - 2, y: 29 }];
       ENEMY.filter(e => e.ai).forEach((e, i) => { e.reload = 6 + Math.random() * 6; e.supp = 0; e.state = ''; e.last = lastA[i] || { x: VC.x + 8, y: VC.y }; e.n0 = e.men.length; e.noRetreat = true; e.onlyAllies = true; e.plaza = [{ x: VC.x + 3, y: VC.y - 2.5 }, { x: VC.x + 4, y: VC.y + 3 }, { x: VC.x - 3, y: VC.y + 3 }][i] || { x: VC.x, y: VC.y }; if (i === 0) e.hold = 9; });
       [['22e demi-brigade de ligne', 'f22', 16.5, { x: VC.x - 7, y: 16.5 }, 9], ['28e demi-brigade de ligne', 'f28', 24, { x: VC.x - 8, y: 29 }, 22]].forEach(([nm, fl, y, lst, hd]) => {
-        const u = Object.assign(buildEnemy({ name: nm, flag: fl, cx: 14, cy: y, h: 0, nFiles: 10 }), { ai: true, hold: hd, reload: 4 + Math.random() * 5, supp: 0, state: '', off: 0, last: lst, n0: 20, noRetreat: true, tough: 0.5 });
-        if (y === 16.5) { u.last = { x: VC.x + 1, y: 16.5 }; aiSlots(u, 5); u.colRef = { x: VC.x - 4, say: true }; }                                  // entra al poble en columna i es desplega en línia (par peloton en ligne)
+        const u = Object.assign(buildEnemy({ name: nm, flag: fl, cx: 14, cy: y, h: 0, nFiles: 10 }), { ai: true, hold: hd, reload: 4 + Math.random() * 5, supp: 0, state: '', off: 0, last: lst, n0: 20, noRetreat: true });
+        if (y === 16.5) { u.last = { x: VC.x + 1, y: 16.5 }; aiSlots(u, 5); u.colRef = { x: VC.x - 4, y: 16.5 }; }                                  // entra al poble en columna i es desplega en línia (par peloton en ligne)
         ALLY.push(u);
       });
       { const au1 = ENEMY.find(e => e.ai), a1 = ALLY.find(a => a.colRef); if (au1 && a1) { au1.focus = a1; a1.focus = au1; } }
