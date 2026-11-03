@@ -2373,11 +2373,12 @@ function advGunTick(g, dt) {                     // bateria d'IA: tria objectiu 
   const angP = c ? Math.abs(wrapA(Math.atan2(c.y - g.y, c.x - g.x) - g.h)) : 9, clear = c && !losBlocked(g.x, g.y, c.x, c.y);
   const sees = clear && dP <= g.vis && angP <= g.cone, heard = clear && now - (co.lastShot || 0) < 9000 && dP <= g.vis + 30;
   g.alertT = sees || heard ? 6 : Math.max(0, g.alertT - dt);
-  const allies = ALLY.filter(a => !a.script && a.men.some(v => v.alive));
+  let allies = ALLY.filter(a => !a.script && a.men.some(v => v.alive));
+  if (g.vil && !g.vilOn) { if (allies.some(a => Math.hypot(a.cx - g.vil.x, a.cy - g.vil.y) < g.vil.r)) g.vilOn = true; else allies = []; }          // g.vil: no bombardegen fins que els aliats arriben al poble
   let tgt = null;
   if (clear && g.alertT > 0 && dP <= g.range) tgt = { x: c.x, y: c.y, p: true, d: dP };
   if (!tgt && allies.length) { let bd = 1e9; for (const a of allies) { const d = Math.hypot(a.cx - g.x, a.cy - g.y); if (d < bd && d <= g.range) { bd = d; tgt = { x: a.cx, y: a.cy, d, a }; } } }
-  if (!tgt && clear && !allies.length && dP <= g.range) tgt = { x: c.x, y: c.y, p: true, d: dP };
+  if (!tgt && clear && !allies.length && !(g.vil && !g.vilOn && ALLY.some(a => !a.script && a.men.some(v => v.alive))) && dP <= g.range) tgt = { x: c.x, y: c.y, p: true, d: dP };
   g.tgt = tgt;
   if (!tgt) { g.aimT = 0; return; }
   const ang = Math.atan2(tgt.y - g.y, tgt.x - g.x), dh = wrapA(ang - g.h), rot = (g.rot || A.gir) * dt;
@@ -2722,7 +2723,7 @@ function aiTickAll(dt) {
   for (const e of ENEMY) if (e.ai) {
     if (e.n0 === undefined) e.n0 = e.men.length;
     const n = enAlive(e);
-    if (e.state !== 'retreat' && !e.routed && n > 0 && n <= e.n0 * TUNE.ia.retirada.perduda && e.n0 > n) { const c = co.members.length ? unitCentre() : { x: e.cx - 1, y: e.cy }; e.state = 'retreat'; e.awayH = Math.atan2(e.cy - c.y, e.cx - c.x); reac('louis', '<b>Louis:</b> Han perdut la meitat dels homes: es retiren!', 2600); }
+    if (!e.noRetreat && e.state !== 'retreat' && !e.routed && n > 0 && n <= e.n0 * TUNE.ia.retirada.perduda && e.n0 > n) { const c = co.members.length ? unitCentre() : { x: e.cx - 1, y: e.cy }; e.state = 'retreat'; e.awayH = Math.atan2(e.cy - c.y, e.cx - c.x); reac('louis', '<b>Louis:</b> Han perdut la meitat dels homes: es retiren!', 2600); }
     aiUnitTick(e, 'au', dt);
   }
   for (const a of ALLY) if (!a.script) aiUnitTick(a, 'fr', dt);
@@ -4516,7 +4517,7 @@ let autoStepT = 0;
 const VOICE = { on: false, rec: null, running: false, tested: false, seg: {}, interim: '', state: '', failT: 0, lastFail: null,
   learn: { phr: {}, ex: {} }, shared: { phr: {}, ex: {} }, opt: { mode: 'cont', vol: true, log: false, tele: true, engine: '' }, log: [], recentExec: null, ptt: false, db: false, loading: false };
 // Connexió amb Supabase (la mateixa de la web: si el joc s'obre dins la web, agafa window.APP_CONFIG) i fonts del motor local Vosk
-const GAME_VERSION = '1.8.25';
+const GAME_VERSION = '1.8.26';
 const CFG = Object.assign({
   SUPABASE_URL: 'https://ltopullwhasagnkuqaek.supabase.co',
   SUPABASE_ANON_KEY: 'sb_publishable_DhHFUh-UrbBrI0l476Vcnw_tSn-Gmkr',
@@ -6287,7 +6288,7 @@ function buildCampaign1() {
 // Dos batallons aliats van a defensar el poble, atacat per tres batallons austríacs; mentre hi hagi aliats, els canons bombardegen el poble (que es va destruint).
 // El 9e ha de creuar els camps cap als canons i silenciar-los (matar-ne més de la meitat dels servidors) abans que els aliats caiguin; pels prats arriba una unitat de jägers.
 function buildCampaign2() {
-  const A = MapKit.A, W = 170, H = 58, sc = [], obs = [], walls = [], R = MapKit.rng(77);
+  const A = MapKit.A, W = 170, H = 74, sc = [], obs = [], walls = [], R = MapKit.rng(77);
   const MSG_H = 'Has tocat una casa: torna-ho a provar';
   const VC = { x: 66, y: 16.5 };                                                                           // centre del poble
   const vil = [];                                                                                          // cases del poble (amb el seu desgast)
@@ -6308,7 +6309,7 @@ function buildCampaign2() {
   // Neerwinden: poble amb carrers i cases a l'atzar
   const segD = (x, y, a, b) => { const dx = b[0] - a[0], dy = b[1] - a[1], k = Math.max(0, Math.min(1, ((x - a[0]) * dx + (y - a[1]) * dy) / (dx * dx + dy * dy))); return Math.hypot(x - a[0] - dx * k, y - a[1] - dy * k); };
   const placed = [[VC.x - 6, VC.y - 5, 3.4]], inVil = (x, y, r) => ((x - VC.x) / (17 - r * 0.6)) ** 2 + ((y - 14.5) / (11.5 - r * 0.6)) ** 2 < 1;
-  const freeH = (x, y, r) => { if (!inVil(x, y, r)) return false; for (const rd of [st1, st2]) for (let i = 1; i < rd.length; i++) if (segD(x, y, rd[i - 1], rd[i]) < 1.6 + r * 0.55) return false; for (const q of placed) if (Math.hypot(x - q[0], y - q[1]) < (q[2] + r) * 0.85) return false; return true; };
+  const freeH = (x, y, r) => { if (!inVil(x, y, r)) return false; for (const rd of [st1, st2]) for (let i = 1; i < rd.length; i++) if (segD(x, y, rd[i - 1], rd[i]) < (rd === st1 ? 2.9 : 1.6) + r * 0.55) return false; for (const q of placed) if (Math.hypot(x - q[0], y - q[1]) < (q[2] + r) * 0.72) return false; return true; };
   vil.push(house(VC.x - 6, VC.y - 5, 3.6, 6, 0, 'church'));
   for (let n = 0, t = 0; n < 22 && t < 30000; t++) {
     const x = VC.x - 17 + R() * 34, y = 3 + R() * 23, w = 4.2 + R() * 1.6, h = 3 + R() * 1.2, rot = (R() - 0.5) * 0.3, r = Math.hypot(w, h) / 2 * 0.78 + 0.2;
@@ -6316,7 +6317,7 @@ function buildCampaign2() {
   }
   // bosc de la dreta (sota la bateria) i boscos del marge decoratiu
   const wd = (pts, kind, seed) => A.wood(pts, { kind, spacing: 2.6, seed });
-  const woods = [wd([[100, 45], [110, 43.5], [122, 44.5], [125, 52], [113, 56], [102, 54]], 'mixed', 61), wd([[158, 2], [168, 3], [168, 14], [160, 13]], 'broad', 62), wd([[2, 48], [16, 47], [20, 56], [4, 57]], 'mixed', 63)];
+  const woods = [wd([[100, 45], [110, 43.5], [122, 44.5], [125, 52], [113, 56], [102, 54]], 'mixed', 61), wd([[0, 69], [40, 68], [90, 70], [130, 68.5], [170, 69.5], [170, 80], [0, 80]], 'broad', 64), wd([[158, 2], [168, 3], [168, 14], [160, 13]], 'broad', 62), wd([[2, 48], [16, 47], [20, 56], [4, 57]], 'mixed', 63)];
   sc.push(...woods); cover.push(...woods.flatMap(w => w.trees));
   const ew = (pts, kind, seed) => A.wood(pts, { kind, spacing: 2.6, seed });
   sc.push(ew([[-16, -16], [W + 16, -16], [W + 16, -2], [-16, -2]], 'mixed', 71), ew([[-16, H + 2], [W + 16, H + 2], [W + 16, H + 16], [-16, H + 16]], 'broad', 72), ew([[-16, -2], [-2, -2], [-2, H + 2], [-16, H + 2]], 'mixed', 73), ew([[W + 2, -2], [W + 16, -2], [W + 16, H + 2], [W + 2, H + 2]], 'broad', 74));
@@ -6342,10 +6343,10 @@ function buildCampaign2() {
   return {
     w: W, h: H, pad: 16, freeStab: true, obertura: 0.1, start: { x: 22, y: 34 }, obstacles: obs, scene: MapKit.scene(sc), zone: null, musket: true, skirm: true, driftScale: 0.5, goalHeading: 0, minMen: 8,
     cover, walls,
-    guns: GYS.map((y, i) => ({ x: GX, y, h: Math.PI, name: 'Canó austríac ' + (i + 1), crew: 5, adv: true, half: true, range: 95, vis: 62, cone: 1.0, can: 25, rt: 14, rot: 0.3 })),
+    guns: GYS.map((y, i) => ({ x: GX, y, h: Math.PI, name: 'Canó austríac ' + (i + 1), crew: 5, adv: true, half: true, range: 95, vis: 62, cone: 1.0, can: 25, rt: 14, rot: 0.3, vil: { x: VC.x, y: 14, r: 13 } })),
     enemies: [
-      { name: '1r batalló austríac', flag: 'aut', cx: 124, cy: 8, h: Math.PI, nFiles: 10, shoots: true, ai: true, hold: 20, off: 0 },
-      { name: '2n batalló austríac', flag: 'aut', cx: 128, cy: 17, h: Math.PI, nFiles: 10, shoots: true, ai: true, hold: 20, off: 0 },
+      { name: '1r batalló austríac', flag: 'aut', cx: 124, cy: 16.5, h: Math.PI, nFiles: 6, shoots: true, ai: true, hold: 20, off: 0 },
+      { name: '2n batalló austríac', flag: 'aut', cx: 128, cy: 22, h: Math.PI, nFiles: 10, shoots: true, ai: true, hold: 20, off: 0 },
       { name: '3r batalló austríac', flag: 'aut', cx: 124, cy: 26, h: Math.PI, nFiles: 10, shoots: true, ai: true, hold: 20, off: 0 }
     ],
     tutorial: { steps, figs: [], startAtencio: true, resetStep: () => 1 },
@@ -6377,8 +6378,10 @@ function buildCampaign2() {
     onReset() {
       st.t = 0; st.jag = false; st.jagE = null; st.fin = undefined; st.done = false; st.allyGone = false; st.down = 0;
       for (const h of vil) h.dmg = 0;
-      for (const e of ENEMY) if (e.ai) { e.reload = 6 + Math.random() * 6; e.supp = 0; e.state = ''; e.last = { x: VC.x + 8, y: VC.y }; e.n0 = e.men.length; }
-      [['1r batalló de línia', 12], ['2n batalló de línia', 24]].forEach(([nm, y]) => ALLY.push(Object.assign(buildEnemy({ name: nm, flag: '9e', cx: 14, cy: y, h: 0, nFiles: 10 }), { ai: true, hold: 22, reload: 4 + Math.random() * 5, supp: 0, state: '', off: 0, last: { x: VC.x - 4, y: VC.y }, n0: 20 })));
+      // els tres batallons austríacs i els dos de línia són «attrezzo» de la batalla: no es retiren mai. El 1r de cada bàndol lluita dins del poble; els altres, als camps de sota
+      const lastA = [{ x: VC.x + 7, y: 16.5 }, { x: VC.x + 4, y: 24 }, { x: VC.x - 2, y: 29 }];
+      ENEMY.filter(e => e.ai).forEach((e, i) => { e.reload = 6 + Math.random() * 6; e.supp = 0; e.state = ''; e.last = lastA[i] || { x: VC.x + 8, y: VC.y }; e.n0 = e.men.length; e.noRetreat = true; if (i === 0) e.hold = 9; });
+      [['1r batalló de línia', 16.5, { x: VC.x - 7, y: 16.5 }, 9], ['2n batalló de línia', 24, { x: VC.x - 8, y: 29 }, 22]].forEach(([nm, y, lst, hd]) => ALLY.push(Object.assign(buildEnemy({ name: nm, flag: '9e', cx: 14, cy: y, h: 0, nFiles: y === 16.5 ? 6 : 10 }), { ai: true, hold: hd, reload: 4 + Math.random() * 5, supp: 0, state: '', off: 0, last: lst, n0: 20, noRetreat: true })));
     },
     tick(dt) {
       if (screen !== 'game' || paused || tutOpen() || co.lost) return;
