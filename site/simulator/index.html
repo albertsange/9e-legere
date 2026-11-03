@@ -4602,7 +4602,7 @@ let autoStepT = 0;
 const VOICE = { on: false, rec: null, running: false, tested: false, seg: {}, interim: '', state: '', failT: 0, lastFail: null,
   learn: { phr: {}, ex: {} }, shared: { phr: {}, ex: {} }, opt: { mode: 'cont', vol: true, log: false, tele: true, engine: '' }, log: [], recentExec: null, ptt: false, db: false, loading: false };
 // Connexió amb Supabase (la mateixa de la web: si el joc s'obre dins la web, agafa window.APP_CONFIG) i fonts del motor local Vosk
-const GAME_VERSION = '1.8.36';
+const GAME_VERSION = '1.8.37';
 const CFG = Object.assign({
   SUPABASE_URL: 'https://ltopullwhasagnkuqaek.supabase.co',
   SUPABASE_ANON_KEY: 'sb_publishable_DhHFUh-UrbBrI0l476Vcnw_tSn-Gmkr',
@@ -6493,7 +6493,14 @@ function buildCampaign2() {
         for (const u of ENEMY) if (u.ai && !u.routed && u.state === 'retreat' && (u.cx > W - 1.5 || u.cx < 1.5 || u.cy < 1.5 || u.cy > H - 1.5)) { for (const m of u.men) m.alive = false; u.routed = true; }
         const dn = downN();
         if (dn !== st.down) { st.down = dn; if (dn < 2) reac('aprova', '<b>Louis:</b> Un canó menys! En queda <b>' + (2 - dn) + '</b>.', 3500); }
-        if (!st.allyGone && allyN() === 0 && st.t > 5) { st.allyGone = true; reac('alerta', '<b>Louis:</b> Els batallons aliats han caigut! Ara els canons ens busquen a <b>nosaltres</b>!', 6000); }
+        for (const a of ALLY) if (!a.script) {                                                              // restes d'una unitat aliada (≤3 homes): en uns segons cauen, perquè la batalla no es quedi encallada
+          const n = enAlive(a); if (n > 0 && n <= 3) { a.lowT = (a.lowT || 0) + dt; if (a.lowT > 6) for (const v of a.men) if (v.alive) { v.alive = false; addCorpse(v.x, v.y, a.h, true, v.rank); } } else a.lowT = 0;
+        }
+        if (!st.allyGone && allyN() === 0 && st.t > 5) {
+          st.allyGone = true; reac('alerta', '<b>Louis:</b> Els batallons aliats han caigut! Ara els canons ens busquen a <b>nosaltres</b>!', 6000);
+          let big = null; for (const u of ENEMY) if (u.ai && !u.jager && !u.routed && !u.gun && (!big || enAlive(u) > enAlive(big))) big = u;     // el batalló austríac més nombrós va a per la línia del 9è
+          if (big) { big.onlyPlayer = true; big.onlyAllies = false; big.plaza = null; big.focus = null; big.hold = 20; big.state = ''; big.ph = 'move'; }
+        }
         if (dn >= 2) {
           st.fin = 0; for (const u of ENEMY) if (u.ai && !u.routed) { u.state = 'retreat'; u.awayH = 0; }
           reac('aprova', '<b>Capità Le Jay:</b> Fantàstic, chasseur! La bateria ha callat! Els austríacs es retiren i Neerwinden és nostra!', 7000);
@@ -6506,7 +6513,7 @@ function buildCampaign2() {
       { t: 'Desarmar els dos canons (matar-ne tres servidors de cada)', ok: () => downN() >= 2 }
     ],
     goalText: 'Creua els camps cap a la bateria austríaca abans que caiguin els aliats, aixafa els jägers del prat i desarma els dos canons matant-ne els servidors.',
-    endText: 'Molt bé, chasseur: has creuat els camps sota el foc, has fet recular els jägers i has fet callar els dos canons de l\'Arxiduc. Neerwinden crema, però la línia francesa aguanta gràcies al 9e. Aquesta és la lliçó: l\'artilleria no s\'aguanta de cara, es pren pel flanc i amb pressa!'
+    endText: 'Molt bé, chasseur: has creuat els camps sota el foc, has fet recular els jägers i has fet callar els dos canons de l\'Arxiduc. Neerwinden crema, però la línia francesa aguanta gràcies al 9e.'
   };
 }
 function buildCampaign3() {
