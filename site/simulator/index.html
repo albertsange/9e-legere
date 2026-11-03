@@ -494,6 +494,15 @@
   #reac img{width:92px;filter:drop-shadow(0 3px 4px rgba(10,15,40,.4));}
   #reac .t{background:var(--sheet);border:1px solid var(--line);border-radius:4px;padding:6px 11px;font-family:var(--display);font-size:1.05rem;color:var(--bleu);max-width:210px;box-shadow:0 6px 18px -8px rgba(10,15,40,.5);margin-bottom:26px;}
   #endmsg .card img.av2{width:120px;display:block;margin:-6px auto 4px;filter:drop-shadow(0 3px 4px rgba(10,15,40,.35));}
+  .tcollage{position:absolute;inset:0;pointer-events:none;overflow:hidden;--s:min(33vh,15vw);z-index:0;}
+  .tcollage .tc{position:absolute;bottom:0;width:calc(var(--s)*2.6);height:calc(var(--s)*2);}
+  .tcollage .tc.l{left:0;} .tcollage .tc.r{right:0;}
+  #screenTitle .tcollage img{position:absolute;margin:0;height:calc(var(--s)*var(--h));width:auto;max-width:none;bottom:calc(var(--s)*var(--b));transform:rotate(var(--r));transform-origin:50% 100%;filter:drop-shadow(0 7px 8px rgba(10,15,40,.45)) drop-shadow(0 1px 1px rgba(10,15,40,.5));}
+  #screenTitle .tcollage .l img{left:calc(var(--s)*var(--x));} #screenTitle .tcollage .r img{right:calc(var(--s)*var(--x));}
+  #screenTitle > :not(.tcollage){position:relative;z-index:1;}
+  #screenTitle .gver,#screenTitle #glangTitle{position:absolute;}
+  #screenTitle .gver{left:50%;transform:translateX(-50%);}
+  @media (max-width:700px){.tcollage{display:none;} #screenTitle .gver{left:16px;transform:none;}}
   .avtitle{position:absolute;right:4vw;bottom:0;height:min(46vh,380px);pointer-events:none;filter:drop-shadow(0 6px 10px rgba(10,15,40,.35));}
   @media (max-width:760px){.avtitle{display:none;}}
 </style>
@@ -511,7 +520,7 @@
   <button class="btn-main" id="btnCampaign">Campanya</button>
   <button class="btn-main alt" id="btnFree">Mode lliure</button>
   <button class="btn-main alt" id="btnRank">Rànquing</button>
-  <img class="avtitle" alt="Capitaine Le Jay">
+  <div class="tcollage" aria-hidden="true"><div class="tc l"><img src="title/04.webp" alt="" style="--x:0.0;--b:0.78;--h:1.0;--r:-5deg;z-index:2"><img src="title/15.webp" alt="" style="--x:0.5;--b:0.62;--h:0.98;--r:3deg;z-index:1"><img src="title/01.webp" alt="" style="--x:0.98;--b:0.46;--h:0.92;--r:-3deg;z-index:2"><img src="title/09.webp" alt="" style="--x:1.42;--b:0.3;--h:0.88;--r:4deg;z-index:1"><img src="title/12.webp" alt="" style="--x:0.2;--b:-0.02;--h:0.95;--r:3deg;z-index:4"><img src="title/11.webp" alt="" style="--x:0.72;--b:-0.06;--h:0.92;--r:-4deg;z-index:5"><img src="title/03.webp" alt="" style="--x:1.22;--b:-0.1;--h:0.9;--r:2deg;z-index:6"></div><div class="tc r"><img src="title/05.webp" alt="" style="--x:0.0;--b:0.78;--h:1.02;--r:5deg;z-index:2"><img src="title/14.webp" alt="" style="--x:0.5;--b:0.6;--h:0.96;--r:-3deg;z-index:1"><img src="title/10.webp" alt="" style="--x:0.98;--b:0.46;--h:0.9;--r:4deg;z-index:2"><img src="title/13.webp" alt="" style="--x:1.42;--b:0.3;--h:0.9;--r:-4deg;z-index:1"><img src="title/06.webp" alt="" style="--x:0.12;--b:-0.02;--h:0.92;--r:-3deg;z-index:4"><img src="title/07.webp" alt="" style="--x:0.58;--b:-0.08;--h:0.88;--r:3deg;z-index:5"><img src="title/02.webp" alt="" style="--x:1.04;--b:-0.06;--h:0.95;--r:-2deg;z-index:6"><img src="title/08.webp" alt="" style="--x:1.52;--b:-0.12;--h:0.9;--r:3deg;z-index:7"></div></div>
   <div class="gver" id="verTitle"></div>
   <div id="glangTitle"></div>
 </section>
@@ -4408,7 +4417,7 @@ let autoStepT = 0;
 const VOICE = { on: false, rec: null, running: false, tested: false, seg: {}, interim: '', state: '', failT: 0, lastFail: null,
   learn: { phr: {}, ex: {} }, shared: { phr: {}, ex: {} }, opt: { mode: 'cont', vol: true, log: false, tele: true, engine: '' }, log: [], recentExec: null, ptt: false, db: false, loading: false };
 // Connexió amb Supabase (la mateixa de la web: si el joc s'obre dins la web, agafa window.APP_CONFIG) i fonts del motor local Vosk
-const GAME_VERSION = '1.8.19';
+const GAME_VERSION = '1.8.20';
 const CFG = Object.assign({
   SUPABASE_URL: 'https://ltopullwhasagnkuqaek.supabase.co',
   SUPABASE_ANON_KEY: 'sb_publishable_DhHFUh-UrbBrI0l476Vcnw_tSn-Gmkr',
