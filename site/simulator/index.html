@@ -2273,7 +2273,23 @@ function updateSkirm(dt) {
     co.sk = null; co.arm = 'portez'; co.loaded = true; lastKey = ''; say('Portez vos armes!'); return;
   }
   if (sk.mode === 'place') {
-    for (const m of co.members) if (m.sh) { m.wt -= dt; if (m.wt <= 0) { manShot(m, 0, true); m.wt = 0.8 + Math.random() * 3.5; } }
+    const F = skFrame(), rnd = () => 0.5 + Math.random() * 0.5;
+    if (!sk.cur && !sk.nx) { sk.nx = { r: 0, t: 0.3 }; }
+    if (sk.nx) {                                                                    // espera el retard aleatori i comença el rengle indicat
+      sk.nx.t -= dt;
+      if (sk.nx.t <= 0) { const ms = co.members.filter(m => m.rank === sk.nx.r).sort((a, b) => (b.x * F.rx + b.y * F.ry) - (a.x * F.rx + a.y * F.ry)); sk.cur = { r: sk.nx.r, list: ms, i: 0, t: 0, first: null }; sk.nx = null; }
+    }
+    if (sk.cur) {                                                                   // dispara d'un en un, de dreta a esquerra
+      const q = sk.cur; q.t -= dt;
+      while (q.i < q.list.length && !co.members.includes(q.list[q.i])) q.i++;                        // els caiguts ja no hi són
+      if (q.i < q.list.length && q.t <= 0) {
+        const m = q.list[q.i];
+        if (m.sh) { if (manShot(m, 0, true) && !q.first) q.first = m; q.i++; q.t = rnd(); }
+      }
+      const fin = q.i >= q.list.length;
+      if (!q.trig && ((q.first && q.first.ld >= 0.5) || (fin && !q.first))) { q.trig = true; sk.nx = { r: 1 - q.r, t: q.first ? rnd() : 1 + Math.random() }; }   // a mitja càrrega comença l'altre rengle
+      if (fin && q.trig) sk.cur = null;
+    }
     return;
   }
   const D = (sk.mode === 'avant' ? SKCFG.adv : SKCFG.ret) * STEP, Rs = skRanks().sort((p, q) => q.p - p.p);           // Rs[0] = el rengle de davant
@@ -2552,14 +2568,18 @@ function aiUnitTick(u, side, dt) {
     return;
   }
   if (ph === 'load') { if (u.reload > 0) return; u.ph = 'aim'; u.gap = GAP; u.aimT = 0; return; }   // carrega (el rellotge es veu damunt la unitat) i espera abans d'apuntar
-  let ok = false;
+  let ok = false, soft = false;
   if (best && d <= A.abast && (u.supp || 0) <= T.supMax) {                   // té prou homes enemics dins la franja?
     const S = makeStrip(live, u.h, u.h, T.obertura), inside = best.men.filter(m => inStrip(S, m.x, m.y) >= 0 && !losBlocked(S.ox, S.oy, m.x, m.y)).length;
-    ok = inside >= Math.max(A.minHomes, best.men.length * A.minFraccio);
+    ok = inside >= Math.max(A.minHomes, best.men.length * A.minFraccio); soft = inside >= 1;
   }
   u.aimD = d;
-  if (ph === 'aim') { if (ok) { u.aimT = (u.aimT || 0) + dt; if (u.aimT >= A.apunta) { u.ph = 'fire'; u.gap = GAP; } } else u.aimT = 0; return; }
-  if (ph === 'fire') { if (ok) { aiVolley(u, best, side); u.reloadMax = u.reload; u.ph = 'load'; } else { u.ph = 'aim'; u.aimT = 0; } }
+  if (ph === 'aim') {
+    if (best && d <= A.abast && Math.abs(diff) > 0.03) aiRot(u, Math.max(-0.7 * dt, Math.min(0.7 * dt, diff)));   // corregeix la punteria cap a l'objectiu
+    if (soft) { u.aimT = (u.aimT || 0) + dt; if (u.aimT >= A.apunta && (ok || u.aimT >= A.apunta + 1)) { u.ph = 'fire'; u.gap = GAP; } } else u.aimT = Math.max(0, (u.aimT || 0) - dt * 0.5);
+    return;
+  }
+  if (ph === 'fire') { if (soft) { aiVolley(u, best, side); u.reloadMax = u.reload; u.ph = 'load'; } else { u.ph = 'aim'; u.aimT = 0; } }
 }
 function drawAiMarks() {                        // damunt de cada unitat que carrega: un rellotge petit que s'omple; quan apunta: el seu camp de foc, suau i en un altre color que el nostre
   const list = [...ENEMY, ...ALLY].filter(u => !u.script && !u.routed && u.men.some(v => v.alive));
@@ -4386,7 +4406,7 @@ let autoStepT = 0;
 const VOICE = { on: false, rec: null, running: false, tested: false, seg: {}, interim: '', state: '', failT: 0, lastFail: null,
   learn: { phr: {}, ex: {} }, shared: { phr: {}, ex: {} }, opt: { mode: 'cont', vol: true, log: false, tele: true, engine: '' }, log: [], recentExec: null, ptt: false, db: false, loading: false };
 // Connexió amb Supabase (la mateixa de la web: si el joc s'obre dins la web, agafa window.APP_CONFIG) i fonts del motor local Vosk
-const GAME_VERSION = '1.8.14';
+const GAME_VERSION = '1.8.15';
 const CFG = Object.assign({
   SUPABASE_URL: 'https://ltopullwhasagnkuqaek.supabase.co',
   SUPABASE_ANON_KEY: 'sb_publishable_DhHFUh-UrbBrI0l476Vcnw_tSn-Gmkr',
@@ -5993,7 +6013,7 @@ function buildCampaign1() {
     u.front = 0;
   }
   function startP3() {
-    st.p3 = true; st.p3t = 0; st.army = 0; st.wave = 0; st.done = false; detShow(0); st.pend = [];
+    st.p3 = true; st.p3t = 0; st.army = 0; st.wave = 0; st.done = false; st.fin = undefined; detShow(0); st.pend = [];
     for (let k = 0; k < NARMY; k++) {                                              // el gruix de l'exèrcit: unitats de 20 homes que van arribant en columna, creuen el gual i es desplegaran en línia a la riba est
       const r = 2 - Math.floor(k / 4), c = k < 8 ? [0, 3, 1, 2][k % 4] : [1, 2][k - 8], sy = 19.5 + 7 * c, sx = rivX(sy) + 3.5 + 3.2 * r;
       st.pend.push({ t0: 4 + 10 * k, slot: [sx, sy] });
@@ -6006,6 +6026,11 @@ function buildCampaign1() {
     reac('assenyala', '<b>Capità Le Jay:</b> Atenció! Una avançada austríaca ve per l\'est!', 3800);
   }
   function p3Tick(dt, c) {
+    if (st.fin !== undefined) {                                                   // final: els austríacs es retiren (giren cua) i s'acaba el nivell
+      st.fin += dt; aiTickAll(dt); const el = detBar(); el.style.display = 'none';
+      if (st.fin >= 6) st.done = true;
+      return;
+    }
     st.p3t += dt;
     while (st.wave < WAVES.length && st.p3t >= WAVES[st.wave][0]) spawnWave(WAVES[st.wave++]);
     aiTickAll(dt);
@@ -6028,7 +6053,7 @@ function buildCampaign1() {
           u.h = 0; u.cx = u.slot[0]; u.cy = u.slot[1]; if (u.front >= 1) u.arrived = true; }
       } }
     const el = detBar();
-    if (st.army >= ARMY_T && !st.pend.length && ALLY.every(u => !u.script || u.arrived)) { st.done = true; el.style.display = 'none'; reac('aprova', '<b>Louis:</b> Ja han creuat! El gruix de l\'exèrcit és a l\'altra riba. Ben fet, chasseur!', 5000); return; }
+    if (st.army >= ARMY_T && !st.pend.length && ALLY.every(u => !u.script || u.arrived)) { st.fin = 0; el.style.display = 'none'; for (const u of ENEMY) if (u.ai && !u.routed) { u.state = 'retreat'; u.awayH = 0; } reac('aprova', '<b>Capità Le Jay:</b> Fantàstic! Les tropes es retiren, per fi l\'exèrcit de la República podrà començar el combat!', 6500); return; }
     el.style.display = screen === 'game' ? 'block' : 'none'; el.classList.remove('pulse');
     const col = contested ? '#e07b24' : '#2e8b3d'; el.querySelector('b').textContent = contested ? 'Assetgen el gual! L\'exèrcit s\'atura…' : 'L\'exèrcit francès creua el gual…'; el.querySelector('b').style.color = col;
     const f = el.querySelector('i'); f.style.width = Math.min(100, st.army / ARMY_T * 100) + '%'; f.style.background = col;
@@ -6091,7 +6116,7 @@ function buildCampaign1() {
     over(ctx, M, mini) {
       if (!mini) {
         ctx.save(); ctx.setLineDash([10, 8]);
-        if (st.p3 && !st.done) { ctx.strokeStyle = 'rgba(46,139,61,.8)'; ctx.lineWidth = 2.2; ctx.beginPath(); for (let y = 20; y <= 42; y += 2) { const x = rivX(y) + 14; y === 20 ? ctx.moveTo(x * M, y * M) : ctx.lineTo(x * M, y * M); } ctx.stroke(); ctx.beginPath(); ctx.arc(FORD.x * M, FORD.y * M, 3 * M, 0, 7); ctx.stroke(); }
+        if (st.p3 && !st.done && st.fin === undefined) { ctx.strokeStyle = 'rgba(46,139,61,.8)'; ctx.lineWidth = 2.2; ctx.beginPath(); for (let y = 20; y <= 42; y += 2) { const x = rivX(y) + 14; y === 20 ? ctx.moveTo(x * M, y * M) : ctx.lineTo(x * M, y * M); } ctx.stroke(); ctx.beginPath(); ctx.arc(FORD.x * M, FORD.y * M, 3 * M, 0, 7); ctx.stroke(); }
         ctx.restore();
       }
       if (mini || !ENEMY.length || ENEMY[0].alert || enAlive(ENEMY[0]) === 0) return;
@@ -6100,7 +6125,7 @@ function buildCampaign1() {
       ctx.fillStyle = 'rgba(' + col + ',' + a.toFixed(3) + ')'; ctx.fill(); ctx.setLineDash([7, 6]); ctx.strokeStyle = 'rgba(' + col + ',.75)'; ctx.lineWidth = 1.6; ctx.stroke(); ctx.restore();
     },
     onReset() {
-      st.det = 0; st.crossed = false; st.cp = 0; st.alarmed = false; st.p3 = false; st.p3t = 0; st.army = 0; st.wave = 0; st.done = false; st.pend = []; st.cone = null; st.coneKey = ''; st.pat = { mode: 'wait', t: 0, d: 0, at: 0, dir: 1 }; detShow(0);
+      st.det = 0; st.crossed = false; st.cp = 0; st.alarmed = false; st.p3 = false; st.p3t = 0; st.army = 0; st.wave = 0; st.done = false; st.fin = undefined; st.pend = []; st.cone = null; st.coneKey = ''; st.pat = { mode: 'wait', t: 0, d: 0, at: 0, dir: 1 }; detShow(0);
       const e = ENEMY[0]; if (e) { e.men.pop(); e.stealth = true; e.jager = true; e.reload = 3; }                    // 16 → 15 jägers
     },
     tick(dt) {
@@ -6137,7 +6162,7 @@ function buildCampaign1() {
     objectives: [
       { t: 'Creuar el rierol sense que et vegin', ok: () => st.crossed },
       { t: 'Aixafar els quinze jägers', ok: () => p1done() },
-      { t: 'Defensar la riba est fins que l\'exèrcit creui el gual', ok: () => st.done },
+      { t: 'Defensar la riba est fins que l\'exèrcit creui el gual', ok: () => st.fin !== undefined || st.done },
       { t: 'Mantenir la unitat amb almenys 8 homes', ok: () => co.members.length >= 8 }
     ],
     goalText: 'Creua el rierol pel bosc sense que et vegin, aixafa la patrulla de jägers i defensa la riba est, desplegat en tiradors, fins que l\'exèrcit francès hagi creuat el gual.',
