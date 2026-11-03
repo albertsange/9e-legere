@@ -2650,18 +2650,33 @@ function aiVolley(u, g, side) {
 }
 function aiLayout(u) {                          // lloc de cada home en una línia de dos rengles (índex d'home → posició), segons el centre i el rumb de la unitat
   const nf = u.nf || Math.round(u.men.length / 2), c = Math.cos(u.h), sn = Math.sin(u.h);
-  return u.men.map((v, i) => { const rank = i < nf ? 0 : 1, file = i % nf, a = -rank * RANK_GAP, l = (nf / 2 - 0.5 - file) * FRONT; return { x: u.cx + c * a - sn * l, y: u.cy + sn * a + c * l }; });
+  let k = 0;
+  return u.men.map(v => { const kk = v.alive ? k++ : k, rank = kk < nf ? 0 : 1, file = kk % nf, a = -rank * RANK_GAP, l = (nf / 2 - 0.5 - file) * FRONT; return { x: u.cx + c * a - sn * l, y: u.cy + sn * a + c * l }; });
 }
 function aiDis(u, d) {                          // desordre visual d'una unitat d'IA (0..1): cada home s'escampa una mica del seu lloc
   d = Math.max(0, Math.min(1, d)); const dd = d - (u.disA || 0); if (!dd) return;
   for (const v of u.men) { if (v.jx === undefined) { v.jx = (Math.random() - 0.5); v.jy = (Math.random() - 0.5); } v.x += v.jx * dd; v.y += v.jy * dd; }
   u.dis = d; u.disA = d;
 }
+function aiClose(u, live, dt) {                  // «Serrez les files»: quan cauen homes, els del 2n rengle avancen i ocupen el davant (si no, es quedarien sense 1r rengle que els empari)
+  const n = live.length;
+  if (u.nAl !== n) {
+    u.nAl = n; if (!u.nf0) u.nf0 = u.nf || Math.round(u.men.length / 2);
+    u.nf = Math.max(1, Math.min(u.nf0, Math.ceil(n / 2))); let k = 0;
+    for (const v of u.men) if (v.alive) v.rank = k++ < u.nf ? 0 : 1;
+    u.closing = true;
+  }
+  if (!u.closing) return;
+  const tg = aiLayout(u); let moving = false;
+  u.men.forEach((v, i) => { if (!v.alive) return; const dx = tg[i].x - v.x, dy = tg[i].y - v.y, d = Math.hypot(dx, dy), s = 2.2 * dt; if (d > 0.05) { moving = true; const f = Math.min(1, s / d); v.x += dx * f; v.y += dy * f; } });
+  if (!moving) u.closing = false;
+}
 function aiUnitTick(u, side, dt) {
   const T = TUNE.mosquet, A = TUNE.ia, GAP = A.pausa, live = u.men.filter(v => v.alive); if (!live.length) return;
   u.supp = Math.max(0, (u.supp || 0) - T.supDecau * dt);
   if (u.reload > 0) u.reload -= dt;
   if (u.gap > 0) u.gap -= dt;
+  if (!u.colRef && !u.reforming && !u.jager && !u.gun && u.state !== 'retreat') aiClose(u, live, dt);
   if (u.state === 'retreat') {                                              // demi-tour i es retira al pas accéléré
     u.ph = 'move';
     const diff = wrapA(u.awayH - u.h), st = Math.max(-A.retirada.gir * dt, Math.min(A.retirada.gir * dt, diff));
@@ -4605,7 +4620,7 @@ let autoStepT = 0;
 const VOICE = { on: false, rec: null, running: false, tested: false, seg: {}, interim: '', state: '', failT: 0, lastFail: null,
   learn: { phr: {}, ex: {} }, shared: { phr: {}, ex: {} }, opt: { mode: 'cont', vol: true, log: false, tele: true, engine: '' }, log: [], recentExec: null, ptt: false, db: false, loading: false };
 // Connexió amb Supabase (la mateixa de la web: si el joc s'obre dins la web, agafa window.APP_CONFIG) i fonts del motor local Vosk
-const GAME_VERSION = '1.8.38';
+const GAME_VERSION = '1.8.39';
 const CFG = Object.assign({
   SUPABASE_URL: 'https://ltopullwhasagnkuqaek.supabase.co',
   SUPABASE_ANON_KEY: 'sb_publishable_DhHFUh-UrbBrI0l476Vcnw_tSn-Gmkr',
