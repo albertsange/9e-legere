@@ -37,6 +37,6 @@ for (const f of fs.readdirSync(path.join(dir, 'i18n')).filter(f => /^[a-z]{2}\.j
   const ok = c => { if (map.has(c)) return true; const nums = c.match(/\d+/g); if (nums && map.has(c.replace(/\d+/g, '#'))) return true; return c.length >= 8 && frag.some(k => c.includes(k)); };
   const miss = [...lits].filter(([c]) => isCa(c) && !ok(c));
   console.log(`${f}: ${miss.length} textos en català sense traduir (de ${lits.size} textos)`);
-  if (miss.length) { bad++; for (const [c, l] of miss.slice(0, process.argv.includes('--list') ? 1e9 : 25)) console.log(`  l.${l}  ${c.slice(0, 140)}`); }
+  if (miss.length) { bad++; if (process.argv.includes("--json")) fs.writeFileSync("/tmp/audit/miss3.json", JSON.stringify(miss.map(m => m[0]))); for (const [c, l] of miss.slice(0, process.argv.includes("--list") ? 1e9 : 25)) console.log(`  l.${l}  ${c.slice(0, 140)}`); }
 }
 process.exit(bad ? 1 : 0);

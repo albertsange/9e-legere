@@ -1997,6 +1997,11 @@ function drawEnemies() {
     if (m.gone) continue;
     if (m.alive || m.fl) {
       ctx.globalAlpha = m.fl ? Math.max(0, Math.min(1, 1 - (m.fl.t - 2.5) / 1.5)) : 1;
+      if (e.cav) {                                                                                         // genet: cavall allargat (marró) amb el genet al damunt
+        ctx.fillStyle = '#c9a97a'; ctx.strokeStyle = '#6b4220'; ctx.lineWidth = Math.max(1, 0.06 * M);
+        ctx.beginPath(); ctx.ellipse(px, py, rS * 2.1, rS * 1.05, e.h, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = '#f7f5ee'; ctx.beginPath(); ctx.arc(px, py, rS * 0.85, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); ctx.globalAlpha = 1; continue;
+      }
       ctx.fillStyle = '#f7f5ee'; ctx.strokeStyle = e.jager ? '#2e8b3d' : '#6c6a63'; ctx.lineWidth = Math.max(1, (e.jager ? 0.1 : 0.05) * M);
       ctx.beginPath(); ctx.arc(px, py, rS, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
       ctx.strokeStyle = e.jager ? '#2e8b3d' : '#8a877e'; ctx.lineWidth = Math.max(1, 0.06 * M); ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(px + Math.cos(m.h ?? e.h) * 0.32 * M, py + Math.sin(m.h ?? e.h) * 0.32 * M); ctx.stroke(); ctx.globalAlpha = 1;
@@ -2132,7 +2137,7 @@ function killOwn(m) {
   addCorpse(m.x, m.y, m.h, true, m.rank);
   if (co.open || co.sk) skRanks();                 // en tiradors el buit es queda (compta com un home imaginari)
   co.members.splice(i, 1); STAT.dead++;
-  if (!co.open && !co.sk) fillHole(m.rank, m.file, m.x, m.y);
+  if (!co.open && !co.sk && !co.sq) fillHole(m.rank, m.file, m.x, m.y);
 }
 function updateGlide(dt) {                       // els qui cobreixen un buit hi caminen (el desplaçament és relatiu: no depèn de si la unitat es mou)
   for (const m of co.members) if (m.gd) {
@@ -2372,17 +2377,23 @@ function advGunTick(g, dt) {                     // bateria d'IA: tria objectiu 
   if (g.h0 === undefined) { g.h0 = g.h; g.alertT = 0; g.rtB = g.rt || 14; g.reloadMax = 0; g.reload = Math.max(g.reload, 2 + Math.random() * 6); }
   const alive = enAlive(g.crewUnit), dP = c ? Math.hypot(c.x - g.x, c.y - g.y) : 1e9;
   const angP = c ? Math.abs(wrapA(Math.atan2(c.y - g.y, c.x - g.x) - g.h)) : 9, clear = c && !losBlocked(g.x, g.y, c.x, c.y);
-  const sees = clear && dP <= g.vis && angP <= g.cone, heard = clear && now - (co.lastShot || 0) < 9000 && dP <= g.vis + 30;
-  g.alertT = sees || heard ? 6 : Math.max(0, g.alertT - dt);
   let allies = ALLY.filter(a => !a.script && a.men.some(v => v.alive));
   if (g.vil) allies = allies.filter(a => Math.hypot(a.cx - g.vil.x, a.cy - g.vil.y) < g.vil.r);          // g.vil: només bombardegen els aliats que són al poble (no els dels camps de sota)
+  const distr = !!g.vil && allies.length > 0 && !(level && level.gunsSee);                                // distrets pel poble: no et veuen mentre no disparis (o no tardis massa)
+  const sees = !distr && clear && dP <= g.vis && angP <= g.cone, heard = clear && now - (co.lastShot || 0) < 9000 && dP <= g.vis + 30;
+  g.alertT = sees || heard ? 6 : Math.max(0, g.alertT - dt);
   if (g.vil && !g.vilOn && allies.length) g.vilOn = true;
   let tgt = null;
   if (clear && g.alertT > 0 && dP <= g.range) tgt = { x: c.x, y: c.y, p: true, d: dP };
   if (!tgt && allies.length) { let bd = 1e9; for (const a of allies) { const d = Math.hypot(a.cx - g.x, a.cy - g.y); if (d < bd && d <= g.range) { bd = d; tgt = { x: a.cx, y: a.cy, d, a }; } } }
   if (!tgt && clear && !allies.length && !(g.vil && ALLY.some(a => !a.script && a.men.some(v => v.alive))) && dP <= g.range) tgt = { x: c.x, y: c.y, p: true, d: dP };
   g.tgt = tgt;
-  if (!tgt) { g.aimT = 0; return; }
+  if (!tgt) { g.aimT = 0; g.prevP = false; return; }
+  if (tgt.p) {                                    // no es pot apuntar a un blanc que es mou: si et mous, deixa d'apuntar, espera un parell de segons i torna a començar
+    if (!g.prevP) g.pWait = 2.2; g.prevP = true;
+    if (co.state !== 'parat') { g.aimT = 0; g.pWait = 2.2; return; }
+    if (g.pWait > 0) { g.pWait -= dt; g.aimT = 0; return; }
+  } else g.prevP = false;
   if (tgt.a && g.alt && level && level.houseTarget) { const hh = level.houseTarget(tgt.x, tgt.y); if (hh) tgt = { x: hh.x, y: hh.y, d: Math.hypot(hh.x - g.x, hh.y - g.y), a: tgt.a, house: true }; }   // un tret de cada dos, a les cases del poble
   const ang = Math.atan2(tgt.y - g.y, tgt.x - g.x), dh = wrapA(ang - g.h), rot = (g.rot || A.gir) * dt;
   g.h += Math.max(-rot, Math.min(rot, dh));
@@ -2599,7 +2610,7 @@ function aiReformTick(u, dt) {                   // true mentre es desplega (ale
   if (!u.colRef) return false;
   if (!u.reforming) {
     if (u.cx < u.colRef.x) return false;
-    u.reforming = 0.001; const c = Math.cos(u.h), sn = Math.sin(u.h); let i = 0;
+    u.reforming = 0.001; if (u.colRef.say) reac('assenyala', '<b>Louis:</b> «Par peloton – en ligne!» El 22è es desplega al mig del poble.', 4500); const c = Math.cos(u.h), sn = Math.sin(u.h); let i = 0;
     for (const m of u.men) { const rk = Math.floor(i / 10), f = i % 10, a = -rk * RANK_GAP, l = (5 - 0.5 - f) * FRONT; m.x0 = m.x; m.y0 = m.y; m.x1 = u.cx + c * a - sn * l; m.y1 = u.cy + sn * a + c * l; i++; }
     reac('louis', '<b>Louis:</b> Par peloton en ligne!', 2200);
   }
@@ -3044,6 +3055,30 @@ function processFix(dt) {
   }
 }
 
+// ---- Quadre contra la cavalleria (nivell 3): els homes formen un anell buit mirant enfora; mentre estan en quadre no es mouen ni disparen ----
+function squareSlots(n, c, h) {
+  const side = Math.max(3.4, n * FRONT / 4), half = side / 2, cs = Math.cos(h), sn = Math.sin(h), out = [];
+  for (let i = 0; i < n; i++) {
+    const tt = i / n * 4, s = Math.floor(tt), f = tt - s; let lx, ly, nh;
+    if (s === 0) { lx = half; ly = -half + f * side; nh = 0; } else if (s === 1) { lx = half - f * side; ly = half; nh = Math.PI / 2; }
+    else if (s === 2) { lx = -half; ly = half - f * side; nh = Math.PI; } else { lx = -half + f * side; ly = -half; nh = -Math.PI / 2; }
+    out.push({ x: c.x + cs * lx - sn * ly, y: c.y + sn * lx + cs * ly, h: h + nh });
+  }
+  return out;
+}
+function formSquare() {
+  const n = co.members.length, c = unitCentre(), h = co.members[0].h, slots = squareSlots(n, c, h);
+  const ord = co.members.map(m => { let a = wrapA(Math.atan2(m.y - c.y, m.x - c.x) - h); if (a < -Math.PI / 4) a += Math.PI * 2; return { m, a }; }).sort((p, q) => p.a - q.a);
+  co.sqForming = true;
+  startAuto([{ list: ord.map((o, i) => ({ m: o.m, tasks: [{ path: [{ x: slots[i].x, y: slots[i].y }], i: 0 }, { rot: slots[i].h }] })) }], false, ORD_SPEED * 1.5, true);
+  co.auto.onEnd = () => { co.sq = { h0: h }; co.sqForming = false; lastKey = ''; reac('aprova', '<b>Louis:</b> Quadre format! Baionetes enfora!', 2500); };
+}
+function breakSquare() {
+  const h = co.sq.h0, c = unitCentre(), fw = { x: Math.cos(h), y: Math.sin(h) }, lt = { x: -Math.sin(h), y: Math.cos(h) }, n = co.members.length, nf = Math.ceil(n / 2);
+  co.sq = null;
+  const ord = co.members.slice().sort((p, q) => (Math.atan2(p.y - c.y, p.x - c.x) - Math.atan2(q.y - c.y, q.x - c.x)));
+  startAuto([{ list: ord.map((m, i) => { const rk = i % 2, fl = Math.floor(i / 2), a = -rk * RANK_GAP + RANK_GAP / 2, l = (nf / 2 - 0.5 - fl) * FRONT; return { m, tasks: [{ path: [{ x: c.x + fw.x * a + lt.x * l, y: c.y + fw.y * a + lt.y * l }], i: 0 }, { rot: h }] }; }) }], true, ORD_SPEED * 1.5, false);
+}
 function startAuto(phases, relabelEnd, speed, keepDrift) {
   co.state = 'auto';
   co.haltReq = false; co.stepT = 0; co.mode = 'direct';
@@ -3810,6 +3845,7 @@ const FAMILIES = [
   { id: 'tir',  name: 'Tiradors',    icon: 'skirm', lvl: 'skirm' }
 ];
 function pre(o = {}) {                         // condicions comunes: retorna el motiu o null
+  if (co.sq && !o.sq && !o.arm) return 'estan en quadre: Rompez le carré per tornar a moure\'s';
   if (co.state === 'auto') return 'hi ha una maniobra en curs';
   if (co.state === 'gir') return 'la unitat està girant';
   if (co.state === 'conv' && !o.conv) return co.conv.kind === 'ligne' ? 's\'està formant la línia' : co.conv.kind === 'turn' ? 'la tropa està fent el Tournez' : co.conv.kind === 'cm' ? 'la tropa fa la contramarxa' : 'hi ha una conversió en curs';
@@ -3868,6 +3904,10 @@ const ORDERS = [
     avail: () => pre() || (co.state !== 'marxa' ? 'cal estar en marxa' : co.mode !== 'direct' ? 'cal marxar recte (no en oblic ni reculant)' : busyHard() ? 'espera que acabi la maniobra' : (co.pf || formationName() === 'columna') ? true : 'cal estar en fila'), run: sd => parFile(sd) },
   { id: 'CD-05', des: 0, fam: 'form', k: 'bataille', sec: 'Fila en marxa', fr: 'Sur la droite, par file en bataille', full: 'Sur la droite, par file en bataille – marche!', gl: 'de fila a línia, cap a la dreta', icon: 'batR', cmds: ['bat'],
     avail: marxaColumna, run: () => surLaDroite(1) },
+  { id: 'CD-20', des: 2, fam: 'form', k: 'carre', lvl: 'square', sec: 'Contra la cavalleria', fr: 'Formez le carré', full: 'Formez le carré!', gl: 'els homes formen un quadre buit amb les 4 cares cap enfora: atura una càrrega de cavalleria', icon: 'attention', cmds: ['carre'],
+    avail: () => co.sq ? 'ja estan en quadre' : aturat(), run: () => formSquare() },
+  { id: 'CD-21', des: 1.5, fam: 'form', k: 'carre', lvl: 'square', sec: 'Contra la cavalleria', fr: 'Rompez le carré', full: 'Rompez le carré – en ligne!', gl: 'desfer el quadre i tornar a la línia', icon: 'attention', cmds: ['ligne'],
+    avail: () => !co.sq ? 'no estan en quadre' : co.state !== 'parat' ? 'espera que acabi la maniobra' : true, run: () => breakSquare() },
   { id: 'WH-04', des: 0, fam: 'form', k: 'ligne', sec: 'Fila en marxa', fr: 'Par peloton en ligne', full: 'Par peloton en ligne – marche!', gl: 'de fila a línia sense aturar-se', icon: 'ligne', cmds: ['ligne'],
     avail: marxaColumna, run: () => parPelotonEnLigne() },
   { id: 'CD-03', des: 0, fam: 'form', k: 'align', sec: 'Línia aturada', fr: 'Alignement', full: 'À {s} – alignement!', gl: 'el guia surt mig pas i els altres s\'hi alineen', sides: true, icons: ['left', 'right'], cmdsS: { '-1': ['alignG', 'align'], '1': ['alignD', 'align'] },
@@ -4556,7 +4596,7 @@ let autoStepT = 0;
 const VOICE = { on: false, rec: null, running: false, tested: false, seg: {}, interim: '', state: '', failT: 0, lastFail: null,
   learn: { phr: {}, ex: {} }, shared: { phr: {}, ex: {} }, opt: { mode: 'cont', vol: true, log: false, tele: true, engine: '' }, log: [], recentExec: null, ptt: false, db: false, loading: false };
 // Connexió amb Supabase (la mateixa de la web: si el joc s'obre dins la web, agafa window.APP_CONFIG) i fonts del motor local Vosk
-const GAME_VERSION = '1.8.28';
+const GAME_VERSION = '1.8.29';
 const CFG = Object.assign({
   SUPABASE_URL: 'https://ltopullwhasagnkuqaek.supabase.co',
   SUPABASE_ANON_KEY: 'sb_publishable_DhHFUh-UrbBrI0l476Vcnw_tSn-Gmkr',
@@ -6419,14 +6459,14 @@ function buildCampaign2() {
       ctx.restore();
     },
     onReset() {
-      st.t = 0; st.jag = false; st.jagE = null; st.fin = undefined; st.done = false; st.allyGone = false; st.down = 0;
+      st.t = 0; st.jag = false; st.jagE = null; st.fin = undefined; st.done = false; st.allyGone = false; st.down = 0; this.gunsSee = false;
       for (const h of vil) h.dmg = 0;
       // els tres batallons austríacs i els dos de línia són «attrezzo» de la batalla: no es retiren mai. El 1r de cada bàndol lluita dins del poble; els altres, als camps de sota
       const lastA = [{ x: VC.x + 7, y: 16.5 }, { x: VC.x + 4, y: 24 }, { x: VC.x - 2, y: 29 }];
       ENEMY.filter(e => e.ai).forEach((e, i) => { e.reload = 6 + Math.random() * 6; e.supp = 0; e.state = ''; e.last = lastA[i] || { x: VC.x + 8, y: VC.y }; e.n0 = e.men.length; e.noRetreat = true; e.onlyAllies = true; e.plaza = [{ x: VC.x + 3, y: VC.y - 2.5 }, { x: VC.x + 4, y: VC.y + 3 }, { x: VC.x - 3, y: VC.y + 3 }][i] || { x: VC.x, y: VC.y }; if (i === 0) e.hold = 9; });
       [['22e demi-brigade de ligne', 'f22', 16.5, { x: VC.x - 7, y: 16.5 }, 9], ['28e demi-brigade de ligne', 'f28', 24, { x: VC.x - 8, y: 29 }, 22]].forEach(([nm, fl, y, lst, hd]) => {
         const u = Object.assign(buildEnemy({ name: nm, flag: fl, cx: 14, cy: y, h: 0, nFiles: 10 }), { ai: true, hold: hd, reload: 4 + Math.random() * 5, supp: 0, state: '', off: 0, last: lst, n0: 20, noRetreat: true, tough: 0.5 });
-        if (y === 16.5) { aiSlots(u, 5); u.colRef = { x: VC.x - 11 }; }                                  // entra al poble en columna i es desplega en línia (par peloton en ligne)
+        if (y === 16.5) { u.last = { x: VC.x + 1, y: 16.5 }; aiSlots(u, 5); u.colRef = { x: VC.x - 4, say: true }; }                                  // entra al poble en columna i es desplega en línia (par peloton en ligne)
         ALLY.push(u);
       });
       { const au1 = ENEMY.find(e => e.ai), a1 = ALLY.find(a => a.colRef); if (au1 && a1) { au1.focus = a1; a1.focus = au1; } }
@@ -6436,6 +6476,7 @@ function buildCampaign2() {
       if (TUT.step < 1) return;
       st.t += dt;
       const c = unitCentre();
+      if (!this.gunsSee && st.t >= 100) { this.gunsSee = true; reac('alerta', '<b>Louis:</b> Triguem massa! Els artillers ja ens han vist!', 5000); }
       if (!st.jag && st.t >= 18) {
         st.jag = true;
         const u = buildEnemy({ name: 'Jägers austríacs', flag: 'aut', cx: 126, cy: 49, h: Math.PI, nFiles: 8, shoots: true, ai: true, hold: 26, off: 0, jager: true });
@@ -6464,9 +6505,118 @@ function buildCampaign2() {
     endText: 'Molt bé, chasseur: has creuat els camps sota el foc, has fet recular els jägers i has fet callar els cinc canons de l\'Arxiduc. Neerwinden crema, però la línia francesa aguanta gràcies al 9e. Aquesta és la lliçó: l\'artilleria no s\'aguanta de cara, es pren pel flanc i amb pressa!'
   };
 }
+function buildCampaign3() {
+  const A = MapKit.A, W = 160, H = 60, sc = [], obs = [], R = MapKit.rng(33), BX = 144, BY = 30;
+  sc.push(A.field([[-16, -16], [W + 16, -16], [W + 16, H + 16], [-16, H + 16]], { kind: 'meadow' }));
+  const road = [[0, 31], [30, 29.5], [60, 31], [95, 29.5], [125, 30.5], [160, 30]];
+  sc.push(A.road(road, { kind: 'track' }));
+  sc.push(A.field([[8, 6], [40, 5], [42, 22], [10, 23]], { kind: 'arable', seed: 3 }), A.field([[50, 38], [86, 37], [88, 54], [52, 55]], { kind: 'arable', seed: 4 }), A.field([[96, 8], [128, 7], [130, 22], [98, 23]], { kind: 'arable', seed: 5 }));
+  sc.push(A.hedge([[44, 8], [46, 22]], { seed: 2 }), A.hedge([[90, 40], [92, 54]], { seed: 6 }));
+  sc.push(A.river([[BX, -18], [BX + 1, 12], [BX - 1, 30], [BX + 1, 48], [BX, 80]], { width: 6, water: true, seed: 9, arrow: false }));
+  sc.push(A.bridge(BX, BY, 0, { span: 11, width: 4, label: 'Pont' }));
+  obs.push({ x0: BX - 3.2, y0: -20, x1: BX + 3.2, y1: BY - 2.6 }, { x0: BX - 3.2, y0: BY + 2.6, x1: BX + 3.2, y1: H + 20 });
+  const wd = (pts, kind, seed) => A.wood(pts, { kind, spacing: 2.6, seed }), cover = [];
+  const woods = [wd([[60, 4], [78, 3], [80, 14], [64, 15]], 'mixed', 41), wd([[20, 42], [36, 41], [38, 52], [22, 54]], 'broad', 42), wd([[108, 40], [124, 39], [126, 52], [110, 53]], 'mixed', 43)];
+  sc.push(...woods); cover.push(...woods.flatMap(w => w.trees));
+  sc.push(wd([[-16, -16], [W + 16, -16], [W + 16, -2], [-16, -2]], 'mixed', 71), wd([[-16, H + 2], [W + 16, H + 2], [W + 16, H + 16], [-16, H + 16]], 'broad', 72), wd([[-16, -2], [-2, -2], [-2, H + 2], [-16, H + 2]], 'mixed', 73), wd([[W + 2, -2], [W + 16, -2], [W + 16, H + 2], [W + 2, H + 2]], 'mixed', 74));
+  sc.push(A.label('Camí de retirada', 72, 26, { kind: 'place', scale: 0.55 }), A.label('Pont segur', BX + 12, BY - 6, { kind: 'place', scale: 0.55 }));
+  const roadY = x => { for (let i = 1; i < road.length; i++) if (x <= road[i][0]) { const a = road[i - 1], b = road[i]; return a[1] + (b[1] - a[1]) * (x - a[0]) / (b[0] - a[0]); } return 30; };
+  const st = { t: 0, cart: { x: 22, y: roadY(22), hp: 3, idle: 0 }, cav: null, repulsed: 0, charges: 0, next: 22, done: false, fin: undefined, hitSq: false, warnedFar: 0 };
+  const cartOk = () => st.cart.hp > 0, arrived = () => st.cart.x >= BX + 5;
+  const steps = [
+    { title: 'Esgotar el Perseguidor', pose: 'serios', hl: [], unlock: ['gir', 'mov', 'pace', 'parfile', 'bataille', 'align', 'obl', 'conv', 'tournez', 'ligne', 'form', 'repos', 'musket', 'skirm', 'carre'], tag: 'Després de Neerwinden · capvespre', intro: true, btn: 'Endavant',
+      text: ['«Neerwinden s\'ha perdut, chasseur. L\'exèrcit es retira i la cavalleria lleugera austríaca ens pica els talons. El nostre <b>carro de municions</b> s\'ha quedat enrere amb els ferits: <b>l\'hem d\'escortar fins al pont</b>.»',
+        '«Els genets són ràpids, però no poden res contra un <b>mur de baionetes</b>. Quan els vegis carregar, no corris: <b>forma el quadre</b> amb <b>Formez le carré</b>. Esquena contra esquena, quatre cares cap enfora. Un cavall no es llança mai contra una baioneta.»',
+        '«Si et pesquen en marxa, la <b>polseguera</b> del galop et cobrirà abans que ho vegis. Fes-los perdre la sang freda, repeteix-ho cada cop que tornin, i quan hagin recuperat el seny, <b>Rompez le carré</b> i tornem a avançar. Guanya temps pels carros. <b>Vive le 9e!</b>»'],
+      done: () => TUT.intro },
+    { title: 'Escorta el carro', pose: 'assenyala', hl: [], unlock: ['gir', 'mov', 'pace', 'parfile', 'bataille', 'align', 'obl', 'conv', 'tournez', 'ligne', 'form', 'repos', 'musket', 'skirm', 'carre'],
+      mini: () => 'Carro: <b>' + Math.max(0, Math.round((BX + 5 - st.cart.x))) + ' m</b> del pont · Càrregues parades: <b>' + st.repulsed + '</b>. ' + (!cartOk() ? '<b>El carro s\'ha perdut!</b>' : st.cav && ['charge'].includes(st.cav.cstate) ? '<b>Càrrega de cavalleria!</b> Forma el <b>quadre</b> ara!' : Math.hypot(unitCentre().x - st.cart.x, unitCentre().y - st.cart.y) > 14 ? 'Torna a prop del carro: sense escorta s\'atura.' : co.sq ? 'Quadre format. Quan hagin fugit, <b>Rompez le carré</b>.' : 'Avança amb el carro i vigila la cavalleria.'),
+      resetStep: () => 1, done: () => false }
+  ];
+  const moveCav = (u, vx, vy, dt) => { for (const m of u.men) { m.x += vx * dt; m.y += vy * dt; } u.cx += vx * dt; u.cy += vy * dt; if (vx || vy) u.h = Math.atan2(vy, vx); };
+  const cavAlive = u => u.men.filter(m => m.alive);
+  const cavC = u => { const a = cavAlive(u); if (!a.length) return { x: u.cx, y: u.cy }; return { x: a.reduce((t, m) => t + m.x, 0) / a.length, y: a.reduce((t, m) => t + m.y, 0) / a.length }; };
+  const spawnCav = () => {
+    const u = buildEnemy({ name: 'Cavalleria lleugera austríaca', flag: 'aut', cx: -8, cy: 30, h: 0, nFiles: 5, cav: true });
+    for (const m of u.men) { m.x = u.cx + (m.x - u.cx) * 2.6; m.y = u.cy + (m.y - u.cy) * 2.6; }
+    Object.assign(u, { shoots: false, cstate: 'trot', ct: 0, n0: u.men.length }); ENEMY.push(u); st.cav = u;
+  };
+  return {
+    w: W, h: H, pad: 16, freeStab: true, localStab: true, square: true, start: { x: 10, y: 30 }, obstacles: obs, scene: MapKit.scene(sc), zone: null, musket: true, skirm: true, driftScale: 0.5, goalHeading: 0, minMen: 8, cover,
+    guns: [], enemies: [],
+    tutorial: { steps, figs: [], startAtencio: true, resetStep: () => 1 },
+    over(ctx, M, mini) {
+      const c = st.cart;
+      if (!mini && cartOk()) {                                                                             // carro de municions: caixa de fusta amb quatre rodes
+        ctx.save(); ctx.translate(c.x * M, c.y * M);
+        ctx.fillStyle = '#7a5a34'; ctx.strokeStyle = '#2d1f10'; ctx.lineWidth = Math.max(1, 0.1 * M); ctx.fillRect(-1.7 * M, -0.9 * M, 3.4 * M, 1.8 * M); ctx.strokeRect(-1.7 * M, -0.9 * M, 3.4 * M, 1.8 * M);
+        ctx.fillStyle = '#e9e1cf'; ctx.fillRect(-1.2 * M, -0.6 * M, 2.4 * M, 1.2 * M);
+        ctx.fillStyle = '#2d1f10'; for (const [dx, dy] of [[-1.1, -1.05], [1.1, -1.05], [-1.1, 1.05], [1.1, 1.05]]) ctx.fillRect((dx - 0.35) * M, (dy - 0.12) * M, 0.7 * M, 0.24 * M);
+        ctx.restore();
+      } else if (mini && cartOk()) { ctx.fillStyle = '#7a5a34'; ctx.fillRect((c.x - 1.5) * M, (c.y - 1) * M, 3 * M, 2 * M); }
+      if (!mini) { ctx.save(); ctx.fillStyle = 'rgba(24,22,60,.22)'; ctx.fillRect(-20 * M, -20 * M, (W + 40) * M, (H + 40) * M); ctx.restore(); }
+    },
+    onReset() {
+      st.t = 0; st.cart = { x: 22, y: roadY(22), hp: 3, idle: 0 }; st.cav = null; st.repulsed = 0; st.charges = 0; st.next = 22; st.done = false; st.fin = undefined; st.hitSq = false; st.warnedFar = 0;
+    },
+    tick(dt) {
+      if (screen !== 'game' || paused || tutOpen() || co.lost) return;
+      if (TUT.step < 1) return;
+      st.t += dt;
+      const c = unitCentre(), cart = st.cart;
+      if (st.fin === undefined) {
+        if (cartOk() && !arrived()) {                                                                      // el carro només avança si l'escorta és a prop
+          const d = Math.hypot(c.x - cart.x, c.y - cart.y);
+          if (d < 14) { cart.x += 1.5 * dt; cart.y = roadY(cart.x); cart.idle = 0; } else { cart.idle += dt; if (cart.idle > 6 && st.t - st.warnedFar > 14) { st.warnedFar = st.t; reac('alerta', '<b>Louis:</b> El carro s\'ha aturat! Ajunta\'t a ell, chasseur!', 4500); } }
+        }
+        if (!st.cav && st.t >= 12) spawnCav();
+        const u = st.cav;
+        if (u && u.cstate !== 'gone') {
+          const alive = cavAlive(u), cc = cavC(u), dx = c.x - cc.x, dy = c.y - cc.y, dist = Math.hypot(dx, dy), ux = dx / (dist || 1), uy = dy / (dist || 1);
+          u.ct += dt;
+          if (alive.length <= 3 && u.cstate !== 'leave') { u.cstate = 'leave'; u.ct = 0; reac('aprova', '<b>Capità Le Jay:</b> Els genets que queden es retiren! Segueix cap al pont!', 5000); }
+          if (u.cstate === 'trot') {
+            if (dist > 58 || st.t >= st.next) moveCav(u, ux * 2.8, uy * 2.8, dt); else moveCav(u, 1.6, 0, dt);                 // espera a distància fins que toca carregar
+            if (dist < 56 && st.t >= st.next) { u.cstate = 'charge'; u.ct = 0; st.charges++; st.hitSq = false; u.cdir = Math.atan2(dy, dx); reac('alerta', '<b>Capità Le Jay:</b> Cavalleria al galop! <b>Formez le carré!</b>', 6500); }
+          } else if (u.cstate === 'charge') {
+            if (dist > 14) u.cdir = Math.atan2(dy, dx);
+            const vx = Math.cos(u.cdir) * 7.5, vy = Math.sin(u.cdir) * 7.5;
+            moveCav(u, vx, vy, dt);
+            for (const m of alive) {
+              m.cd = (m.cd || 0) - dt;
+              let near = null, nd = 1.7; for (const o of co.members) { const d = Math.hypot(o.x - m.x, o.y - m.y); if (d < nd) { nd = d; near = o; } }
+              if (near && m.cd <= 0) {
+                m.cd = 0.9;
+                if (co.sq) { st.hitSq = true; if (Math.random() < 0.6) killEnemy(m, u); if (Math.random() < 0.1) killOwn(near); u.cstate = 'flee'; u.ct = 0; }
+                else if (Math.random() < 0.5) killOwn(near);
+              }
+            }
+            if (cartOk() && Math.hypot(cavC(u).x - cart.x, cavC(u).y - cart.y) < 3 && !(co.sq && Math.hypot(c.x - cart.x, c.y - cart.y) < 6) && !u.cartHit) { u.cartHit = true; cart.hp--; reac('alerta', '<b>Louis:</b> Han tocat el carro! ' + (cart.hp > 0 ? 'Aguanta!' : 'El carro és perdut!'), 4500); }
+            if (u.cstate === 'charge' && ((cavC(u).x - c.x) * Math.cos(u.cdir) + (cavC(u).y - c.y) * Math.sin(u.cdir)) > 14) { u.cstate = 'flee'; u.ct = 0; }
+          } else if (u.cstate === 'flee') {
+            if (u.ct === dt || u.ct < dt * 1.5) u.cartHit = false;
+            moveCav(u, -ux * 6, -uy * 6, dt);
+            if (u.ct > 2 && !u.counted) { u.counted = true; if (st.hitSq) { st.repulsed++; reac('aprova', '<b>Louis:</b> Els hem fet recular! Càrrega parada!', 4500); } }
+            if (u.ct > 8) { u.cstate = 'trot'; u.counted = false; st.next = st.t + 10; }
+          } else if (u.cstate === 'leave') { moveCav(u, -5, 0, dt); if (u.ct > 8) { u.cstate = 'gone'; for (const m of u.men) m.alive = false; u.routed = true; } }
+        }
+        if (arrived()) { st.fin = 0; reac('aprova', '<b>Capità Le Jay:</b> Tenim el carro al pont, chasseur! Heu guanyat el temps que necessitàvem!', 7000); }
+      } else { st.fin += dt; if (st.fin >= 3 && (co.members.some(m => m.x >= BX + 2) || st.fin >= 12)) st.done = true; }
+    },
+    win: () => st.done && cartOk(),
+    objectives: [
+      { t: 'Parar una càrrega de cavalleria formant el quadre', ok: () => st.repulsed >= 1 },
+      { t: 'Escortar el carro fins al pont', ok: () => arrived() && cartOk() },
+      { t: 'Mantenir la unitat amb almenys 8 homes', ok: () => co.members.length >= 8 }
+    ],
+    goalText: 'Escorta el carro fins al pont. Quan la cavalleria carregui, forma el quadre.',
+    endText: 'Molt bé, chasseur: has parat la cavalleria amb un mur de baionetes i el carro ha passat el pont. La retirada ha guanyat el temps que necessitava. Recorda-ho: un quadre ben format no es pren de cara.'
+  };
+}
 const campFull = f => () => Object.assign(f(), { advanced: true });                   // a tota la campanya hi ha l'indicador de cansament i el d'ordre
 const CAMP = [{ id: 'c1n1', n: 1, title: 'El Bateig de Foc', desc: 'Philippeville, 23 de maig de 1793. Navega en sigil pel bosc, aixafa una patrulla de quinze jägers austríacs sense que donin l\'alarma i defensa la riba del rierol fins que l\'exèrcit creui.', build: campFull(buildCampaign1) },
-  { id: 'c1n2', n: 2, title: 'La Línia de Neerwinden', desc: 'Neerwinden, 18 de març de 1793. Creua els camps sota el foc de la bateria austríaca, aixafa els jägers del prat i desarma cinc canons abans que caiguin els aliats.', build: campFull(buildCampaign2) }];
+  { id: 'c1n2', n: 2, title: 'La Línia de Neerwinden', desc: 'Neerwinden, 18 de març de 1793. Creua els camps sota el foc de la bateria austríaca, aixafa els jägers del prat i desarma cinc canons abans que caiguin els aliats.', build: campFull(buildCampaign2) },
+  { id: 'c1n3', n: 3, title: 'Esgotar el Perseguidor', desc: 'Després de Neerwinden, al capvespre. Escorta un carro de municions fins al pont i para les càrregues de la cavalleria lleugera austríaca formant el quadre.', build: campFull(buildCampaign3) }];
 const CAMP_BY_ID = {}; for (const L of CAMP) CAMP_BY_ID[L.id] = L;
 // ---- Campanyes: les 8 campanyes amb els 85 nivells; la campanya 1 té mapa il·lustrat amb el recorregut ----
 const CAMP_DATA = [{"n":1,"t":"Forjant la República (1792-1797)","l":[[1,"El Bateig de Foc (Philippeville)","23 maig 1793"],[2,"La Línia de Neerwinden","18 març 1793"],[3,"Esgotar el Perseguidor","Post-Neerwinden"],[4,"Avançada cap a Hondschoote","Setembre 1793"],[5,"La Càrrega a Hondschoote","6 setembre 1793"],[6,"Boscos de Wattignies","15 octubre 1793"],[7,"Trencament del Setge","16 octubre 1793"],[8,"L'Amalgama de Fleurus","Maig 1794"],[9,"La Defensa Implacable","26 juny 1794"],[10,"Les Altures de Partenheim","1796"],[11,"Foc a Gaualgesheim","6 octubre 1796"],[12,"Consolidació a Kempten","Tardor 1796"]]},{"n":2,"t":"La Forja de L'Incomparable (1798-1800)","l":[[13,"L'Espessor de la Vendée","1799"],[14,"La Preparació a Dijon","Abril 1800"],[15,"L'Infern de Gel (Valais)","Primavera 1800"],[16,"Les Ribes de la Chiusella","26 maig 1800"],[17,"La cursa cap a Piacenza","Juny 1800"],[18,"Captura d'Honor","5-7 juny 1800"],[19,"El Col·lapse del Matí (Marengo)","14 juny 1800"],[20,"L'Ancora de Desaix","14 juny 1800"],[21,"La Mort del Comandant","14 juny 1800"],[22,"La Càrrega Incomparable","14 juny 1800"],[23,"La Fama Sancionada","Juny 1802"]]},{"n":3,"t":"El Sol d'Austerlitz i les Ombres del Danubi (1803-1805)","l":[[24,"Exercicis a Boulogne","1803-1805"],[25,"La Marxa d'Àguiles","Tardor 1805"],[26,"La Solitud de Haslach","11 octubre 1805"],[27,"El Laberint de Jungingen","11 octubre 1805"],[28,"Caça i Captura a Ulm","Octubre 1805"],[29,"L'Eixam del Danubi","Novembre 1805"],[30,"Ombres de Dürenstein","11 novembre 1805"],[31,"Acer fred a la Nit","11 novembre 1805"],[32,"Ocupació a Viena","Desembre 1805"],[33,"Recompte i Reforma","Entre 1805 i 1808"]]},{"n":4,"t":"Triomf, Tragèdia i Redempció (1806-1807)","l":[[34,"Avançant a Turíngia (Jena)","Octubre 1806"],[35,"L'Obsolescència (Jena)","14 octubre 1806"],[36,"La Rereguarda Esgotada","Octubre 1806"],[37,"Fam al Fang i la Neu","Hivern 1806-1807"],[38,"Pànic a Mohrungen","25 gener 1807"],[39,"L'Eclipsi de l'Àguila","25 gener 1807"],[40,"Eylau: Esgotament Blanc","8 febrer 1807"],[41,"L'Error de Bennigsen","14 juny 1807"],[42,"El Càstig dels Canons","14 juny 1807"],[43,"Purificats pel Foc","14 juny 1807"],[44,"Tilsit i Nou Equipament","Final 1807"]]},{"n":5,"t":"Sang a Espanya i Foc a Àustria (1808-1811)","l":[[45,"Els Engorjats (Pirineus)","1808"],[46,"La Marxa Furtiva (Talavera)","27 juliol 1809"],[47,"L'Assalt a l'Alt de Medellín","Nit 27 juliol 1809"],[48,"El Preu de la Foscor","Matinada 28 juliol 1809"],[49,"Suportant el Càstig","28 juliol 1809"],[50,"Les Trinxeres de Badajoz","1812"],[51,"Cobrint el Glacis","Final setge 1812"],[52,"El Cap de Pont d'Essling","Maig 1809"],[53,"L'Escorxador (Aspern-Essling)","Maig 1809"],[54,"La Ruta a l'Illa de Lobau","Final d'Essling"],[55,"Tempesta a Lobau","Juliol 1809"],[56,"Silenciant els Grenz","5 juliol 1809 (Wagram)"],[57,"L'Infern Lineal de l'Artilleria","6 juliol 1809 (Wagram)"],[58,"La Cacera i les Amputacions","Post-Wagram"]]},{"n":6,"t":"El Desastre i el Renaixement (1812-1813)","l":[[59,"La Pols del Niemen","Estiu 1812"],[60,"Smolensk En Flames","Agost 1812"],[61,"L'Ombra de Borodino","Pre-7 Setembre 1812"],[62,"La Fletxa Trencada","7 Setembre 1812 (Borodino)"],[63,"L'Arrelament (Borodino)","Final de Borodino"],[64,"L'Infern de Cristall","Hivern 1812 (Moscou)"],[65,"Berezina Gelada","Novembre 1812"],[66,"La Generació \"Marie Louise\"","Primavera 1813"],[67,"Desesperació a Lützen","2 maig 1813"],[68,"Ganivetada a Bautzen","20-21 maig 1813"],[69,"Tancats a Dresden","Agost 1813"],[70,"La Doctrina dels Dos Rangs","Octubre 1813"],[71,"La Gran Derrota (Leipzig)","16-19 Octubre 1813"]]},{"n":7,"t":"La Defensa de França i la Descomposició (1814)","l":[[72,"La Guerrilla Imperial","Gener 1814"],[73,"El Foc Cremant (Vauchamps)","14 febrer 1814"],[74,"La Costa Carnissera (Craonne)","Març 1814"],[75,"Les Roques del Sud (Orthez)","27 febrer 1814"],[76,"Retrocés Destructiu","Post-Orthez"],[77,"El Mur Ensangonat (Tolosa)","Abril 1814"],[78,"L'Amagatall i la Vergonya","Estiu 1814"]]},{"n":8,"t":"El Vol de l'Àliga i l'Ocàs (1815)","l":[[79,"L'Àliga a la Llum","Març 1815"],[80,"Oportunitat Furtiva","Juny 1815"],[81,"L'Infern Absolut (Ligny)","16 juny 1815"],[82,"L'Espasa Partida de Blücher","16 juny 1815"],[83,"La Ceguesa als Boscos","18 juny 1815"],[84,"Tancat entre les Aigües (Wavre)","18-19 juny 1815"],[85,"L'Ordre de Llicenciament","Estiu 1815"]]}];   // [{ n, t: títol, l: [[nivell, nom, data], …] }]
