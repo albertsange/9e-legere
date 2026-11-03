@@ -1733,7 +1733,8 @@ function reset() {
   centreCam();
   if (level && level.free) co.atencio = true;
   co.arm = 'portez'; co.loaded = false; co.reloading = false; co.serrez = null; FX.length = 0;
-  CORPSES.length = 0; BALLS.length = 0; GUNS.length = 0; for (const g of (level && level.guns) || []) GUNS.push(Object.assign({ reload: 3, aimT: 0 }, g)); ENEMY.length = 0; ALLY.length = 0; co.ldBoost = 1; for (const d of (level && level.enemies) || []) ENEMY.push(buildEnemy(d)); HOVER = null; if (level && level.onReset) level.onReset();
+  CORPSES.length = 0; BALLS.length = 0; GUNS.length = 0; for (const g of (level && level.guns) || []) GUNS.push(Object.assign({ reload: 3, aimT: 0 }, g)); ENEMY.length = 0; ALLY.length = 0; co.ldBoost = 1; for (const d of (level && level.enemies) || []) ENEMY.push(buildEnemy(d));
+  for (const g of GUNS) if (g.crew) { const c = Math.cos(g.h), sn = Math.sin(g.h), men = [[-2.4, -1.0], [-2.4, 1.0], [-0.6, -1.5], [-0.6, 1.5]].slice(0, g.crew).map(([a, l]) => ({ x: g.x + c * a - sn * l, y: g.y + sn * a + c * l, alive: true, t: 0, rank: 0 })); const u = { name: 'Servidors del canó', flag: 'aut', cx: g.x - c * 1.5, cy: g.y - sn * 1.5, h: g.h, nf: 2, men, reload: 0, aimT: 0, volleys: 0, routed: false, shoots: false, gun: g }; g.crewUnit = u; ENEMY.push(u); } HOVER = null; if (level && level.onReset) level.onReset();
   objReset();
   tutOnReset();
 }
@@ -2326,6 +2327,7 @@ function updateGuns(dt) {
   const A = TUNE.art, c = unitCentre();
   for (const g of GUNS) {
     if (g.reload > 0) g.reload -= dt;
+    if (g.crewUnit && !enAlive(g.crewUnit)) { g.aimT = 0; continue; }          // sense servidors, el canó calla
     if (g.mute > 0) { g.mute -= dt; g.aimT = 0; continue; }                // el foc dels tiradors els fa abaixar el cap: no disparen
     const d = Math.hypot(c.x - g.x, c.y - g.y);
     if (d > A.abast || losBlocked(g.x, g.y, c.x, c.y)) { g.aimT = 0; continue; }
@@ -2346,7 +2348,7 @@ function drawGuns() {
     ctx.fillStyle = '#3b2e22'; ctx.fillRect(-0.5 * M, -0.75 * M, 0.8 * M, 0.22 * M); ctx.fillRect(-0.5 * M, 0.53 * M, 0.8 * M, 0.22 * M);   // rodes
     ctx.fillStyle = '#b08a3e'; ctx.beginPath(); ctx.roundRect(-0.6 * M, -0.17 * M, 2.4 * M, 0.34 * M, 0.12 * M); ctx.fill();              // canó de bronze
     ctx.fillStyle = '#f7f5ee'; ctx.strokeStyle = '#6c6a63'; ctx.lineWidth = Math.max(1, 0.05 * M);
-    for (const [x, y] of [[-2.3, -0.9], [-2.4, 0.9], [-0.2, -1.4]]) { ctx.beginPath(); ctx.arc(x * M, y * M, Math.max(1.8, 0.2 * M), 0, Math.PI * 2); ctx.fill(); ctx.stroke(); }
+    if (!g.crewUnit) for (const [x, y] of [[-2.3, -0.9], [-2.4, 0.9], [-0.2, -1.4]]) { ctx.beginPath(); ctx.arc(x * M, y * M, Math.max(1.8, 0.2 * M), 0, Math.PI * 2); ctx.fill(); ctx.stroke(); }
     ctx.restore();
   }
   ctx.fillStyle = '#222';
@@ -4406,7 +4408,7 @@ let autoStepT = 0;
 const VOICE = { on: false, rec: null, running: false, tested: false, seg: {}, interim: '', state: '', failT: 0, lastFail: null,
   learn: { phr: {}, ex: {} }, shared: { phr: {}, ex: {} }, opt: { mode: 'cont', vol: true, log: false, tele: true, engine: '' }, log: [], recentExec: null, ptt: false, db: false, loading: false };
 // Connexió amb Supabase (la mateixa de la web: si el joc s'obre dins la web, agafa window.APP_CONFIG) i fonts del motor local Vosk
-const GAME_VERSION = '1.8.17';
+const GAME_VERSION = '1.8.18';
 const CFG = Object.assign({
   SUPABASE_URL: 'https://ltopullwhasagnkuqaek.supabase.co',
   SUPABASE_ANON_KEY: 'sb_publishable_DhHFUh-UrbBrI0l476Vcnw_tSn-Gmkr',
@@ -5299,7 +5301,7 @@ function buildFree() {
   for (let k = 0; k < 4; k++) sc.push(A.tent(18 + k * 4.2, 22, { w: 2.5, rot: 0 }), A.tent(18 + k * 4.2, 28, { w: 2.5, rot: Math.PI }));
   return {
     w: W, h: H, start: { x: 55, y: 66 }, obstacles: [], scene: MapKit.scene(sc), zone: null, free: true, musket: true, skirm: true,
-    enemies: [{ name: 'Regiment austríac', flag: 'aut', cx: 136, cy: 44, h: Math.PI, shoots: true }], guns: [{ x: 141, y: 31, h: Math.PI, name: 'Bateria austríaca' }], advanced: true, warnDisorder: true, driftScale: 1, goalHeading: 0,
+    enemies: [{ name: 'Regiment austríac', flag: 'aut', cx: 136, cy: 44, h: Math.PI, shoots: true }], guns: [{ x: 141, y: 31, h: Math.PI, name: 'Bateria austríaca', crew: 4 }], advanced: true, warnDisorder: true, driftScale: 1, goalHeading: 0,
     goalText: 'Un camp obert per provar totes les ordres del joc. A l\'est, al camp de proves, hi ha un regiment austríac i una bateria: si t\'hi acostes, et dispararan.', endText: ''
   };
 }
