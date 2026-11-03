@@ -4504,7 +4504,7 @@ let autoStepT = 0;
 const VOICE = { on: false, rec: null, running: false, tested: false, seg: {}, interim: '', state: '', failT: 0, lastFail: null,
   learn: { phr: {}, ex: {} }, shared: { phr: {}, ex: {} }, opt: { mode: 'cont', vol: true, log: false, tele: true, engine: '' }, log: [], recentExec: null, ptt: false, db: false, loading: false };
 // Connexió amb Supabase (la mateixa de la web: si el joc s'obre dins la web, agafa window.APP_CONFIG) i fonts del motor local Vosk
-const GAME_VERSION = '1.8.22';
+const GAME_VERSION = '1.8.23';
 const CFG = Object.assign({
   SUPABASE_URL: 'https://ltopullwhasagnkuqaek.supabase.co',
   SUPABASE_ANON_KEY: 'sb_publishable_DhHFUh-UrbBrI0l476Vcnw_tSn-Gmkr',
@@ -5286,13 +5286,16 @@ function buildLevel1() {
     { title: 'Pas accéléré', hl: ['p_accelerat'], unlock: ['pace'],
       text: ['Mentre camina pots canviar la <b>cadència</b>. L\'<b>École du soldat</b> en té tres: <b>pas ordinaire</b> (76 passos per minut), <b>pas accéléré</b> (100) i <b>pas de charge</b> (120). Amb més passos per minut, la unitat cobreix més terreny.',
         'A la palanca del <b>Pas</b>, al costat de Halte, prem <b>Accéléré</b>. Compte: com més corre la unitat, menys temps tens per donar l\'ordre següent.'],
-      done: () => co.state === 'marxa' && co.pace !== 'ordinari' },
+      done: () => (co.state === 'marxa' && co.pace !== 'ordinari') || lastPast() },      // si ja han passat les tendes sense accelerar, no es bloqueja: passa directament al Par file
     { title: 'Girar la fila en marxa', unlock: ['parfile'],
       when: () => maxY() > 25.2,      // el diàleg surt quan el davanter és a l'alçada de la tenda del mig
       get hl() { return lastPast() ? ['pfG'] : []; },
       cue: () => lastPast() ? 'Ara! Par file à gauche!' : '',
-      text: ['Quan s\'acabi el corredor cal tornar cap a l\'est sense aturar-se. <b>Par file à gauche / droite</b> fa que la fila canviï de rumb: la primera filera gira just on has donat l\'ordre i les altres giren pel mateix punt.',
-        'Segueix caminant pel corredor. Quan l\'<b>últim soldat</b> hagi passat l\'<b>última tenda</b> t\'avisaré: llavors, a <b>Girs</b>, prem <b>Par file → gauche</b>.'],
+      get text() {
+        const base = 'Quan s\'acabi el corredor cal tornar cap a l\'est sense aturar-se. <b>Par file à gauche / droite</b> fa que la fila canviï de rumb: la primera filera gira just on has donat l\'ordre i les altres giren pel mateix punt.';
+        return lastPast() ? [base, 'Ja has passat l\'última tenda (sense accelerar, no passa res: el pas accéléré és opcional). <b>Ara</b>, sense aturar-te, a <b>Girs</b> prem <b>Par file → gauche</b>.']
+          : [base, 'Segueix caminant pel corredor. Quan l\'<b>últim soldat</b> hagi passat l\'<b>última tenda</b> t\'avisaré: llavors, a <b>Girs</b>, prem <b>Par file → gauche</b>.'];
+      },
       done: () => co.state === 'marxa' && !co.pf && Math.abs(wrapA(co.members[0].h)) < 0.1 && maxY() > 29 },
     { title: 'Tornar a formar', hl: ['bat'], unlock: ['bataille'],
       text: 'Ara desplega la fila en línia amb <b>Sur la droite, par file en bataille</b>: cada filera es col·loca a la dreta de la primera i la línia queda mirant cap a la dreta de la fila. Com que la fila va cap a l\'est, quedaràs <b>de cara al sud</b>, dins la placeta.',
