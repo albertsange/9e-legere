@@ -27,7 +27,7 @@ for (const k of ['CAMP_DATA', 'CAMP_DESC']) {
 }
 // Mateix detector que el del joc (i18nMissNote)
 const CA = /(^|[\s'’(«])(el|la|els|les|un|una|de|del|dels|amb|per|que|què|és|són|ha|han|hem|has|cal|ja|més|molt|tot|tots|al|als|pel|seu|seva|teu|teva|ens|et|sense|fins|quan|com|sobre|entre|cap|hi|aquí|ara|després|abans|només|també|encara|però|perquè|mentre|cada|vol|pots|pot|fes|fer|vols|nivell|unitat|homes|línia|ordre)(?=[\s'’,.:;!?)»]|$)|[àèòçŀ]|l·l/i;
-const FR = /(?<![\wÀ-ÿ])(le|du|des|sur|par|et|vous|rangs|serrez|croisez|baïonnette|avançant|avant|files|à|droite|gauche|arrière|alignement|charge|légère|régiment|après|compiègne|català)(?![\wÀ-ÿ])/i;
+const FR = /(?<![\wÀ-ÿ])(le|du|des|sur|par|et|vous|rangs|demi-brigade|ligne|serrez|croisez|baïonnette|avançant|avant|files|à|droite|gauche|arrière|alignement|charge|légère|régiment|après|compiègne|català)(?![\wÀ-ÿ])/i;
 const isCa = s => s.length >= 4 && CA.test(s) && !FR.test(s) && !EN.test(s) && !/^(data:|https?:|\/|\.|#|\[i18n\])/.test(s);
 const EN = /\b(the|and|you|your|is|of|to|we|are|with|for|will|this|that)\b/i;
 let bad = 0;
