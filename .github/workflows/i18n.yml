@@ -1,0 +1,19 @@
+name: i18n audit
+
+on:
+  push:
+    paths: ['site/simulator/**', 'tools/i18n-audit.mjs']
+  pull_request:
+    paths: ['site/simulator/**', 'tools/i18n-audit.mjs']
+  workflow_dispatch:
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: npm install --no-save acorn@8 acorn-walk@8
+      - name: Every Catalan text must have a translation in each i18n/<lang>.json
+        run: node tools/i18n-audit.mjs --list

@@ -1066,6 +1066,15 @@ function i18nSetDict(rows) {
 }
 function i18nCached() { const c = store.get(SK.i18n(I18N.lang)); if (c && c.rows && c.rows.length) { i18nSetDict(c.rows); return true; } return false; }
 const i18nWs = s => s.replace(/\s+/g, ' ').trim();
+// Detector de text català sense traduir (només per a desenvolupament): window.__i18nMiss recull els textos; amb ?i18nlog també es mostren per consola.
+const I18N_CA_RX = /(^|[\s'’(«])(el|la|els|les|un|una|de|del|dels|amb|per|que|què|és|són|ha|han|hem|has|cal|ja|més|molt|tot|tots|al|als|pel|seu|seva|teu|teva|ens|et|sense|fins|quan|com|sobre|entre|cap|hi|aquí|ara|després|abans|només|també|encara|però|perquè|mentre|cada|vol|pots|pot|fes|fer|vols|nivell|unitat|homes|línia|ordre)(?=[\s'’,.:;!?)»]|$)|[àèòçŀ]|l·l/i;
+const I18N_FR_RX = /(?<![\wÀ-ÿ])(le|du|des|sur|par|et|vous|rangs|serrez|croisez|baïonnette|avançant|avant|files|à|droite|gauche|arrière|alignement|charge|légère|régiment|après|compiègne|català)(?![\wÀ-ÿ])/i;
+const I18N_EN_RX = /\b(the|and|you|your|is|of|to|we|are|with|for|will|this|that)\b/i;                  // ja és anglès (trossos ja traduïts)
+function i18nMissNote(core) {
+  if (I18N.lang === 'ca' || !I18N.ready || core.length < 4 || !I18N_CA_RX.test(core) || I18N_FR_RX.test(core) || I18N_EN_RX.test(core)) return;
+  const m = (window.__i18nMiss = window.__i18nMiss || new Set());
+  if (!m.has(core)) { m.add(core); if (/[?&]i18nlog\b/.test(location.search)) console.warn('[i18n] sense traducció (' + I18N.lang + '):', core); }
+}
 function i18nTr(s) {                                   // text en català -> text en l'idioma actual (o el mateix, si no hi ha traducció)
   if (I18N.lang === 'ca' || !I18N.ready || !s || !/[A-Za-zÀ-ÿ]{2}/.test(s)) return s;
   const hit = I18N.memo.get(s); if (hit !== undefined) return hit;
@@ -1082,6 +1091,7 @@ function i18nTr(s) {                                   // text en català -> tex
     if (changed) out = t;
   }
   const res = out === null ? s : lead + out + trail;
+  if (out === null) i18nMissNote(core);
   if (I18N.memo.size > 4000) I18N.memo.clear();
   I18N.memo.set(s, res); return res;
 }
@@ -2575,7 +2585,8 @@ function aiGroups(side) {                       // contra qui lluita una unitat:
   if (side === 'au') {
     if (co.members.length) { const c = unitCentre(); g.push({ own: true, men: co.members, h: co.members[0].h, cx: c.x, cy: c.y }); }
     for (const a of ALLY) { if (a.script) continue; const l = a.men.filter(v => v.alive); if (l.length) g.push({ ally: a, men: l, h: a.h, cx: a.cx, cy: a.cy }); }
-  } else for (const e of ENEMY) { if (e.routed || e.state === 'retreat') continue; const l = e.men.filter(v => v.alive); if (l.length) g.push({ en: e, men: l, h: e.h, cx: e.cx, cy: e.cy }); }
+  } else for (const e of ENEMY) { if (e.routed || e.state === 'retreat' || e.gun) continue;       // els aliats no disparen mai als servidors dels canons: els silencia el jugador
+    const l = e.men.filter(v => v.alive); if (l.length) g.push({ en: e, men: l, h: e.h, cx: e.cx, cy: e.cy }); }
   return g;
 }
 function aiVolley(u, g, side) {
@@ -2619,13 +2630,14 @@ function aiUnitTick(u, side, dt) {
     if (Math.abs(diff) < A.retirada.tol) { const sp = STEP * PACES.accelerat.cad / 60 * dt; aiMove(u, Math.cos(u.h) * sp, Math.sin(u.h) * sp); }
     return;
   }
-  const gs = aiGroups(side); if (!gs.length) return;
+  const gs = aiGroups(side).filter(g => !u.onlyPlayer || g.own); if (!gs.length) return;       // onlyPlayer: la unitat només persegueix el jugador (els jägers del nivell 2)
   const vis = gs.filter(g => !losBlocked(u.cx, u.cy, g.cx, g.cy));              // només veu els qui no té tapats per una casa o el bosc
   let best = null, bs = 1e9;                                                // tria objectiu: el més proper; compta com a més proper el que ens ensenya el flanc o és més feble
   for (const g of vis) {
     const d = Math.hypot(g.cx - u.cx, g.cy - u.cy), face = Math.abs(wrapA(Math.atan2(u.cy - g.cy, u.cx - g.cx) - g.h));
     const sc = d - (face > A.flanc ? A.flancBonus : 0) - (g.men.length < A.feble ? A.febleBonus : 0) - (g.own ? A.jugadorBonus : 0); if (sc < bs) { bs = sc; best = g; }
   }
+  if (!best && u.onlyPlayer) { const c0 = unitCentre(); u.last = { x: c0.x, y: c0.y }; }
   let tx, ty;
   if (best) { u.last = { x: best.cx, y: best.cy }; tx = best.cx; ty = best.cy; }
   else if (u.last) { tx = u.last.x; ty = u.last.y; if (Math.hypot(tx - u.cx, ty - u.cy) < A.cercaRadi) u.last = null; }   // no el veu: va on el va veure per darrera vegada
@@ -4504,7 +4516,7 @@ let autoStepT = 0;
 const VOICE = { on: false, rec: null, running: false, tested: false, seg: {}, interim: '', state: '', failT: 0, lastFail: null,
   learn: { phr: {}, ex: {} }, shared: { phr: {}, ex: {} }, opt: { mode: 'cont', vol: true, log: false, tele: true, engine: '' }, log: [], recentExec: null, ptt: false, db: false, loading: false };
 // Connexió amb Supabase (la mateixa de la web: si el joc s'obre dins la web, agafa window.APP_CONFIG) i fonts del motor local Vosk
-const GAME_VERSION = '1.8.23';
+const GAME_VERSION = '1.8.24';
 const CFG = Object.assign({
   SUPABASE_URL: 'https://ltopullwhasagnkuqaek.supabase.co',
   SUPABASE_ANON_KEY: 'sb_publishable_DhHFUh-UrbBrI0l476Vcnw_tSn-Gmkr',
@@ -6295,11 +6307,11 @@ function buildCampaign2() {
   for (const [x, y] of lone) { sc.push(A.tree(x, y, { kind: 'broad', r: 1.3, seed: x })); cover.push({ x, y, r: 1.3 }); }
   // Neerwinden: poble amb carrers i cases a l'atzar
   const segD = (x, y, a, b) => { const dx = b[0] - a[0], dy = b[1] - a[1], k = Math.max(0, Math.min(1, ((x - a[0]) * dx + (y - a[1]) * dy) / (dx * dx + dy * dy))); return Math.hypot(x - a[0] - dx * k, y - a[1] - dy * k); };
-  const placed = [[VC.x - 6, VC.y - 5, 3.4]], inVil = (x, y, r) => ((x - VC.x) / (16 - r)) ** 2 + ((y - 14.5) / (11 - r)) ** 2 < 1;
-  const freeH = (x, y, r) => { if (!inVil(x, y, r)) return false; for (const rd of [st1, st2]) for (let i = 1; i < rd.length; i++) if (segD(x, y, rd[i - 1], rd[i]) < 2 + r) return false; for (const q of placed) if (Math.hypot(x - q[0], y - q[1]) < q[2] + r) return false; return true; };
+  const placed = [[VC.x - 6, VC.y - 5, 3.4]], inVil = (x, y, r) => ((x - VC.x) / (17 - r * 0.6)) ** 2 + ((y - 14.5) / (11.5 - r * 0.6)) ** 2 < 1;
+  const freeH = (x, y, r) => { if (!inVil(x, y, r)) return false; for (const rd of [st1, st2]) for (let i = 1; i < rd.length; i++) if (segD(x, y, rd[i - 1], rd[i]) < 1.6 + r * 0.55) return false; for (const q of placed) if (Math.hypot(x - q[0], y - q[1]) < (q[2] + r) * 0.85) return false; return true; };
   vil.push(house(VC.x - 6, VC.y - 5, 3.6, 6, 0, 'church'));
-  for (let n = 0, t = 0; n < 15 && t < 20000; t++) {
-    const x = VC.x - 16 + R() * 32, y = 4 + R() * 21, w = 4.2 + R() * 1.6, h = 3 + R() * 1.2, rot = (R() - 0.5) * 0.3, r = Math.hypot(w, h) / 2 + 0.3;
+  for (let n = 0, t = 0; n < 22 && t < 30000; t++) {
+    const x = VC.x - 17 + R() * 34, y = 3 + R() * 23, w = 4.2 + R() * 1.6, h = 3 + R() * 1.2, rot = (R() - 0.5) * 0.3, r = Math.hypot(w, h) / 2 * 0.78 + 0.2;
     if (!freeH(x, y, r)) continue; n++; placed.push([x, y, r - 0.1]); vil.push(house(x, y, w, h, rot, 'house'));
   }
   // bosc de la dreta (sota la bateria) i boscos del marge decoratiu
@@ -6318,13 +6330,12 @@ function buildCampaign2() {
   const steps = [
     { title: 'La Línia de Neerwinden', pose: 'serios', hl: [], unlock: ['gir', 'mov', 'pace', 'parfile', 'bataille', 'align', 'obl', 'conv', 'tournez', 'ligne', 'form', 'repos', 'musket', 'skirm'], tag: 'Neerwinden · 18 de març de 1793', intro: true, btn: 'Endavant',
       text: ['«Això és <b>Neerwinden</b>, chasseur, i avui no som a Philippeville: aquí no podem esquivar l\'enemic. L\'Arxiduc ha plantat una <b>bateria de cinc canons</b> a l\'extrem est del camp, i <b>tres batallons austríacs</b> ataquen el poble per la seva banda.»',
-        '«Els nostres <b>dos batallons de línia</b> aniran a defensar Neerwinden, i ho faran d\'allò més bé, però no aguantaran gaire: mentre els austríacs els pressionen, els <b>canons bombardejaran el poble</b> per protegir la seva pròpia artilleria. Veuràs com les cases s\'enfonsen i s\'encenen.»',
-        '«<b>La nostra feina és una altra</b>: creuem els <b>camps</b>, per sota del poble, fins als canons i els fem callar. Cal anar <b>de pressa</b>: si els aliats cauen abans que hi arribem, els canons es giraran contra nosaltres. Un canó queda <b>desarmat</b> quan has matat <b>més de la meitat dels seus cinc servidors</b> (és a dir, tres), i es converteix en una carcassa fumejant. Els has de desarmar <b>els cinc</b>.»',
-        '«Compte amb les <b>peces</b>: tenen un <b>angle de visió</b> i, si us veuen arribar o senten els vostres trets, <b>es giren lentament</b> cap a vosaltres. Si us hi acosteu <b>de cara</b> a menys de <b>25 metres</b>, encara que sigueu desplegats en tiradors, dispararan <b>metralla</b> i això és devastador. Aprofiteu els arbres i les tanques, ataqueu pel flanc i recordeu que un canó <b>no pot disparar si en té un altre al davant</b>.»',
-        '«Un darrer avís: pels <b>prats</b> del sud avança una unitat de <b>jägers</b> austríacs que us sortirà al pas. Feu-los recular (en perdre la meitat dels homes es retiren) i només llavors aneu a pels canons. Els indicadors de <b>càrrega</b> i de <b>franja de tir</b> que veus sobre l\'enemic et diran quan estan a punt de disparar. Endavant, chasseur: la República compta amb el 9e!»'],
+        '«Els nostres <b>batallons de línia</b> aniran a defensar Neerwinden, però no aguantaran gaire: mentre els austríacs els pressionen, els <b>canons bombardejaran el poble</b> per cobrir la seva infanteria.»',
+        '«<b>Nosaltres tenim la missió de silenciar els canons.</b> Cal anar <b>de pressa</b>: si els aliats cauen abans que hi arribem, els canons es giraran contra nosaltres. Un canó queda <b>desarmat</b> quan has matat <b>més de la meitat dels seus servidors</b>. Has de desarmar <b>tots els canons</b> perquè l\'exèrcit no quedi esclafat.»',
+        '«Aprofiteu els <b>arbres</b> i les <b>tanques</b>, ataqueu pel <b>flanc</b> i, si trobeu enemics, esclafeu-los. <b>Vive le 9e!</b>»'],
       done: () => TUT.intro },
     { title: 'Silencia la bateria', pose: 'assenyala', hl: [], unlock: ['gir', 'mov', 'pace', 'parfile', 'bataille', 'align', 'obl', 'conv', 'tournez', 'ligne', 'form', 'repos', 'musket', 'skirm'],
-      mini: () => 'Canons desarmats: <b>' + downN() + ' / 5</b> · Aliats al poble: <b>' + allyN() + '</b> homes. ' + (allyN() > 0 ? 'Avança pels <b>camps</b> fins a la bateria abans que cauen els aliats.' : '<b>Els aliats han caigut</b>: els canons ens busquen a nosaltres!') + (st.jag && !jagDone() ? ' Els <b>jägers</b> avancen pels prats: aixafa\'ls.' : ''),
+      mini: () => 'Canons desarmats: <b>' + downN() + ' / 5</b> · Aliats al poble: <b>' + allyN() + '</b>. ' + (allyN() > 0 ? 'Avança pels <b>camps</b> fins a la bateria abans que cauen els aliats.' : '<b>Els aliats han caigut</b>: els canons ens busquen a nosaltres!') + (st.jag && !jagDone() ? ' Els <b>jägers</b> avancen pels prats: aixafa\'ls.' : ''),
       resetStep: () => 1, done: () => false }
   ];
   const ash = (v, i) => ((Math.sin(v * 12.9898 + i * 78.233) * 43758.5453) % 1 + 1) % 1;
@@ -6377,7 +6388,7 @@ function buildCampaign2() {
       if (!st.jag && st.t >= 18) {
         st.jag = true;
         const u = buildEnemy({ name: 'Jägers austríacs', flag: 'aut', cx: 126, cy: 49, h: Math.PI, nFiles: 8, shoots: true, ai: true, hold: 26, off: 0, jager: true });
-        Object.assign(u, { reload: 6, supp: 0, state: '', last: { x: 70, y: 46 }, n0: u.men.length }); ENEMY.push(u); st.jagE = u;
+        Object.assign(u, { onlyPlayer: true, reload: 6, supp: 0, state: '', last: { x: 70, y: 46 }, n0: u.men.length }); ENEMY.push(u); st.jagE = u;
         reac('assenyala', '<b>Capità Le Jay:</b> Atenció! Una unitat de <b>jägers</b> avança pels prats del sud. Aixafa\'ls abans d\'anar a pels canons!', 6500);
       }
       if (st.fin === undefined) {
@@ -6798,8 +6809,11 @@ VOICE.on = !!VOICE.want && voiceSupported(); VOICE.tested = VOICE.on;
 async function i18nLoad() {                            // descarrega la traducció de Supabase (i la desa al navegador)
   if (I18N.lang === 'ca') return;
   try {
-    const r = await sbFetch('/rest/v1/game_i18n?lang=eq.' + I18N.lang + '&select=src,dst&limit=3000'); const rows = await r.json();
-    if (Array.isArray(rows) && rows.length) { i18nSetDict(rows); store.set(SK.i18n(I18N.lang), { rows }); }
+    // font de veritat: i18n/<lang>.json (al repositori, {català: traducció}); la taula game_i18n de Supabase hi afegeix el que falti
+    let rows = [];
+    try { const r = await sbFetch('/rest/v1/game_i18n?lang=eq.' + I18N.lang + '&select=src,dst&limit=3000'); const d = await r.json(); if (Array.isArray(d)) rows = d; } catch (e) {}
+    try { const o = (window.__I18N_EMBED || {})[I18N.lang] || await (await fetch('i18n/' + I18N.lang + '.json?v=' + GAME_VERSION)).json(); for (const k in o) rows.push({ src: k, dst: o[k] }); } catch (e) {}   // __I18N_EMBED: només a la còpia de proves d'un sol fitxer
+    if (rows.length) { i18nSetDict(rows); store.set(SK.i18n(I18N.lang), { rows }); }
   } catch (e) {}
   i18nApply();
 }
