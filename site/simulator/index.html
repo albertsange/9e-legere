@@ -4597,7 +4597,7 @@ let autoStepT = 0;
 const VOICE = { on: false, rec: null, running: false, tested: false, seg: {}, interim: '', state: '', failT: 0, lastFail: null,
   learn: { phr: {}, ex: {} }, shared: { phr: {}, ex: {} }, opt: { mode: 'cont', vol: true, log: false, tele: true, engine: '' }, log: [], recentExec: null, ptt: false, db: false, loading: false };
 // Connexió amb Supabase (la mateixa de la web: si el joc s'obre dins la web, agafa window.APP_CONFIG) i fonts del motor local Vosk
-const GAME_VERSION = '1.8.32';
+const GAME_VERSION = '1.8.33';
 const CFG = Object.assign({
   SUPABASE_URL: 'https://ltopullwhasagnkuqaek.supabase.co',
   SUPABASE_ANON_KEY: 'sb_publishable_DhHFUh-UrbBrI0l476Vcnw_tSn-Gmkr',
@@ -6477,7 +6477,6 @@ function buildCampaign2() {
       if (TUT.step < 1) return;
       st.t += dt;
       const c = unitCentre();
-      if (!this.gunsSee && st.t >= 100) { this.gunsSee = true; reac('alerta', '<b>Louis:</b> Triguem massa! Els artillers ja ens han vist!', 5000); }
       if (!st.jag && st.t >= 18) {
         st.jag = true;
         const u = buildEnemy({ name: 'Jägers austríacs', flag: 'aut', cx: 126, cy: 49, h: Math.PI, nFiles: 8, shoots: true, ai: true, hold: 26, off: 0, jager: true });
