@@ -4406,7 +4406,7 @@ let autoStepT = 0;
 const VOICE = { on: false, rec: null, running: false, tested: false, seg: {}, interim: '', state: '', failT: 0, lastFail: null,
   learn: { phr: {}, ex: {} }, shared: { phr: {}, ex: {} }, opt: { mode: 'cont', vol: true, log: false, tele: true, engine: '' }, log: [], recentExec: null, ptt: false, db: false, loading: false };
 // Connexió amb Supabase (la mateixa de la web: si el joc s'obre dins la web, agafa window.APP_CONFIG) i fonts del motor local Vosk
-const GAME_VERSION = '1.8.15';
+const GAME_VERSION = '1.8.16';
 const CFG = Object.assign({
   SUPABASE_URL: 'https://ltopullwhasagnkuqaek.supabase.co',
   SUPABASE_ANON_KEY: 'sb_publishable_DhHFUh-UrbBrI0l476Vcnw_tSn-Gmkr',
@@ -6347,10 +6347,10 @@ function scoreShow(n) {
     '<tr><td><span>Temps</span> · ' + fmtT(sc.time) + '</td><td>' + P.t + ' / 250</td></tr><tr><td><span>Baixes</span> · ' + sc.dead + '</td><td>' + P.d + ' / 250</td></tr>' +
     '<tr><td><span>Ordres donades</span> · ' + sc.orders + '</td><td>' + P.o + ' / 250</td></tr><tr><td><span>Ordre mitjà</span> · ' + sc.avg + ' %</td><td>' + P.a + ' / 250</td></tr></table><div class="sv"></div>';
   const sv = el.querySelector('.sv'), a = progAuth();
-  if (typeof n === 'string') { sv.textContent = 'Puntuació desada en aquest navegador (el rànquing de la campanya arribarà més endavant).'; return; }
+  let lvN = n; if (typeof n === 'string') { const q = /n(\d+)$/.exec(n); lvN = q ? 100 + +q[1] : 0; if (!lvN) return; }
   if (!a) { sv.textContent = 'Inicia sessió a la web del 9e per entrar al rànquing.'; return; }
   sv.textContent = 'Desant la puntuació…';
-  sbFetch('/rest/v1/rpc/game_submit_score', { method: 'POST', headers: { Authorization: 'Bearer ' + a.token }, body: JSON.stringify({ p_level: n, p_score: sc.total, p_detail: sc }) })
+  sbFetch('/rest/v1/rpc/game_submit_score', { method: 'POST', headers: { Authorization: 'Bearer ' + a.token }, body: JSON.stringify({ p_level: lvN, p_score: sc.total, p_detail: sc }) })
     .then(() => { sv.textContent = 'Puntuació enviada al rànquing (compta la teva millor del nivell).'; }).catch(() => { sv.textContent = 'No s\'ha pogut enviar la puntuació al rànquing.'; });
 }
 async function rankLoad() {
@@ -6366,7 +6366,8 @@ async function rankLoad() {
   let h = '<div class="podium">' + pod + '</div><table class="rtab"><tr><th class="n">#</th><th>Nom de guerre</th><th class="n">Punts</th></tr>';
   rows.forEach((r, i) => {
     h += '<tr class="row' + (r.me ? ' me' : '') + '" data-i="' + i + '"><td class="n">' + (i + 1) + '</td><td>' + vEsc(r.nom_guerre) + '</td><td class="n">' + r.total + '</td></tr>' +
-         '<tr class="det" id="rdet' + i + '" style="display:none"><td></td><td colspan="2">' + lv.map(L => '<span>Nivell</span> ' + L.n + ': <b>' + ((r.levels || {})[L.n] || '—') + '</b>').join(' · ') + '</td></tr>';
+         '<tr class="det" id="rdet' + i + '" style="display:none"><td></td><td colspan="2">' + '<div><span>Tutorial</span> · ' + lv.map(L => L.n + ': <b>' + ((r.levels || {})[L.n] || '—') + '</b>').join(' · ') + '</div>' +
+         '<div><span>Campanya</span> · ' + (Object.keys(r.camp || {}).length ? Object.keys(r.camp).sort((a, b) => a - b).map(k => 'Nivell ' + k + ': <b>' + r.camp[k] + '</b>').join(' · ') : '—') + '</div></td></tr>';
   });
   body.innerHTML = h + '</table>';
   body.querySelectorAll('tr.row').forEach(tr => { tr.onclick = () => { const d = document.getElementById('rdet' + tr.dataset.i); d.style.display = d.style.display === 'none' ? '' : 'none'; }; });
@@ -6498,7 +6499,30 @@ function updateRot(dt) {
 window.addEventListener('keydown', e => { if (tutOpen() && (e.key === 'Escape' || e.key === 'Enter')) { e.preventDefault(); document.getElementById('tutOk').click(); } });
 document.getElementById('btnLevels').onclick = () => showScreen('levels');
 document.getElementById('btnBackTitle').onclick = () => showScreen('title');
-document.getElementById('btnCampaign').onclick = () => showScreen('camp');
+// La campanya només s'obre un cop completat el tutorial; si no, en Louis t'hi envia
+const tutDone = () => /[?&]campok\b/.test(location.search) || LEVELS.filter(L => !L.locked).every(L => !!PROG.levels[L.n]);
+let campTry = 0;
+function louisGate() {
+  let m = document.getElementById('louisGate');
+  if (!m) {
+    m = document.createElement('div'); m.id = 'louisGate';
+    m.style.cssText = 'position:fixed;inset:0;z-index:400;display:none;align-items:center;justify-content:center;background:rgba(10,14,30,.6);padding:16px';
+    m.innerHTML = '<div style="background:var(--sheet,#fff);border:2px solid var(--ecarlate,#b3261e);border-radius:8px;max-width:440px;width:100%;padding:18px;display:flex;flex-direction:column;gap:14px;box-shadow:0 10px 40px rgba(0,0,0,.5)">' +
+      '<div style="display:flex;gap:12px;align-items:flex-end"><img id="lgImg" style="width:96px;flex:none"><div id="lgTxt" style="font-size:1.05rem;line-height:1.35"></div></div>' +
+      '<div style="display:flex;gap:10px;justify-content:flex-end"><button class="btn-sec" id="lgRetry">Tornar-ho a intentar</button><button class="btn-main" id="lgTut">Anar al tutorial</button></div></div>';
+    document.body.appendChild(m);
+    m.querySelector('#lgTut').onclick = () => { m.style.display = 'none'; showScreen('levels'); };
+    m.querySelector('#lgRetry').onclick = () => { campTry++; louisGate(); };
+    document.addEventListener('keydown', e => { if (e.key === 'Escape' && m.style.display === 'flex') { m.style.display = 'none'; e.stopImmediatePropagation(); } }, true);
+  }
+  m.querySelector('#lgImg').src = AV.louis || AV.serios;
+  m.querySelector('#lgTxt').innerHTML = campTry === 0
+    ? '<b>Louis:</b> No em crec que puguis fer això encara, chasseur. Ves a fer el tutorial ara mateix, abans que perdi la paciència…'
+    : '<b>Louis:</b> T\'he dit <i>(et pega)</i> que facis <i>(et pega)</i> el tutorial <i>(et clava el genoll a l\'estomac)</i>.';
+  m.querySelector('#lgRetry').style.display = campTry === 0 ? '' : 'none';
+  m.style.display = 'flex';
+}
+document.getElementById('btnCampaign').onclick = () => { if (tutDone()) showScreen('camp'); else louisGate(); };
 document.getElementById('btnCampBack').onclick = () => showScreen('title');
 document.getElementById('screenCamp').addEventListener('click', campCardClose);
 // Menú lateral (estil Age of Empires): continuar, repetir el pas, reiniciar, ajustos i sortir. Pausa el joc mentre és obert.
