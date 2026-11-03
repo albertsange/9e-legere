@@ -226,7 +226,7 @@
   .famBtn .badge{position:absolute;top:-7px;right:-7px;min-width:18px;height:18px;border-radius:9px;background:var(--chasseur);color:#fff;font:700 11px/18px var(--label);font-style:normal;text-align:center;}
   .famBtn .badge:empty{display:none;}
   #controls .famBtn.hl{outline:2px solid var(--ecarlate);outline-offset:2px;animation:pulse 1.3s ease-in-out infinite;}
-  .menu{display:none;position:absolute;bottom:calc(100% - 1px);left:0;z-index:60;min-width:390px;max-height:60vh;overflow:auto;
+  .menu{display:none;position:absolute;bottom:calc(100% - 1px);left:0;z-index:120;min-width:390px;max-height:60vh;overflow:auto;
     background:var(--sheet);border:1px solid var(--line);border-top:3px solid var(--bleu);border-radius:4px;padding:8px 10px 10px;box-shadow:0 22px 50px -18px rgba(20,30,60,.55);}
   .fam.open .menu{display:block;}
   .fam .menu::after{content:"";position:absolute;left:0;right:0;top:100%;height:14px;}
@@ -275,7 +275,6 @@
   #fireBox{position:absolute;bottom:calc(100% + 14px);right:370px;display:flex;align-items:center;gap:8px;z-index:90;
     padding:6px 6px 6px 16px;background:var(--sheet);border:1px solid var(--line);border-radius:999px;box-shadow:0 6px 18px rgba(0,0,0,.18);}
   #controls #fireBox button{font-family:inherit;cursor:pointer;}
-  #controls.menuOpen #fireBox,#controls.menuOpen #skBox{display:none !important;}
   #skBox{position:absolute;bottom:calc(100% + 14px);right:370px;display:none;align-items:center;gap:8px;z-index:90;padding:6px 6px 6px 16px;background:var(--sheet);border:1px solid var(--line);border-radius:999px;box-shadow:0 6px 18px rgba(0,0,0,.18);}
   #skBox .fst{display:flex;align-items:center;gap:7px;padding-right:12px;border-right:1px solid var(--line);color:var(--bleu);font-weight:700;font-size:14px;height:30px;}
   #skBox button{font-family:inherit;cursor:pointer;height:40px;padding:0 16px;border-radius:999px;border:none;background:transparent;color:var(--bleu);font-weight:700;font-size:14px;}
@@ -1262,7 +1261,8 @@ const TUNE = {
               dist: 16 },                     // m: distància màxima del capità a la unitat per ajudar
   ia:       { abast: 42,                      // m: a més distància no dispara
               minHomes: 3, minFraccio: 0.3,   // homes enemics dins la franja necessaris: el màxim entre «minHomes» i aquesta fracció de la unitat objectiu
-              apunta: 2.5,                    // s que triga a apuntar quan té prou homes dins la franja
+              apunta: 1.5,                    // s que triga a apuntar quan té prou homes dins la franja
+              pausa: 1.5,                     // s d'espera entre ordre i ordre (parar, alinear, carregar, apuntar, disparar)
               recMin: 1.25, recVar: 0.5,      // recàrrega (més lenta que la nostra) = carrega × (recMin + aleatori × recVar)
               nAu: 0.7, nFr: 1.0,             // punteria relativa dels austríacs i dels francesos
               supMax: 0.9,                    // la supressió només redueix la punteria fins a aquest valor
@@ -1909,7 +1909,7 @@ function buildEnemy(d) {
     const a = -rank * RANK_GAP, l = (nf / 2 - 0.5 - file) * FRONT;
     men.push({ x: d.cx + c * a - sn * l, y: d.cy + sn * a + c * l, alive: true, t: 0, rank });
   }
-  return Object.assign({}, d, { men, reload: TUNE.mosquet.enInici, aimT: 0, volleys: 0, routed: false });
+  return Object.assign({}, d, { men, nf, reload: TUNE.mosquet.enInici, aimT: 0, volleys: 0, routed: false });
 }
 const enAlive = e => e.men.filter(m => m.alive).length;
 const OWN_UNIT = { name: '9e Régiment d\'Infanterie Légère «L\'Incomparable»', flag: '9e', col: '#1f3a78' };
@@ -2425,20 +2425,22 @@ function updateEnemies(dt) {                     // els regiments enemics es gir
     if (e.reload > 0) e.reload -= dt;
     e.supp = Math.max(0, (e.supp || 0) - T.supDecau * dt);
     if (e.supp > T.supMax && !e.suppMsg) { e.suppMsg = true; reac('aprova', '<b>Louis:</b> El <b>' + e.name + '</b> està sota una pressió de foc tan forta que <b>ja no gosa disparar</b>!', 4000); }
+    e.calmT = (e.calmT || 0) + dt;
     const seen = !losBlocked(e.cx, e.cy, c.x, c.y);
     if (!e.alert && (e.volleys > 0 || (!e.stealth && seen && Math.hypot(c.x - e.cx, c.y - e.cy) <= T.enAlerta))) {
       e.alert = true; reac('louis', '<b>Louis:</b> Ens han vist! El <b>' + e.name + '</b> gira cap a nosaltres.', 4500);
     }
     if (e.alert && seen) {                                                   // gira sobre el seu centre per encarar-nos
       const d = wrapA(Math.atan2(c.y - e.cy, c.x - e.cx) - e.h), st = Math.max(-T.enGir * dt, Math.min(T.enGir * dt, d));
-      if (Math.abs(st) > 1e-5) { const cs = Math.cos(st), sn = Math.sin(st); for (const v of live) { const x = v.x - e.cx, y = v.y - e.cy; v.x = e.cx + x * cs - y * sn; v.y = e.cy + x * sn + y * cs; } e.h += st; }
+      if (Math.abs(st) > 1e-5) { e.calmT = 0; const cs = Math.cos(st), sn = Math.sin(st); for (const v of live) { const x = v.x - e.cx, y = v.y - e.cy; v.x = e.cx + x * cs - y * sn; v.y = e.cy + x * sn + y * cs; } e.h += st; }
     }
     if (e.stealth && !e.alert) { e.aimT = 0; continue; }                      // una patrulla que no ha donat l'alerta no dispara
     const S = makeStrip(live, e.h, e.h, T.enOberta);
     if (!co.members.some(m => inStrip(S, m.x, m.y) >= 0 && !losBlocked(S.ox, S.oy, m.x, m.y))) { e.aimT = 0; continue; }
     if (e.reload > 0 || e.supp > T.supMax) { e.aimT = Math.min(e.aimT, T.enAvis * 0.5); continue; }
+    if (e.calmT < TUNE.ia.pausa) { e.aimT = 0; continue; }                   // després de girar, espera abans d'apuntar
     e.aimT += dt;
-    if (e.aimT >= T.enAvis) enemyVolley(e, S, live);
+    if (e.aimT >= T.enAvis) { enemyVolley(e, S, live); e.calmT = 0; }
   }
 }
 // ---------- Unitats amb IA (nivell 10): cada unitat del 9e i cada unitat austríaca actua per si sola ----------
@@ -2487,11 +2489,22 @@ function aiVolley(u, g, side) {
     if (r.inside.length) { g.en.supp = Math.min(1, (g.en.supp || 0) + T.supDescarrega * TUNE.ia.supFrac); g.en.volleys++; }
   }
 }
+function aiLayout(u) {                          // lloc de cada home en una línia de dos rengles (índex d'home → posició), segons el centre i el rumb de la unitat
+  const nf = u.nf || Math.round(u.men.length / 2), c = Math.cos(u.h), sn = Math.sin(u.h);
+  return u.men.map((v, i) => { const rank = i < nf ? 0 : 1, file = i % nf, a = -rank * RANK_GAP, l = (nf / 2 - 0.5 - file) * FRONT; return { x: u.cx + c * a - sn * l, y: u.cy + sn * a + c * l }; });
+}
+function aiDis(u, d) {                          // desordre visual d'una unitat d'IA (0..1): cada home s'escampa una mica del seu lloc
+  d = Math.max(0, Math.min(1, d)); const dd = d - (u.disA || 0); if (!dd) return;
+  for (const v of u.men) { if (v.jx === undefined) { v.jx = (Math.random() - 0.5); v.jy = (Math.random() - 0.5); } v.x += v.jx * dd; v.y += v.jy * dd; }
+  u.dis = d; u.disA = d;
+}
 function aiUnitTick(u, side, dt) {
-  const T = TUNE.mosquet, A = TUNE.ia, live = u.men.filter(v => v.alive); if (!live.length) return;
+  const T = TUNE.mosquet, A = TUNE.ia, GAP = A.pausa, live = u.men.filter(v => v.alive); if (!live.length) return;
   u.supp = Math.max(0, (u.supp || 0) - T.supDecau * dt);
   if (u.reload > 0) u.reload -= dt;
+  if (u.gap > 0) u.gap -= dt;
   if (u.state === 'retreat') {                                              // demi-tour i es retira al pas accéléré
+    u.ph = 'move';
     const diff = wrapA(u.awayH - u.h), st = Math.max(-A.retirada.gir * dt, Math.min(A.retirada.gir * dt, diff));
     if (Math.abs(st) > 1e-5) aiRot(u, st);
     if (Math.abs(diff) < A.retirada.tol) { const sp = STEP * PACES.accelerat.cad / 60 * dt; aiMove(u, Math.cos(u.h) * sp, Math.sin(u.h) * sp); }
@@ -2509,21 +2522,55 @@ function aiUnitTick(u, side, dt) {
   else if (u.last) { tx = u.last.x; ty = u.last.y; if (Math.hypot(tx - u.cx, ty - u.cy) < A.cercaRadi) u.last = null; }   // no el veu: va on el va veure per darrera vegada
   else { tx = u.cx + Math.cos(u.h) * A.cercaDist; ty = u.cy + Math.sin(u.h) * A.cercaDist; }
   const d = Math.hypot(tx - u.cx, ty - u.cy), want = Math.atan2(ty - u.cy, tx - u.cx), hold = best ? u.hold : A.holdSenseObj;
-  const diff = wrapA(want + (best && d > u.hold + A.holdMarge ? (u.off || 0) : 0) - u.h), rate = Math.min(d > hold ? A.girMarxa : T.enGir * A.girParat, aiWheelRate(u)) * dt, st = Math.max(-rate, Math.min(rate, diff));
-  const av = d > hold && !(u.ign > 0) ? aiAvoid(u) : null;
-  if (u.ign > 0) u.ign -= dt;
-  if (av) {                                                                  // casa o arbre al davant: gira per esquivar-lo
-    u.stk = (u.stk || 0) + dt; if (u.stk > A.evita.encallat) { u.ign = A.evita.ignora; u.stk = 0; }
-    aiWheel(u, av.turn * Math.min(A.evita.girar, aiWheelRate(u)) * dt);
-    if (!av.stop) { const sp = STEP * PACES.ordinari.cad / 60 * dt * A.evita.vel; aiMove(u, Math.cos(u.h) * sp, Math.sin(u.h) * sp); }
-  } else {
-    u.stk = Math.max(0, (u.stk || 0) - dt);
-    if (Math.abs(st) > 1e-5) aiWheel(u, st);
-    if (d > hold && Math.abs(diff) < A.tolMarxa) { const sp = STEP * PACES.ordinari.cad / 60 * dt; aiMove(u, Math.cos(u.h) * sp, Math.sin(u.h) * sp); }
+  const diff = wrapA(want + (best && d > u.hold + A.holdMarge ? (u.off || 0) : 0) - u.h);
+  let ph = u.ph || 'move';
+  if (ph !== 'move' && (!best || d > hold + 2 || Math.abs(diff) > 0.25)) { ph = u.ph = 'move'; u.aimT = 0; u.gap = GAP; }   // l'objectiu s'ha mogut: torna a maniobrar
+  if (ph === 'move') {                                                       // maniobra: gira sobre un extrem (o contramarxa si ha de fer mitja volta) i avança, i s'hi va desordenant
+    if (u.gap > 0) return;
+    if (Math.abs(diff) > 2.0) { aiRot(u, Math.max(-2.2 * dt, Math.min(2.2 * dt, diff))); return; }   // contremarche: mitja volta sobre ell mateix
+    const rate = Math.min(d > hold ? A.girMarxa : T.enGir * A.girParat, aiWheelRate(u)) * dt, st = Math.max(-rate, Math.min(rate, diff));
+    const av = d > hold && !(u.ign > 0) ? aiAvoid(u) : null;
+    if (u.ign > 0) u.ign -= dt;
+    if (av) {                                                                // casa o arbre al davant: gira per esquivar-lo
+      u.stk = (u.stk || 0) + dt; if (u.stk > A.evita.encallat) { u.ign = A.evita.ignora; u.stk = 0; }
+      aiWheel(u, av.turn * Math.min(A.evita.girar, aiWheelRate(u)) * dt);
+      if (!av.stop) { const sp = STEP * PACES.ordinari.cad / 60 * dt * A.evita.vel; aiMove(u, Math.cos(u.h) * sp, Math.sin(u.h) * sp); aiDis(u, (u.dis || 0) + sp * 0.05); }
+    } else {
+      u.stk = Math.max(0, (u.stk || 0) - dt);
+      if (Math.abs(st) > 1e-5) aiWheel(u, st);
+      if (d > hold && Math.abs(diff) < A.tolMarxa) { const sp = STEP * PACES.ordinari.cad / 60 * dt; aiMove(u, Math.cos(u.h) * sp, Math.sin(u.h) * sp); aiDis(u, (u.dis || 0) + sp * 0.05); }
+    }
+    if (best && d <= hold && Math.abs(diff) < 0.08 && !av) { u.ph = 'stop'; u.gap = GAP; }   // ja és al lloc: s'atura i espera abans de la següent ordre
+    return;
   }
-  if (best && d <= A.abast && u.reload <= 0 && (u.supp || 0) <= T.supMax) {      // dispara quan té prou homes enemics dins la franja
+  if (u.gap > 0) return;
+  if (ph === 'stop') { if ((u.dis || 0) > 0.02) { u.ph = 'align'; u.alT = 0; u.alS = u.men.map(v => ({ x: v.x, y: v.y })); } else { u.ph = 'load'; u.gap = GAP; } return; }
+  if (ph === 'align') {                                                      // alineament: cada home torna al seu lloc de la línia
+    u.alT += dt; const k = Math.min(1, u.alT / 1.4), e = k * k * (3 - 2 * k), tg = aiLayout(u);
+    u.men.forEach((v, i) => { const s0 = u.alS[i]; if (v.alive && s0) { v.x = s0.x + (tg[i].x - s0.x) * e; v.y = s0.y + (tg[i].y - s0.y) * e; } });
+    if (k >= 1) { u.dis = 0; u.disA = 0; u.ph = 'load'; u.gap = GAP; }
+    return;
+  }
+  if (ph === 'load') { if (u.reload > 0) return; u.ph = 'aim'; u.gap = GAP; u.aimT = 0; return; }   // carrega (el rellotge es veu damunt la unitat) i espera abans d'apuntar
+  let ok = false;
+  if (best && d <= A.abast && (u.supp || 0) <= T.supMax) {                   // té prou homes enemics dins la franja?
     const S = makeStrip(live, u.h, u.h, T.obertura), inside = best.men.filter(m => inStrip(S, m.x, m.y) >= 0 && !losBlocked(S.ox, S.oy, m.x, m.y)).length;
-    if (inside >= Math.max(A.minHomes, best.men.length * A.minFraccio)) { u.aimT = (u.aimT || 0) + dt; if (u.aimT >= A.apunta) aiVolley(u, best, side); } else u.aimT = 0;
+    ok = inside >= Math.max(A.minHomes, best.men.length * A.minFraccio);
+  }
+  if (ph === 'aim') { if (ok) { u.aimT = (u.aimT || 0) + dt; if (u.aimT >= A.apunta) { u.ph = 'fire'; u.gap = GAP; } } else u.aimT = 0; return; }
+  if (ph === 'fire') { if (ok) { aiVolley(u, best, side); u.reloadMax = u.reload; u.ph = 'load'; } else { u.ph = 'aim'; u.aimT = 0; } }
+}
+function drawAiMarks() {                        // damunt de cada unitat que carrega: un rellotge que s'omple; quan apunta: una creu
+  const list = [...ENEMY, ...ALLY].filter(u => !u.script && !u.routed && u.men.some(v => v.alive));
+  for (const u of list) {
+    const load = u.ai ? u.ph === 'load' && u.reload > 0 : u.shoots && u.alert && u.reload > 0, aim = u.ai && (u.ph === 'aim' || u.ph === 'fire');
+    if (!load && !aim) continue;
+    const x = u.cx * M, y = (u.cy - 2.9) * M, r = Math.max(7, 0.6 * M);
+    ctx.save(); ctx.lineWidth = Math.max(1.5, 0.08 * M); ctx.fillStyle = 'rgba(255,255,255,.92)'; ctx.strokeStyle = aim ? '#b3261e' : '#8a6d1a';
+    ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    if (load) { u.reloadMax = Math.max(u.reloadMax || 0, u.reload); const f = Math.max(0, Math.min(1, 1 - u.reload / u.reloadMax)); ctx.fillStyle = f > 0.85 ? '#2e8b3d' : '#d4a72c'; ctx.beginPath(); ctx.moveTo(x, y); ctx.arc(x, y, r * 0.78, -Math.PI / 2, -Math.PI / 2 + f * Math.PI * 2); ctx.closePath(); ctx.fill(); }
+    else { ctx.beginPath(); ctx.moveTo(x - r * 0.7, y); ctx.lineTo(x + r * 0.7, y); ctx.moveTo(x, y - r * 0.7); ctx.lineTo(x, y + r * 0.7); ctx.stroke(); }
+    ctx.restore();
   }
 }
 function aiHit(x, y, m) {                       // hi ha una casa o un arbre en aquest punt?
@@ -3821,7 +3868,7 @@ function buildOrderPanel() {
     menu.innerHTML = '<div class="mtitle">' + f.name + '</div>';
     wrap.appendChild(menu); wrap.appendChild(btn); row.appendChild(wrap);
     wrap.addEventListener('mouseenter', () => { clearTimeout(famEnterT); if (famPinned && famPinned !== f.id) return; if (openFam && openFam !== f.id) famEnterT = setTimeout(() => openMenu(f.id), 240); else openMenu(f.id); });   // canviar de menú amb una petita espera: no se'n selecciona un altre en passar de pressa
-    wrap.addEventListener('mouseleave', () => { clearTimeout(famEnterT); clearTimeout(closeT); closeT = setTimeout(() => { if (openFam === f.id && famPinned !== f.id) openMenu(null); }, 800); });
+    wrap.addEventListener('mouseleave', () => { clearTimeout(famEnterT); clearTimeout(closeT); closeT = setTimeout(() => { if (openFam === f.id && famPinned !== f.id) openMenu(null); }, 140); });
     btn.addEventListener('click', () => {            // el ratolí ja obre el menú en passar-hi per sobre: un clic el deixa fix; un segon clic el tanca
       if (openFam !== f.id) openMenu(f.id); famPinned = f.id;
     });
@@ -4285,7 +4332,7 @@ function drawCo() {
     const c = co.conv; ctx.strokeStyle = T.ecarlate; ctx.lineWidth = 1.5; ctx.setLineDash([3, 3]);
     ctx.beginPath(); ctx.arc(c.px * M, c.py * M, Math.max(5, 0.5 * M), 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]);
   }
-  drawCorpses(); drawHover(); drawEnemies(); drawAllies(); drawColumn(); drawCaptain(); drawGuns();
+  drawCorpses(); drawHover(); drawEnemies(); drawAllies(); drawAiMarks(); drawColumn(); drawCaptain(); drawGuns();
   // Soldats: rodones; la ratlla blanca indica cap on miren
   const rS = Math.max(1.8, 0.2 * M);
   for (const m of co.members) {
@@ -4331,7 +4378,7 @@ let autoStepT = 0;
 const VOICE = { on: false, rec: null, running: false, tested: false, seg: {}, interim: '', state: '', failT: 0, lastFail: null,
   learn: { phr: {}, ex: {} }, shared: { phr: {}, ex: {} }, opt: { mode: 'cont', vol: true, log: false, tele: true, engine: '' }, log: [], recentExec: null, ptt: false, db: false, loading: false };
 // Connexió amb Supabase (la mateixa de la web: si el joc s'obre dins la web, agafa window.APP_CONFIG) i fonts del motor local Vosk
-const GAME_VERSION = '1.8.12';
+const GAME_VERSION = '1.8.13';
 const CFG = Object.assign({
   SUPABASE_URL: 'https://ltopullwhasagnkuqaek.supabase.co',
   SUPABASE_ANON_KEY: 'sb_publishable_DhHFUh-UrbBrI0l476Vcnw_tSn-Gmkr',
@@ -5947,7 +5994,7 @@ function buildCampaign1() {
   }
   function spawnWave(w) {
     const u = buildEnemy({ name: 'Avançada austríaca', flag: 'aut', cx: 94, cy: w[1], h: Math.PI, nFiles: w[2], shoots: true, ai: true, hold: w[2] >= 6 ? 16 : 12, off: 0 });
-    Object.assign(u, { reload: 5 + Math.random() * 4, supp: 0, state: '', last: { x: FORD.x + 2, y: FORD.y }, n0: u.men.length }); ENEMY.push(u);
+    Object.assign(u, { reload: 5 + Math.random() * 4, supp: 0, state: '', last: { x: FORD.x + 2, y: FORD.y }, n0: u.men.length }); aiDis(u, 0.8); ENEMY.push(u);
     reac('assenyala', '<b>Capità Le Jay:</b> Atenció! Una avançada austríaca ve per l\'est!', 3800);
   }
   function p3Tick(dt, c) {
