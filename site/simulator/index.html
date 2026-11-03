@@ -2692,8 +2692,11 @@ function aiUnitTick(u, side, dt) {
   let best = null, bs = 1e9;                                                // tria objectiu: el més proper; compta com a més proper el que ens ensenya el flanc o és més feble
   for (const g of vis) {
     const d = Math.hypot(g.cx - u.cx, g.cy - u.cy), face = Math.abs(wrapA(Math.atan2(u.cy - g.cy, u.cx - g.cx) - g.h));
-    const sc = d - (face > A.flanc ? A.flancBonus : 0) - (g.men.length < A.feble ? A.febleBonus : 0) - (g.own ? A.jugadorBonus : 0); if (sc < bs) { bs = sc; best = g; }
+    let sc = d - (face > A.flanc ? A.flancBonus : 0) - (g.men.length < A.feble ? A.febleBonus : 0) - (g.own ? A.jugadorBonus : 0);
+    if (u.curK && (g.en || g.ally || (g.own && 'own')) === u.curK) sc -= 12;                  // histèresi: no salta d'un objectiu a l'altre cada tick (evita que «dubti» entre dos blancs i es mogui sense parar)
+    if (sc < bs) { bs = sc; best = g; }
   }
+  u.curK = best ? (best.en || best.ally || (best.own && 'own')) : null;
   if (!best && fo) u.last = { x: fo.cx, y: fo.cy };                        // la unitat amb qui lluita no la veu (cases pel mig): sap on és
   if (!best && u.onlyPlayer) { const c0 = unitCentre(); u.last = { x: c0.x, y: c0.y }; }
   let tx, ty;
@@ -4602,7 +4605,7 @@ let autoStepT = 0;
 const VOICE = { on: false, rec: null, running: false, tested: false, seg: {}, interim: '', state: '', failT: 0, lastFail: null,
   learn: { phr: {}, ex: {} }, shared: { phr: {}, ex: {} }, opt: { mode: 'cont', vol: true, log: false, tele: true, engine: '' }, log: [], recentExec: null, ptt: false, db: false, loading: false };
 // Connexió amb Supabase (la mateixa de la web: si el joc s'obre dins la web, agafa window.APP_CONFIG) i fonts del motor local Vosk
-const GAME_VERSION = '1.8.37';
+const GAME_VERSION = '1.8.38';
 const CFG = Object.assign({
   SUPABASE_URL: 'https://ltopullwhasagnkuqaek.supabase.co',
   SUPABASE_ANON_KEY: 'sb_publishable_DhHFUh-UrbBrI0l476Vcnw_tSn-Gmkr',
