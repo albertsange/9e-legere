@@ -4596,7 +4596,7 @@ let autoStepT = 0;
 const VOICE = { on: false, rec: null, running: false, tested: false, seg: {}, interim: '', state: '', failT: 0, lastFail: null,
   learn: { phr: {}, ex: {} }, shared: { phr: {}, ex: {} }, opt: { mode: 'cont', vol: true, log: false, tele: true, engine: '' }, log: [], recentExec: null, ptt: false, db: false, loading: false };
 // Connexió amb Supabase (la mateixa de la web: si el joc s'obre dins la web, agafa window.APP_CONFIG) i fonts del motor local Vosk
-const GAME_VERSION = '1.8.29';
+const GAME_VERSION = '1.8.30';
 const CFG = Object.assign({
   SUPABASE_URL: 'https://ltopullwhasagnkuqaek.supabase.co',
   SUPABASE_ANON_KEY: 'sb_publishable_DhHFUh-UrbBrI0l476Vcnw_tSn-Gmkr',
@@ -6363,7 +6363,7 @@ function buildCampaign1() {
   };
 }
 // ---------- CAMPANYA 1 · Nivell 2 «La Línia de Neerwinden» (18 de març de 1793) ----------
-// Camp allargat: la línia francesa a l'oest, el poble de Neerwinden al nord i, a l'est, una bateria de cinc canons austríacs amb els seus servidors.
+// Camp allargat: la línia francesa a l'oest, el poble de Neerwinden al nord i, a l'est, una bateria de dos canons austríacs amb els seus servidors.
 // Dos batallons aliats van a defensar el poble, atacat per tres batallons austríacs; mentre hi hagi aliats, els canons bombardegen el poble (que es va destruint).
 // El 9e ha de creuar els camps cap als canons i silenciar-los (matar-ne més de la meitat dels servidors) abans que els aliats caiguin; pels prats arriba una unitat de jägers.
 function buildCampaign2() {
@@ -6401,21 +6401,21 @@ function buildCampaign2() {
   const ew = (pts, kind, seed) => A.wood(pts, { kind, spacing: 2.6, seed });
   sc.push(ew([[-16, -16], [W + 16, -16], [W + 16, -2], [-16, -2]], 'mixed', 71), ew([[-16, H + 2], [W + 16, H + 2], [W + 16, H + 16], [-16, H + 16]], 'broad', 72), ew([[-16, -2], [-2, -2], [-2, H + 2], [-16, H + 2]], 'mixed', 73), ew([[W + 2, -2], [W + 16, -2], [W + 16, H + 2], [W + 2, H + 2]], 'broad', 74));
   sc.push(A.label('Neerwinden', VC.x, 3.2, { kind: 'town', scale: 0.7 }), A.label('Línia francesa', 8, 5, { kind: 'place', scale: 0.5 }), A.label('Camps', 70, 43.5, { kind: 'place', scale: 0.5 }), A.label('Prats', 70, 52, { kind: 'place', scale: 0.55 }), A.label('Bateria austríaca', 150, 8, { kind: 'place', scale: 0.5 }));
-  // la bateria: cinc canons de cara a l'oest, amb una tanca darrere
+  // la bateria: dos canons de cara a l'oest, amb una tanca darrere
   sc.push(A.hedge([[160, 10], [161, 28], [160.5, 46]], { seed: 12 }));
-  const GX = 153, GYS = [16, 23, 30, 37, 44];
+  const GX = 153, GYS = [22, 36];
   const st = { t: 0, jag: false, jagE: null, fin: undefined, done: false, allyGone: false, down: 0 };
   const downN = () => GUNS.filter(g => g.down).length, allyN = () => ALLY.reduce((t, a) => t + (a.script ? 0 : enAlive(a)), 0);
   const jagDone = () => !!st.jagE && (st.jagE.routed || st.jagE.state === 'retreat' || enAlive(st.jagE) === 0);
   const steps = [
     { title: 'La Línia de Neerwinden', pose: 'serios', hl: [], unlock: ['gir', 'mov', 'pace', 'parfile', 'bataille', 'align', 'obl', 'conv', 'tournez', 'ligne', 'form', 'repos', 'musket', 'skirm'], tag: 'Neerwinden · 18 de març de 1793', intro: true, btn: 'Endavant',
-      text: ['«Això és <b>Neerwinden</b>, chasseur, i avui no som a Philippeville: aquí no podem esquivar l\'enemic. L\'Arxiduc ha plantat una <b>bateria de cinc canons</b> a l\'extrem est del camp, i <b>tres batallons austríacs</b> ataquen el poble per la seva banda.»',
+      text: ['«Això és <b>Neerwinden</b>, chasseur, i avui no som a Philippeville: aquí no podem esquivar l\'enemic. L\'Arxiduc ha plantat una <b>bateria de dos canons</b> a l\'extrem est del camp, i <b>tres batallons austríacs</b> ataquen el poble per la seva banda.»',
         '«Els nostres <b>batallons de línia</b> aniran a defensar Neerwinden, però no aguantaran gaire: mentre els austríacs els pressionen, els <b>canons bombardejaran el poble</b> per cobrir la seva infanteria.»',
         '«<b>Nosaltres tenim la missió de silenciar els canons.</b> Cal anar <b>de pressa</b>: si els aliats cauen abans que hi arribem, els canons es giraran contra nosaltres. Un canó queda <b>desarmat</b> quan has matat <b>més de la meitat dels seus servidors</b>. Has de desarmar <b>tots els canons</b> perquè l\'exèrcit no quedi esclafat.»',
         '«Aprofiteu els <b>arbres</b> i les <b>tanques</b>, ataqueu pel <b>flanc</b> i, si trobeu enemics, esclafeu-los. <b>Vive le 9e!</b>»'],
       done: () => TUT.intro },
     { title: 'Silencia la bateria', pose: 'assenyala', hl: [], unlock: ['gir', 'mov', 'pace', 'parfile', 'bataille', 'align', 'obl', 'conv', 'tournez', 'ligne', 'form', 'repos', 'musket', 'skirm'],
-      mini: () => 'Canons desarmats: <b>' + downN() + ' / 5</b> · Aliats al poble: <b>' + allyN() + '</b>. ' + (allyN() > 0 ? 'Avança pels <b>camps</b> fins a la bateria abans que cauen els aliats.' : '<b>Els aliats han caigut</b>: els canons ens busquen a nosaltres!') + (st.jag && !jagDone() ? ' Els <b>jägers</b> avancen pels prats: aixafa\'ls.' : ''),
+      mini: () => 'Canons desarmats: <b>' + downN() + ' / 2</b> · Aliats al poble: <b>' + allyN() + '</b>. ' + (allyN() > 0 ? 'Avança pels <b>camps</b> fins a la bateria abans que cauen els aliats.' : '<b>Els aliats han caigut</b>: els canons ens busquen a nosaltres!') + (st.jag && !jagDone() ? ' Els <b>jägers</b> avancen pels prats: aixafa\'ls.' : ''),
       resetStep: () => 1, done: () => false }
   ];
   const ash = (v, i) => ((Math.sin(v * 12.9898 + i * 78.233) * 43758.5453) % 1 + 1) % 1;
@@ -6487,9 +6487,9 @@ function buildCampaign2() {
         aiTickAll(dt);
         for (const u of ENEMY) if (u.ai && !u.routed && u.state === 'retreat' && (u.cx > W - 1.5 || u.cx < 1.5 || u.cy < 1.5 || u.cy > H - 1.5)) { for (const m of u.men) m.alive = false; u.routed = true; }
         const dn = downN();
-        if (dn !== st.down) { st.down = dn; if (dn < 5) reac('aprova', '<b>Louis:</b> Un canó menys! En queden <b>' + (5 - dn) + '</b>.', 3500); }
+        if (dn !== st.down) { st.down = dn; if (dn < 2) reac('aprova', '<b>Louis:</b> Un canó menys! En queda <b>' + (2 - dn) + '</b>.', 3500); }
         if (!st.allyGone && allyN() === 0 && st.t > 5) { st.allyGone = true; reac('alerta', '<b>Louis:</b> Els batallons aliats han caigut! Ara els canons ens busquen a <b>nosaltres</b>!', 6000); }
-        if (dn >= 5) {
+        if (dn >= 2) {
           st.fin = 0; for (const u of ENEMY) if (u.ai && !u.routed) { u.state = 'retreat'; u.awayH = 0; }
           reac('aprova', '<b>Capità Le Jay:</b> Fantàstic, chasseur! La bateria ha callat! Els austríacs es retiren i Neerwinden és nostra!', 7000);
         }
@@ -6498,11 +6498,11 @@ function buildCampaign2() {
     win: () => st.done,
     objectives: [
       { t: 'Aixafar els jägers del prat (en perdre la meitat, es retiren)', ok: () => jagDone() },
-      { t: 'Desarmar els cinc canons (matar-ne tres servidors de cada)', ok: () => downN() >= 5 },
+      { t: 'Desarmar els dos canons (matar-ne tres servidors de cada)', ok: () => downN() >= 2 },
       { t: 'Mantenir la unitat amb almenys 8 homes', ok: () => co.members.length >= 8 }
     ],
-    goalText: 'Creua els camps cap a la bateria austríaca abans que caiguin els aliats, aixafa els jägers del prat i desarma els cinc canons matant-ne els servidors.',
-    endText: 'Molt bé, chasseur: has creuat els camps sota el foc, has fet recular els jägers i has fet callar els cinc canons de l\'Arxiduc. Neerwinden crema, però la línia francesa aguanta gràcies al 9e. Aquesta és la lliçó: l\'artilleria no s\'aguanta de cara, es pren pel flanc i amb pressa!'
+    goalText: 'Creua els camps cap a la bateria austríaca abans que caiguin els aliats, aixafa els jägers del prat i desarma els dos canons matant-ne els servidors.',
+    endText: 'Molt bé, chasseur: has creuat els camps sota el foc, has fet recular els jägers i has fet callar els dos canons de l\'Arxiduc. Neerwinden crema, però la línia francesa aguanta gràcies al 9e. Aquesta és la lliçó: l\'artilleria no s\'aguanta de cara, es pren pel flanc i amb pressa!'
   };
 }
 function buildCampaign3() {
@@ -6615,7 +6615,7 @@ function buildCampaign3() {
 }
 const campFull = f => () => Object.assign(f(), { advanced: true });                   // a tota la campanya hi ha l'indicador de cansament i el d'ordre
 const CAMP = [{ id: 'c1n1', n: 1, title: 'El Bateig de Foc', desc: 'Philippeville, 23 de maig de 1793. Navega en sigil pel bosc, aixafa una patrulla de quinze jägers austríacs sense que donin l\'alarma i defensa la riba del rierol fins que l\'exèrcit creui.', build: campFull(buildCampaign1) },
-  { id: 'c1n2', n: 2, title: 'La Línia de Neerwinden', desc: 'Neerwinden, 18 de març de 1793. Creua els camps sota el foc de la bateria austríaca, aixafa els jägers del prat i desarma cinc canons abans que caiguin els aliats.', build: campFull(buildCampaign2) },
+  { id: 'c1n2', n: 2, title: 'La Línia de Neerwinden', desc: 'Neerwinden, 18 de març de 1793. Creua els camps sota el foc de la bateria austríaca, aixafa els jägers del prat i desarma dos canons abans que caiguin els aliats.', build: campFull(buildCampaign2) },
   { id: 'c1n3', n: 3, title: 'Esgotar el Perseguidor', desc: 'Després de Neerwinden, al capvespre. Escorta un carro de municions fins al pont i para les càrregues de la cavalleria lleugera austríaca formant el quadre.', build: campFull(buildCampaign3) }];
 const CAMP_BY_ID = {}; for (const L of CAMP) CAMP_BY_ID[L.id] = L;
 // ---- Campanyes: les 8 campanyes amb els 85 nivells; la campanya 1 té mapa il·lustrat amb el recorregut ----
