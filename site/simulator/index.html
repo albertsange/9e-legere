@@ -1261,8 +1261,8 @@ const TUNE = {
               dist: 16 },                     // m: distància màxima del capità a la unitat per ajudar
   ia:       { abast: 42,                      // m: a més distància no dispara
               minHomes: 3, minFraccio: 0.3,   // homes enemics dins la franja necessaris: el màxim entre «minHomes» i aquesta fracció de la unitat objectiu
-              apunta: 1.5,                    // s que triga a apuntar quan té prou homes dins la franja
-              pausa: 1.5,                     // s d'espera entre ordre i ordre (parar, alinear, carregar, apuntar, disparar)
+              apunta: 2.5,                    // s que triga a apuntar quan té prou homes dins la franja
+              pausa: 0,                       // s d'espera entre ordre i ordre (parar, alinear, carregar, apuntar, disparar); 0 = sense espera
               recMin: 1.25, recVar: 0.5,      // recàrrega (més lenta que la nostra) = carrega × (recMin + aleatori × recVar)
               nAu: 0.7, nFr: 1.0,             // punteria relativa dels austríacs i dels francesos
               supMax: 0.9,                    // la supressió només redueix la punteria fins a aquest valor
@@ -2534,11 +2534,11 @@ function aiUnitTick(u, side, dt) {
     if (av) {                                                                // casa o arbre al davant: gira per esquivar-lo
       u.stk = (u.stk || 0) + dt; if (u.stk > A.evita.encallat) { u.ign = A.evita.ignora; u.stk = 0; }
       aiWheel(u, av.turn * Math.min(A.evita.girar, aiWheelRate(u)) * dt);
-      if (!av.stop) { const sp = STEP * PACES.ordinari.cad / 60 * dt * A.evita.vel; aiMove(u, Math.cos(u.h) * sp, Math.sin(u.h) * sp); aiDis(u, (u.dis || 0) + sp * 0.05); }
+      if (!av.stop) { const sp = STEP * PACES.ordinari.cad / 60 * dt * A.evita.vel; aiMove(u, Math.cos(u.h) * sp, Math.sin(u.h) * sp); aiDis(u, Math.min(0.6, (u.dis || 0) + sp * 0.025)); }
     } else {
       u.stk = Math.max(0, (u.stk || 0) - dt);
       if (Math.abs(st) > 1e-5) aiWheel(u, st);
-      if (d > hold && Math.abs(diff) < A.tolMarxa) { const sp = STEP * PACES.ordinari.cad / 60 * dt; aiMove(u, Math.cos(u.h) * sp, Math.sin(u.h) * sp); aiDis(u, (u.dis || 0) + sp * 0.05); }
+      if (d > hold && Math.abs(diff) < A.tolMarxa) { const sp = STEP * PACES.ordinari.cad / 60 * dt; aiMove(u, Math.cos(u.h) * sp, Math.sin(u.h) * sp); aiDis(u, Math.min(0.6, (u.dis || 0) + sp * 0.025)); }
     }
     if (best && d <= hold && Math.abs(diff) < 0.08 && !av) { u.ph = 'stop'; u.gap = GAP; }   // ja és al lloc: s'atura i espera abans de la següent ordre
     return;
@@ -2557,20 +2557,28 @@ function aiUnitTick(u, side, dt) {
     const S = makeStrip(live, u.h, u.h, T.obertura), inside = best.men.filter(m => inStrip(S, m.x, m.y) >= 0 && !losBlocked(S.ox, S.oy, m.x, m.y)).length;
     ok = inside >= Math.max(A.minHomes, best.men.length * A.minFraccio);
   }
+  u.aimD = d;
   if (ph === 'aim') { if (ok) { u.aimT = (u.aimT || 0) + dt; if (u.aimT >= A.apunta) { u.ph = 'fire'; u.gap = GAP; } } else u.aimT = 0; return; }
   if (ph === 'fire') { if (ok) { aiVolley(u, best, side); u.reloadMax = u.reload; u.ph = 'load'; } else { u.ph = 'aim'; u.aimT = 0; } }
 }
-function drawAiMarks() {                        // damunt de cada unitat que carrega: un rellotge que s'omple; quan apunta: una creu
+function drawAiMarks() {                        // damunt de cada unitat que carrega: un rellotge petit que s'omple; quan apunta: el seu camp de foc, suau i en un altre color que el nostre
   const list = [...ENEMY, ...ALLY].filter(u => !u.script && !u.routed && u.men.some(v => v.alive));
   for (const u of list) {
     const load = u.ai ? u.ph === 'load' && u.reload > 0 : u.shoots && u.alert && u.reload > 0, aim = u.ai && (u.ph === 'aim' || u.ph === 'fire');
-    if (!load && !aim) continue;
-    const x = u.cx * M, y = (u.cy - 2.9) * M, r = Math.max(7, 0.6 * M);
-    ctx.save(); ctx.lineWidth = Math.max(1.5, 0.08 * M); ctx.fillStyle = 'rgba(255,255,255,.92)'; ctx.strokeStyle = aim ? '#b3261e' : '#8a6d1a';
-    ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-    if (load) { u.reloadMax = Math.max(u.reloadMax || 0, u.reload); const f = Math.max(0, Math.min(1, 1 - u.reload / u.reloadMax)); ctx.fillStyle = f > 0.85 ? '#2e8b3d' : '#d4a72c'; ctx.beginPath(); ctx.moveTo(x, y); ctx.arc(x, y, r * 0.78, -Math.PI / 2, -Math.PI / 2 + f * Math.PI * 2); ctx.closePath(); ctx.fill(); }
-    else { ctx.beginPath(); ctx.moveTo(x - r * 0.7, y); ctx.lineTo(x + r * 0.7, y); ctx.moveTo(x, y - r * 0.7); ctx.lineTo(x, y + r * 0.7); ctx.stroke(); }
-    ctx.restore();
+    if (aim) {
+      const S = makeStrip(u.men.filter(v => v.alive), u.h, u.h, TUNE.mosquet.obertura), R = Math.min(S.R, (u.aimD || 30) + 4), w1 = S.hw + R * S.tg;
+      ctx.save(); ctx.translate(S.ox * M, S.oy * M); ctx.rotate(S.a);
+      const g = ctx.createLinearGradient(0, 0, R * M, 0); g.addColorStop(0, 'rgba(120,90,20,.16)'); g.addColorStop(1, 'rgba(120,90,20,.02)');
+      ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(0, -S.hw * M); ctx.lineTo(R * M, -w1 * M); ctx.lineTo(R * M, w1 * M); ctx.lineTo(0, S.hw * M); ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = 'rgba(120,90,20,.28)'; ctx.lineWidth = Math.max(1, 0.05 * M); ctx.setLineDash([0.5 * M, 0.7 * M]);
+      ctx.beginPath(); ctx.moveTo(0, -S.hw * M); ctx.lineTo(R * M, -w1 * M); ctx.moveTo(0, S.hw * M); ctx.lineTo(R * M, w1 * M); ctx.stroke(); ctx.restore();
+    }
+    if (load) {
+      const x = u.cx * M, y = (u.cy - 2.6) * M, r = Math.max(5, 0.42 * M); u.reloadMax = Math.max(u.reloadMax || 0, u.reload); const f = Math.max(0, Math.min(1, 1 - u.reload / u.reloadMax));
+      ctx.save(); ctx.lineWidth = Math.max(1, 0.05 * M); ctx.fillStyle = 'rgba(255,255,255,.8)'; ctx.strokeStyle = 'rgba(120,90,20,.7)';
+      ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = f > 0.85 ? 'rgba(46,139,61,.85)' : 'rgba(212,167,44,.85)'; ctx.beginPath(); ctx.moveTo(x, y); ctx.arc(x, y, r * 0.75, -Math.PI / 2, -Math.PI / 2 + f * Math.PI * 2); ctx.closePath(); ctx.fill(); ctx.restore();
+    }
   }
 }
 function aiHit(x, y, m) {                       // hi ha una casa o un arbre en aquest punt?
@@ -4378,7 +4386,7 @@ let autoStepT = 0;
 const VOICE = { on: false, rec: null, running: false, tested: false, seg: {}, interim: '', state: '', failT: 0, lastFail: null,
   learn: { phr: {}, ex: {} }, shared: { phr: {}, ex: {} }, opt: { mode: 'cont', vol: true, log: false, tele: true, engine: '' }, log: [], recentExec: null, ptt: false, db: false, loading: false };
 // Connexió amb Supabase (la mateixa de la web: si el joc s'obre dins la web, agafa window.APP_CONFIG) i fonts del motor local Vosk
-const GAME_VERSION = '1.8.13';
+const GAME_VERSION = '1.8.14';
 const CFG = Object.assign({
   SUPABASE_URL: 'https://ltopullwhasagnkuqaek.supabase.co',
   SUPABASE_ANON_KEY: 'sb_publishable_DhHFUh-UrbBrI0l476Vcnw_tSn-Gmkr',
@@ -5994,7 +6002,7 @@ function buildCampaign1() {
   }
   function spawnWave(w) {
     const u = buildEnemy({ name: 'Avançada austríaca', flag: 'aut', cx: 94, cy: w[1], h: Math.PI, nFiles: w[2], shoots: true, ai: true, hold: w[2] >= 6 ? 16 : 12, off: 0 });
-    Object.assign(u, { reload: 5 + Math.random() * 4, supp: 0, state: '', last: { x: FORD.x + 2, y: FORD.y }, n0: u.men.length }); aiDis(u, 0.8); ENEMY.push(u);
+    Object.assign(u, { reload: 5 + Math.random() * 4, supp: 0, state: '', last: { x: FORD.x + 2, y: FORD.y }, n0: u.men.length }); aiDis(u, 0.3); ENEMY.push(u);
     reac('assenyala', '<b>Capità Le Jay:</b> Atenció! Una avançada austríaca ve per l\'est!', 3800);
   }
   function p3Tick(dt, c) {
