@@ -87,7 +87,7 @@
   .btn-sec{font-family:var(--label);letter-spacing:.05em;font-size:.95rem;color:var(--bleu);background:var(--sheet);border:1px solid var(--bleu);border-radius:3px;padding:.4rem 1rem;cursor:pointer;}
   .btn-sec:hover{background:var(--quote-bg);}
   #screenLevels,#screenRank,#screenCamp{padding:2.4rem 1.2rem 3rem;}
-  #rankBody{width:min(760px,100%);}
+  #rankBody{width:min(760px,100%);} .rtab th.ic{text-align:center;color:var(--bleu);} .rtab th.ic svg{vertical-align:middle;}
   #rankMsg{color:var(--muted);text-align:center;margin:2rem 0;}
   .podium{display:flex;align-items:flex-end;justify-content:center;gap:.6rem;margin:.4rem 0 1.6rem;}
   .podium .pl{flex:1;max-width:210px;text-align:center;background:var(--sheet);border:1px solid var(--line);border-radius:4px 4px 0 0;padding:.7rem .4rem .5rem;display:flex;flex-direction:column;justify-content:flex-end;}
@@ -98,6 +98,7 @@
   .rtab th{font-family:var(--label);font-weight:400;letter-spacing:.08em;text-transform:uppercase;font-size:.8rem;color:var(--muted);}
   .rtab td.n,.rtab th.n{text-align:right;font-variant-numeric:tabular-nums;} .rtab tr.row{cursor:pointer;} .rtab tr.row:hover{background:rgba(0,0,0,.03);}
   .rtab tr.me{background:rgba(31,58,120,.09);font-weight:700;} .rtab tr.det td{font-size:.85rem;color:var(--muted);padding-top:.1rem;}
+  #endLearn{margin:.2rem 0 .8rem;padding:.7rem .8rem;border:1px solid var(--line);border-radius:6px;background:var(--quote-bg);} #endLearn h4{margin:0 0 .45rem;font-family:var(--label);font-size:.82rem;letter-spacing:.06em;text-transform:uppercase;color:var(--vert,#2e6b3a);} #endLearn .lbtn{display:inline-flex;align-items:center;gap:8px;padding:6px 14px;border:1px solid var(--bleu);border-radius:5px;background:#fff;color:var(--bleu);font-family:var(--label);font-size:15px;letter-spacing:.04em;} #endLearn .lbtn svg{width:22px;height:22px;} #endLearn p{margin:.5rem 0 0;font-size:.88rem;}
   #endScore{margin:.6rem 0 .2rem;} #endScore .big{font-family:var(--display);font-size:2.2rem;color:var(--bleu);line-height:1;} #endScore .big small{font-size:1rem;color:var(--muted);}
   #endScore table{border-collapse:collapse;width:100%;font-size:.9rem;margin-top:.4rem;} #endScore td{padding:.15rem .3rem;border-bottom:1px solid var(--line);} #endScore td:last-child{text-align:right;font-variant-numeric:tabular-nums;}
   #endScore .sv{font-size:.8rem;color:var(--muted);margin-top:.3rem;}
@@ -540,7 +541,7 @@
   </div></div>
 <div id="tmini"><img alt=""><div class="t"></div></div>
 <div id="tut"><div class="card"><div class="av"><img alt="Capitaine Le Jay"><span>Capitaine Le Jay</span></div><div class="n"></div><h4></h4><p></p><div class="figs"></div><button id="tutOk">Entesos</button></div></div>
-<div id="endmsg"><div class="card"><img class="av2" alt="Capitaine Le Jay"><h3>Nivell completat</h3><p id="endText"></p><div id="endScore"></div>
+<div id="endmsg"><div class="card"><img class="av2" alt="Capitaine Le Jay"><h3>Nivell completat</h3><p id="endText"></p><div id="endLearn"></div><div id="endScore"></div>
   <div class="row"><button class="btn-sec" id="btnAgain">Repetir</button><button class="btn-sec" id="btnToLevels">Tutorial</button><button class="btn-main" id="btnNext" style="font-size:1rem;padding:.5rem 1.4rem">Nivell següent ›</button></div></div></div>
 <canvas id="c"></canvas>
 <div id="compass" data-cmd="compass" title="Brúixola: clica per posar el nord amunt; arrossega-la o usa les fletxes ← → del teclat per girar el mapa (↑ ↓ fan zoom)"><svg viewBox="-32 -32 64 64" aria-label="Brúixola"><circle r="27" fill="none" stroke="var(--line)" stroke-width="1"/><g id="needle"><path d="M0 -24 L6 0 L-6 0Z" fill="#b3261e"/><path d="M0 24 L6 0 L-6 0Z" fill="#6b6a63"/><text y="-12.5" text-anchor="middle" font-size="9" font-weight="700" fill="#fff" font-family="sans-serif" style="pointer-events:none">N</text></g><circle r="2.2" fill="var(--sheet)" stroke="var(--ink)" stroke-width=".6"/></svg></div>
@@ -1642,14 +1643,15 @@ function makeCo(cx, cy) {
 let co, lastKey = '', level = null, screen = 'title', paused = false;
 // ---------- Puntuació i rànquing ----------
 // Cada nivell dóna fins a 1000 punts: 4 parts de 250 (temps, baixes, ordres donades i ordre mitjà del regiment). Es guarda la millor de cada nivell.
-const STAT = { t: 0, ord: 0, dead: 0, oSum: 0, men0: 20 };
-const SCORE_REF = { 1: { t: 90, o: 12 }, 2: { t: 100, o: 14 }, 3: { t: 110, o: 16 }, 4: { t: 140, o: 20 }, 5: { t: 200, o: 25 }, 6: { t: 120, o: 14 }, 7: { t: 150, o: 20 }, 8: { t: 170, o: 30 }, 9: { t: 150, o: 10 }, 10: { t: 300, o: 35 }, c1n1: { t: 360, o: 32 } };   // temps (s) i ordres de referència: 250 punts; amb el triple, 0
-function statReset() { STAT.t = 0; STAT.ord = 0; STAT.dead = 0; STAT.oSum = 0; STAT.men0 = co ? co.members.length : 20; }
+const STAT = { t: 0, ord: 0, dead: 0, oSum: 0, men0: 20, kInf: 0, kCav: 0, kGun: 0 };
+const SCORE_REF = { 1: { t: 90, o: 12 }, 2: { t: 100, o: 14 }, 3: { t: 110, o: 16 }, 4: { t: 140, o: 20 }, 5: { t: 200, o: 25 }, 6: { t: 120, o: 14 }, 7: { t: 150, o: 20 }, 8: { t: 170, o: 30 }, 9: { t: 150, o: 10 }, 10: { t: 300, o: 35 }, c1n1: { t: 360, o: 32, k: 15 }, c1n2: { t: 300, o: 30, k: 40 }, c1n3: { t: 570, o: 30, k: 14 }, c1n4: { t: 420, o: 30, k: 30 } };   // temps (s) i ordres de referència: 250 punts; amb el triple, 0
+function statReset() { STAT.kInf = 0; STAT.kCav = 0; STAT.kGun = 0; STAT.t = 0; STAT.ord = 0; STAT.dead = 0; STAT.oSum = 0; STAT.men0 = co ? co.members.length : 20; }
+const killPts = () => STAT.kInf + 2 * STAT.kCav + 10 * STAT.kGun;      // campanya: infanteria 1, cavalleria 2, canó destrossat 10 (5 de la dotació + 5 del canó)
 function scoreCalc(n) {
   const R = SCORE_REF[n] || { t: 150, o: 20 }, P = TUNE.puntuacio, lin = (v, ref) => Math.max(0, Math.min(1, 1 - (v - ref) / (P.marge * ref)));
   const avg = STAT.t > 0 ? STAT.oSum / STAT.t : 100;
-  const p = { t: Math.round(P.part * lin(STAT.t, R.t)), d: Math.round(P.part * Math.max(0, 1 - STAT.dead / Math.max(1, STAT.men0))), o: Math.round(P.part * lin(STAT.ord, R.o)), a: Math.round(P.part * Math.max(0, Math.min(1, avg / 100))) };
-  return { total: p.t + p.d + p.o + p.a, parts: p, time: Math.round(STAT.t), dead: STAT.dead, orders: STAT.ord, avg: Math.round(avg) };
+  const p = { t: Math.round(P.part * lin(STAT.t, R.t)), d: Math.round(P.part * Math.max(0, 1 - STAT.dead / Math.max(1, STAT.men0))), o: Math.round(P.part * (typeof n === 'string' ? Math.min(1, killPts() / (R.k || 20)) : lin(STAT.ord, R.o))), a: Math.round(P.part * Math.max(0, Math.min(1, avg / 100))) };
+  return { total: p.t + p.d + p.o + p.a, parts: p, time: Math.round(STAT.t), dead: STAT.dead, orders: STAT.ord, avg: Math.round(avg), kills: { inf: STAT.kInf, cav: STAT.kCav, guns: STAT.kGun, pts: killPts() } };
 }
 const fmtT = s => Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
 
@@ -2115,7 +2117,7 @@ function drawCorpses() {
     ctx.restore();
   }
 }
-function killEnemy(v, e) { v.alive = false; v.a = e.h; addCorpse(v.x, v.y, e.h + (Math.random() - 0.5) * 0.6, false, v.rank); }
+function killEnemy(v, e) { if (screen === 'game' && !GUNS.some(g => g.crewUnit === e)) { if (e.cav) STAT.kCav++; else STAT.kInf++; } v.alive = false; v.a = e.h; addCorpse(v.x, v.y, e.h + (Math.random() - 0.5) * 0.6, false, v.rank); }
 function routEnemy(e) {                          // els supervivents fugen corrents, lluny de la nostra unitat
   const c = unitCentre(); let fled = 0;
   for (const v of e.men) if (v.alive) { v.alive = false; const a = Math.atan2(v.y - c.y, v.x - c.x) + (Math.random() - 0.5) * 0.9, sp = 3.2 + Math.random() * 2; v.fl = { vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, t: -Math.random() * 0.6 }; fled++; }
@@ -2350,7 +2352,7 @@ function updateGuns(dt) {
   const A = TUNE.art, c = unitCentre();
   for (const g of GUNS) {
     if (g.reload > 0) g.reload -= dt;
-    if (g.crewUnit) { const dn = gunDown(g); if (dn && !g.down) { g.down = true; g.aimT = 0; g.tgt = null; } if (dn) continue; }          // sense servidors (o amb menys de la meitat), el canó calla
+    if (g.crewUnit) { const dn = gunDown(g); if (dn && !g.down) { g.down = true; STAT.kGun++; g.aimT = 0; g.tgt = null; } if (dn) continue; }          // sense servidors (o amb menys de la meitat), el canó calla
     if (g.adv) { advGunTick(g, dt); continue; }
     if (g.mute > 0) { g.mute -= dt; g.aimT = 0; continue; }                // el foc dels tiradors els fa abaixar el cap: no disparen
     const d = Math.hypot(c.x - g.x, c.y - g.y);
@@ -2771,7 +2773,7 @@ function aiUnitTick(u, side, dt) {
 function drawAiMarks() {                        // damunt de cada unitat que carrega: un rellotge petit que s'omple; quan apunta: el seu camp de foc, suau i en un altre color que el nostre
   const list = [...ENEMY, ...ALLY].filter(u => !u.script && !u.routed && u.men.some(v => v.alive));
   for (const u of list) {
-    const load = u.ai ? u.ph === 'load' && u.reload > 0 : u.shoots && u.alert && u.reload > 0, aim = u.ai && (u.ph === 'aim' || u.ph === 'fire');
+    const wv = u.cstate === 'volley', load = u.ai ? u.ph === 'load' && u.reload > 0 : (u.shoots && u.alert && u.reload > 0) || (wv && u.nv > 0 && u.reload > 0), aim = (u.ai && (u.ph === 'aim' || u.ph === 'fire')) || (wv && (!u.nv || u.reload < 3));
     if (aim) {
       const S = makeStrip(u.men.filter(v => v.alive), u.h, u.h, TUNE.mosquet.obertura), R = Math.min(S.R, (u.aimD || 30) + 4), w1 = S.hw + R * S.tg;
       ctx.save(); ctx.translate(S.ox * M, S.oy * M); ctx.rotate(S.a);
@@ -4548,6 +4550,8 @@ function checkLevel() {
     document.getElementById('btnNext').style.display = camp ? (campNextId() ? '' : 'none') : typeof curLevel === 'number' && levelUnlocked(curLevel + 1) ? '' : 'none'; }
   document.getElementById('tut').classList.remove('show'); document.getElementById('tmini').classList.remove('show');
   document.getElementById('endText').textContent = level.endText;
+  { const L = level.learn, el = document.getElementById('endLearn'); el.style.display = L ? '' : 'none';
+    if (L) { const o = ORDER_BY_ID[L.id]; el.innerHTML = '<h4>Nova ordre apresa: ' + L.name + '</h4><div class="lbtn">' + (o && o.icon && ICONS[o.icon] ? ICONS[o.icon] : '') + '<span>' + L.name + '</span></div><p>' + L.text + '</p>'; } }
   document.querySelector('#endmsg .av2').src = AV.saluda;
   document.getElementById('reac').classList.remove('show');
   document.getElementById('endmsg').classList.add('show');
@@ -4625,7 +4629,7 @@ let autoStepT = 0;
 const VOICE = { on: false, rec: null, running: false, tested: false, seg: {}, interim: '', state: '', failT: 0, lastFail: null,
   learn: { phr: {}, ex: {} }, shared: { phr: {}, ex: {} }, opt: { mode: 'cont', vol: true, log: false, tele: true, engine: '' }, log: [], recentExec: null, ptt: false, db: false, loading: false };
 // Connexió amb Supabase (la mateixa de la web: si el joc s'obre dins la web, agafa window.APP_CONFIG) i fonts del motor local Vosk
-const GAME_VERSION = '1.8.49';
+const GAME_VERSION = '1.8.50';
 const CFG = Object.assign({
   SUPABASE_URL: 'https://ltopullwhasagnkuqaek.supabase.co',
   SUPABASE_ANON_KEY: 'sb_publishable_DhHFUh-UrbBrI0l476Vcnw_tSn-Gmkr',
@@ -6556,7 +6560,7 @@ function buildCampaign3() {
   sc.push(A.label('Camí de retirada', 72, 26, { kind: 'place', scale: 0.55 }), A.label('Pont segur', BX + 12, BY - 6, { kind: 'place', scale: 0.55 }));
   const roadY = x => { for (let i = 1; i < road.length; i++) if (x <= road[i][0]) { const a = road[i - 1], b = road[i]; return a[1] + (b[1] - a[1]) * (x - a[0]) / (b[0] - a[0]); } return 30; };
   const QUEUE = ['c', 'i', 'c', 'c', 'i', 'c'], FINAL = ['i', 'c', 'c'];                                   // c = cavalleria (cal Ralliement), i = infanteria a la baioneta (cal línia i foc)
-  const st = { t: 0, cart: { x: 22, y: roadY(22), hp: 3, idle: 0 }, q: QUEUE.slice(), act: null, wait: 12, resolved: 0, total: QUEUE.length + FINAL.length, volleyT: -9, done: false, fin: undefined, warnedFar: 0, finalOn: false, go: false, sx: 0, sy: 0 };
+  const st = { t: 0, cart: { x: 22, y: roadY(22), hp: 3, idle: 0 }, q: QUEUE.slice(), act: null, wait: 12, resolved: 0, total: QUEUE.length + FINAL.length, volleyT: -9, done: false, fin: undefined, warnedFar: 0, finalOn: false, go: false, sx: 0, sy: 0, ncav: 0 };
   const cartOk = () => st.cart.hp > 0, arrived = () => st.cart.x >= BX + 5;
   const cartMax = () => !st.finalOn ? BX - 30 : (st.q.length || st.act ? BX - 14 : BX + 5);
   const steps = [
@@ -6579,8 +6583,8 @@ function buildCampaign3() {
     const nf = kind === 'c' ? (Math.random() < 0.5 ? 4 : 5) : (Math.random() < 0.5 ? 4 : 5);
     const u = buildEnemy({ name: kind === 'c' ? 'Cavalleria lleugera austríaca' : 'Infanteria austríaca', flag: 'aut', cx: px, cy: py, h, nFiles: nf, cav: kind === 'c', inf: kind === 'i' });
     if (kind === 'c') for (const m of u.men) { m.x = u.cx + (m.x - u.cx) * 2.6; m.y = u.cy + (m.y - u.cy) * 2.6; }
-    Object.assign(u, { shoots: false, cstate: kind === 'c' ? 'charge' : 'run', ct: 0, n0: u.men.length, cdir: h, kind }); ENEMY.push(u); st.act = u;
-    reac('alerta', kind === 'c' ? '<b>Capità Le Jay:</b> Cavalleria al galop! <b>Ralliement!</b>' : '<b>Capità Le Jay:</b> Infanteria austríaca a la baioneta! Formeu la línia i <b>foc</b>!', 6500);
+    Object.assign(u, { shoots: false, cstate: kind === 'c' ? 'charge' : 'run', ct: 0, n0: u.men.length, cdir: h, kind, trot: kind === 'c' && st.ncav === 0 }); if (kind === 'c') st.ncav++; ENEMY.push(u); st.act = u;
+    reac('alerta', kind === 'c' ? (u.trot ? '<b>Capità Le Jay:</b> Cavalleria al trot! <b>Ralliement!</b>' : '<b>Capità Le Jay:</b> Cavalleria al galop! <b>Ralliement!</b>') : '<b>Capità Le Jay:</b> Infanteria austríaca a la baioneta! Formeu la línia i <b>foc</b>!', 6500);
   };
   const resolveWave = () => { const u = st.act; if (!u) return; for (const m of u.men) m.alive = false; u.routed = true; const i = ENEMY.indexOf(u); if (i >= 0) ENEMY.splice(i, 1); st.act = null; st.resolved++; st.wait = 7 + Math.random() * 5; lastKey = ''; };
   return {
@@ -6599,7 +6603,7 @@ function buildCampaign3() {
       if (!mini) { ctx.save(); ctx.fillStyle = 'rgba(24,22,60,.22)'; ctx.fillRect(-20 * M, -20 * M, (W + 40) * M, (H + 40) * M); ctx.restore(); }
     },
     onReset() {
-      st.t = 0; st.go = false; st.cart = { x: 22, y: roadY(22), hp: 3, idle: 0 }; st.q = QUEUE.slice(); st.act = null; st.wait = 12; st.resolved = 0; st.volleyT = -9; st.done = false; st.fin = undefined; st.warnedFar = 0; st.finalOn = false;
+      st.t = 0; st.go = false; st.ncav = 0; st.cart = { x: 22, y: roadY(22), hp: 3, idle: 0 }; st.q = QUEUE.slice(); st.act = null; st.wait = 12; st.resolved = 0; st.volleyT = -9; st.done = false; st.fin = undefined; st.warnedFar = 0; st.finalOn = false;
     },
     onVolley() { st.volleyT = st.t; },
     tick(dt) {
@@ -6625,10 +6629,11 @@ function buildCampaign3() {
             if (u.kind === 'c') {
               if (u.cstate === 'charge') {
                 if (dist > 14) u.cdir = Math.atan2(dy, dx);
-                moveCav(u, Math.cos(u.cdir) * 7.5, Math.sin(u.cdir) * 7.5, dt);
-                if (co.sq && dist < 10) {                                                                  // reagrupats: els genets no s'hi llancen, hi giren al voltant
+                const vC = u.trot ? 4.2 : 7.5; moveCav(u, Math.cos(u.cdir) * vC, Math.sin(u.cdir) * vC, dt);
+                if (co.sq) { let hit = 0; for (const m of alive) if (!m.imp && co.members.some(o => Math.hypot(o.x - m.x, o.y - m.y) < 2.6)) { m.imp = true; if (Math.random() < 0.4) { killEnemy(m, u); hit++; } } if (hit) reac('aprova', '<b>Louis:</b> Un cavall s\'ha empalat a les baionetes!', 3500); }   // si la bola és a punt, els cavalls s'hi claven
+                if (co.sq && dist < 4.5) {                                                                  // reagrupats: els genets no s'hi llancen, hi giren al voltant
                   u.cstate = 'circle'; u.t0 = st.t;
-                  alive.forEach((m, i) => { const a = Math.atan2(m.y - c.y, m.x - c.x); m.oa = a + i * 0.12; m.orad = 7.5 + (i % 3) * 1.4; m.ow = 6.5 / m.orad; m.acc = 0; });
+                  alive.forEach((m, i) => { const a = Math.atan2(m.y - c.y, m.x - c.x); m.oa = a + i * 0.12; m.orad = 6 + (i % 3) * 1.3; m.ow = 6.5 / m.orad; m.acc = 0; });
                 } else for (const m of alive) {
                   m.cd = (m.cd || 0) - dt;
                   let near = null, nd = 1.7; for (const o of co.members) { const dd = Math.hypot(o.x - m.x, o.y - m.y); if (dd < nd) { nd = dd; near = o; } }
@@ -6658,7 +6663,8 @@ function buildCampaign3() {
                 else if (touch) { u.cstate = 'melee'; u.mt = 0; u.tk = 0; }
                 else if (n <= u.n0 / 2) { u.cstate = 'rout'; u.ct = 0; reac('aprova', '<b>Louis:</b> Fugen! Els hem aturat amb les descàrregues!', 4500); }
               } else if (u.cstate === 'volley') {
-                u.vt += dt; const ang = Math.atan2(dy, dx); for (const m of alive) m.h = ang;
+                u.vt += dt; const ang = Math.atan2(dy, dx); for (const m of alive) m.h = ang; u.h = ang; u.aimD = dist;
+                if (u.nv) { u.reloadMax = u.rl; u.reload = Math.max(0, u.rl - u.vt); }
                 if (u.vt >= (u.nv ? u.rl : 1.2)) {                                                         // apunten, disparen i recarreguen amb les normes d'IA (recàrrega nostra × 1,25–1,75)
                   u.vt = 0; u.nv++; u.rl = TUNE.mosquet.carrega * (TUNE.ia.recMin + Math.random() * TUNE.ia.recVar);
                   for (const m of alive) { FX.push({ k: 'shot', x: m.x + Math.cos(ang) * 1.25, y: m.y + Math.sin(ang) * 1.25, a: ang, t: -Math.random() * 0.3 }); SFX.shot(Math.random() * 0.3); }
@@ -6694,7 +6700,8 @@ function buildCampaign3() {
       { t: 'Mantenir la unitat amb almenys 8 homes', ok: () => co.members.length >= 8 }
     ],
     goalText: 'Escorta el carro fins al pont i supera totes les càrregues: contra la cavalleria fes un Ralliement; contra la infanteria, forma la línia i foc.',
-    endText: 'Molt bé, chasseur: has parat la cavalleria amb un mur de baionetes i el carro ha passat el pont. La retirada ha guanyat el temps que necessitava. Recorda-ho: una bola de baionetes ben tancada no es pren de cara.'
+    endText: 'Molt bé, chasseur: has parat la cavalleria amb un mur de baionetes i el carro ha passat el pont. La retirada ha guanyat el temps que necessitava.',
+    learn: { id: 'SK-09', name: 'Ralliement', text: 'Fes-la servir sempre que t\'ataqui la cavalleria per poder-te\'n defensar.' }
   };
 }
 function buildCampaign4() {
@@ -6957,7 +6964,7 @@ function scoreShow(n) {
   const sc = scoreCalc(n), el = document.getElementById('endScore'), P = sc.parts;
   el.innerHTML = '<div class="big">' + sc.total + ' <small>/ 1000 <span>punts</span></small></div><table>' +
     '<tr><td><span>Temps</span> · ' + fmtT(sc.time) + '</td><td>' + P.t + ' / 250</td></tr><tr><td><span>Baixes</span> · ' + sc.dead + '</td><td>' + P.d + ' / 250</td></tr>' +
-    '<tr><td><span>Ordres donades</span> · ' + sc.orders + '</td><td>' + P.o + ' / 250</td></tr><tr><td><span>Ordre mitjà</span> · ' + sc.avg + ' %</td><td>' + P.a + ' / 250</td></tr></table><div class="sv"></div>';
+    (typeof n === 'string' ? '<tr><td><span>Enemics derrotats</span> · ' + sc.kills.pts + ' <small>(' + i18nTr('infanteria') + ' ' + sc.kills.inf + ', ' + i18nTr('cavalleria') + ' ' + sc.kills.cav + ', ' + i18nTr('canons') + ' ' + sc.kills.guns + ')</small></td><td>' + P.o + ' / 250</td></tr>' : '<tr><td><span>Ordres donades</span> · ' + sc.orders + '</td><td>' + P.o + ' / 250</td></tr>') + '<tr><td><span>Ordre mitjà</span> · ' + sc.avg + ' %</td><td>' + P.a + ' / 250</td></tr></table><div class="sv"></div>';
   const sv = el.querySelector('.sv'), a = progAuth();
   let lvN = n; if (typeof n === 'string') { const q = /n(\d+)$/.exec(n); lvN = q ? 100 + +q[1] : 0; if (!lvN) return; }
   if (!a) { sv.textContent = 'Inicia sessió a la web del 9e per entrar al rànquing.'; return; }
@@ -6973,16 +6980,20 @@ async function rankLoad() {
   let rows;
   try { rows = await (await sbFetch('/rest/v1/rpc/game_ranking', { method: 'POST', headers: { Authorization: 'Bearer ' + a.token }, body: '{}' })).json(); } catch (e) { msg('No s\'ha pogut carregar el rànquing.'); return; }
   if (!rows.length) { msg('Encara no hi ha cap puntuació. Completa un nivell per ser el primer!'); return; }
-  const lv = LEVELS.filter(L => !L.locked);
+  const sum = o => Object.keys(o || {}).reduce((t, k) => t + (+o[k] || 0), 0);
+  rows.forEach(r => { if (r.tut === undefined) { r.tut = sum(r.levels); r.camp_pts = sum(r.camp); } });
   const pod = [1, 0, 2].filter(i => rows[i]).map(i => '<div class="pl p' + (i + 1) + '"><div class="pos">' + (i + 1) + '</div><div class="nm">' + vEsc(rows[i].nom_guerre) + '</div><div class="pt">' + rows[i].total + ' <span>punts</span></div></div>').join('');
-  let h = '<div class="podium">' + pod + '</div><table class="rtab"><tr><th class="n">#</th><th>Nom de guerre</th><th class="n">Punts</th></tr>';
+  const ic = {                                   // icones petites de la capçalera: infanteria, cavalleria, canons
+    inf: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="9" cy="6" r="2.4"/><path d="M9 9v7M6 12l3-1.5 3 1.5M9 16l-2.5 5M9 16l2.5 5M16 3v18"/></svg>',
+    cav: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 20v-6l3-2 2-5 3 2 3-3 4 2 2 4v8M3 14h6l2-3M13 20v-5"/><circle cx="16" cy="9" r=".6"/></svg>',
+    gun: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11h13l3-2v6l-3-2H3z"/><circle cx="8" cy="17" r="3.2"/></svg>'
+  };
+  let h = '<div class="podium">' + pod + '</div><table class="rtab"><tr><th class="n">#</th><th>' + i18nTr('Nom de guerre') + '</th><th class="n" title="' + i18nTr('Puntuació del tutorial') + '">' + i18nTr('Tutorial') + '</th><th class="n" title="' + i18nTr('Puntuació de la campanya') + '">' + i18nTr('Campanya') + '</th>' +
+    '<th class="n ic" title="' + i18nTr('Enemics derrotats (infanteria)') + '">' + ic.inf + '</th><th class="n ic" title="' + i18nTr('Cavalleria derrotada') + '">' + ic.cav + '</th><th class="n ic" title="' + i18nTr('Canons destrossats') + '">' + ic.gun + '</th></tr>';
   rows.forEach((r, i) => {
-    h += '<tr class="row' + (r.me ? ' me' : '') + '" data-i="' + i + '"><td class="n">' + (i + 1) + '</td><td>' + vEsc(r.nom_guerre) + '</td><td class="n">' + r.total + '</td></tr>' +
-         '<tr class="det" id="rdet' + i + '" style="display:none"><td></td><td colspan="2">' + '<div><span>Tutorial</span> · ' + lv.map(L => L.n + ': <b>' + ((r.levels || {})[L.n] || '—') + '</b>').join(' · ') + '</div>' +
-         '<div><span>Campanya</span> · ' + (Object.keys(r.camp || {}).length ? Object.keys(r.camp).sort((a, b) => a - b).map(k => 'Nivell ' + k + ': <b>' + r.camp[k] + '</b>').join(' · ') : '—') + '</div></td></tr>';
+    h += '<tr class="row' + (r.me ? ' me' : '') + '"><td class="n">' + (i + 1) + '</td><td>' + vEsc(r.nom_guerre) + '</td><td class="n">' + (r.tut || '—') + '</td><td class="n">' + (r.camp_pts || '—') + '</td><td class="n">' + (r.k_inf || '—') + '</td><td class="n">' + (r.k_cav || '—') + '</td><td class="n">' + (r.k_guns || '—') + '</td></tr>';
   });
   body.innerHTML = h + '</table>';
-  body.querySelectorAll('tr.row').forEach(tr => { tr.onclick = () => { const d = document.getElementById('rdet' + tr.dataset.i); d.style.display = d.style.display === 'none' ? '' : 'none'; }; });
 }
 // ---- Música del menú: en bucle des que acaba la càrrega fins que entres en un nivell (fosa suau al sortir; torna en tornar al menú) ----
 const MUSIC = (() => {
