@@ -301,6 +301,8 @@
   #sqBox button.split{border-color:#b3261e;color:#b3261e;} #sqBox button.split:hover{background:#b3261e;color:#fff;}
   #sqBox button.main:disabled{cursor:default;opacity:1;}
   #sqBox .l{position:relative;z-index:1;}
+  #sqBox button.main.hl{box-shadow:0 0 0 4px rgba(199,154,43,.6),0 6px 18px rgba(0,0,0,.18);animation:sqPulse 1.1s ease-in-out infinite;}
+  @keyframes sqPulse{50%{box-shadow:0 0 0 9px rgba(199,154,43,.15),0 6px 18px rgba(0,0,0,.18);}}
   #sqBox .pb{position:absolute;left:0;right:0;bottom:0;height:5px;background:rgba(31,58,120,.12);} #sqBox .pb i{display:block;height:100%;width:0;background:#2e7d32;transition:width .2s;}
   #skPick{position:absolute;bottom:calc(100% + 14px);right:370px;display:none;align-items:center;gap:10px;z-index:91;padding:8px 8px 8px 16px;background:var(--sheet);border:1px solid var(--line);border-radius:18px;box-shadow:0 6px 22px rgba(0,0,0,.22);}
   #skPick.open{display:flex;}
@@ -1672,7 +1674,7 @@ function sqSplit() {
   const keep = co.members.filter(m => keepF.has(m.file)), go = co.members.filter(m => !keepF.has(m.file));
   if (!go.length || !keep.length) return;
   co.members = keep; if (!open) relabel();                                   // desplegats: cada home conserva la seva filera (no es renumera)
-  const G = makeCo(0, 0); G.members = go; G.atencio = co.atencio; G.arm = co.arm === 'charge' ? 'portez' : co.arm; G.loaded = co.loaded; G.cansament = co.cansament; G.aiT = 1.2; G.jT = 0; G.open = open || null; G.needRel = !!open;
+  const G = makeCo(0, 0); G.members = go; G.atencio = co.atencio; G.arm = co.arm === 'charge' ? 'portez' : co.arm; G.loaded = co.loaded; G.cansament = co.cansament; G.aiT = 1.2; G.jT = 0; G.open = open || null; G.needRel = !!open; G.sep = { s: open ? -1 : 0, t: 0, dist: 8, x0: null }; G.sepDone = false;
   for (const m of G.members) m.row = null;
   if (!open) withCo(G, () => relabel());
   SQ = { G, mode: 'split' };
@@ -1707,7 +1709,13 @@ function sqPickChoice(k) {
   SQ_SAY(k === 'join' ? 'Entesos! Ens unim al desplegament.' : 'Entesos! Anem al vostre costat, formats.');
   sqGo(k);
 }
+function sqHl() {                                 // tutorial: ressalta el botó quan toca prémer-lo
+  const b = document.querySelector('#sqBox button.main'); if (!b) return;
+  const cs = level && level.tutorial && level.tutorial.steps[TUT.step];
+  b.classList.toggle('hl', !!(tutOn() && cs && cs.hlSq && !(SQ && SQ.mode === 'regroup') && !tutLocked()));
+}
 function sqTick(dt) {
+  sqHl();
   if (!SQ) return;
   const G = SQ.G;
   if (!G.members.length) { SQ = null; sqButton(); return; }
@@ -1735,6 +1743,21 @@ function sqTick(dt) {
     sqButton(); return;
   }
   withCo(G, () => updateCo(dt));
+  if (G.sep) {                                   // separació visible: Première escouade, en avant… marche! → Halte! (les mateixes ordres que nosaltres)
+    const S = G.sep; S.t += dt;
+    if (S.s === -1) {                            // si estàvem desplegats, primer tanquen files
+      if (S.t < 0.6) return;
+      if (!S.said) { S.said = true; SQ_SAY('Première escouade, serrez les files!', 3500); withCo(G, () => { const o = ORDER_BY_ID['SK-04']; if (o.avail(1) === true) o.run(1); }); }
+      else if (G.state === 'parat' && !G.auto && S.t > 1.5) { withCo(G, () => relabel()); G.needRel = false; S.s = 0; S.t = 0; }
+    } else if (S.s === 0) {
+      if (S.t > 1.0) { SQ_SAY('Première escouade, en avant… marche!', 3500); withCo(G, () => { S.x0 = unitCentre(); ORDER_BY_ID['MA-01'].run(); }); S.s = 1; }
+    } else if (S.s === 1) {
+      const d = withCo(G, () => { const c = unitCentre(); return Math.hypot(c.x - S.x0.x, c.y - S.x0.y); });
+      if (d >= S.dist) { SQ_SAY('Halte!', 2500); withCo(G, () => HALTE.run()); S.s = 2; S.t = 0; }
+    } else if (S.s === 2 && S.t > 1.2 && G.state === 'parat') { G.sep = null; G.sepDone = true; G.sepAt = performance.now(); G.aiT = 0.5; }
+    return;
+  }
+  if (level && level.sqIdle && level.sqIdle()) return;
   G.aiT -= dt; if (G.aiT > 0) return; G.aiT = 0.25;
   withCo(G, () => sqBrain(G));
 }
@@ -2821,6 +2844,7 @@ function aiClose(u, live, dt) {                  // «Serrez les files»: quan c
   u.men.forEach((v, i) => { if (!v.alive) return; const dx = tg[i].x - v.x, dy = tg[i].y - v.y, d = Math.hypot(dx, dy), s = 2.2 * dt; if (d > 0.05) { moving = true; const f = Math.min(1, s / d); v.x += dx * f; v.y += dy * f; } });
   if (!moving) u.closing = false;
 }
+const aiSp = dt => STEP * PACES[(level && level.aiPace) || 'accelerat'].cad / 60 * dt;          // pas de la infanteria d'IA (per defecte accéléré; el nivell 5, ordinaire)
 function aiMergeStep(u, dt) {                  // reserva que va cap al regiment que ha caigut i s'hi ajunta (un sol regiment)
   const t = u.mergeTo, live = u.men.filter(v => v.alive);
   if (!live.length) { u.mergeTo = null; return; }
@@ -2828,7 +2852,7 @@ function aiMergeStep(u, dt) {                  // reserva que va cap al regiment
   const dx = t.cx - u.cx, dy = t.cy - u.cy, d = Math.hypot(dx, dy), diff = wrapA(Math.atan2(dy, dx) - u.h);
   if (d > 3.5) {
     if (Math.abs(diff) > 0.02) aiRot(u, Math.max(-TUNE.ia.retirada.gir * dt, Math.min(TUNE.ia.retirada.gir * dt, diff)));
-    if (Math.abs(diff) < 0.5) { const sp = STEP * PACES.carrega.cad / 60 * dt; aiMove(u, Math.cos(u.h) * sp, Math.sin(u.h) * sp); }      // la reserva hi va al pas de charge
+    if (Math.abs(diff) < 0.5) { const sp = aiSp(dt); aiMove(u, Math.cos(u.h) * sp, Math.sin(u.h) * sp); }
     return;
   }
   const n1 = enAlive(t);
@@ -2847,13 +2871,13 @@ function aiUnitTick(u, side, dt) {
     u.ph = 'move';
     const diff = wrapA(u.awayH - u.h), st = Math.max(-A.retirada.gir * dt, Math.min(A.retirada.gir * dt, diff));
     if (Math.abs(st) > 1e-5) aiRot(u, st);
-    if (Math.abs(diff) < A.retirada.tol) { const sp = STEP * PACES.accelerat.cad / 60 * dt; aiMove(u, Math.cos(u.h) * sp, Math.sin(u.h) * sp); }
+    if (Math.abs(diff) < A.retirada.tol) { const sp = aiSp(dt); aiMove(u, Math.cos(u.h) * sp, Math.sin(u.h) * sp); }
     return;
   }
   if (u.colRef && !u.reforming && u.colRef.y !== undefined) {                 // columna d'entrada: avança recta pel carrer fins al lloc on es desplega (no es desvia ni busca enemics)
     const dx = u.colRef.x + 3 - u.cx, dy = u.colRef.y - u.cy, diff = wrapA(Math.atan2(dy, dx) - u.h);
     if (Math.abs(diff) > 0.02) aiRot(u, Math.max(-A.retirada.gir * dt, Math.min(A.retirada.gir * dt, diff)));
-    const sp = STEP * PACES.accelerat.cad / 60 * dt; aiMove(u, Math.cos(u.h) * sp, Math.sin(u.h) * sp);
+    const sp = aiSp(dt); aiMove(u, Math.cos(u.h) * sp, Math.sin(u.h) * sp);
     return;
   }
   const fo = u.focus && enAlive(u.focus) > 0 && !u.focus.routed ? u.focus : null;                       // focus: lluita només contra aquesta unitat mentre sigui viva (batalla dins del poble)
@@ -2864,7 +2888,7 @@ function aiUnitTick(u, side, dt) {
       if (d > 1.5) {
         const diff = wrapA(Math.atan2(dy, dx) - u.h), st = Math.max(-A.retirada.gir * dt, Math.min(A.retirada.gir * dt, diff));
         if (Math.abs(st) > 1e-5) aiRot(u, st);
-        if (Math.abs(diff) < A.retirada.tol) { const sp = STEP * PACES.accelerat.cad / 60 * dt; aiMove(u, Math.cos(u.h) * sp, Math.sin(u.h) * sp); }
+        if (Math.abs(diff) < A.retirada.tol) { const sp = aiSp(dt); aiMove(u, Math.cos(u.h) * sp, Math.sin(u.h) * sp); }
       } else { const diff = wrapA(Math.PI - u.h); if (Math.abs(diff) > 0.02) aiRot(u, Math.max(-A.retirada.gir * dt, Math.min(A.retirada.gir * dt, diff))); }
     }
     return;
@@ -2897,11 +2921,11 @@ function aiUnitTick(u, side, dt) {
     if (av) {                                                                // casa o arbre al davant: gira per esquivar-lo
       u.stk = (u.stk || 0) + dt; if (u.stk > A.evita.encallat) { u.ign = A.evita.ignora; u.stk = 0; }
       aiWheel(u, av.turn * Math.min(A.evita.girar, aiWheelRate(u)) * dt);
-      if (!av.stop) { const sp = STEP * PACES.accelerat.cad / 60 * dt * A.evita.vel; aiMove(u, Math.cos(u.h) * sp, Math.sin(u.h) * sp); aiDis(u, Math.min(0.6, (u.dis || 0) + sp * 0.025)); }
+      if (!av.stop) { const sp = aiSp(dt) * A.evita.vel; aiMove(u, Math.cos(u.h) * sp, Math.sin(u.h) * sp); aiDis(u, Math.min(0.6, (u.dis || 0) + sp * 0.025)); }
     } else {
       u.stk = Math.max(0, (u.stk || 0) - dt);
       if (Math.abs(st) > 1e-5) aiWheel(u, st);
-      if (d > hold && !u.stay && Math.abs(diff) < A.tolMarxa) { const sp = STEP * PACES.accelerat.cad / 60 * dt; aiMove(u, Math.cos(u.h) * sp, Math.sin(u.h) * sp); aiDis(u, Math.min(0.6, (u.dis || 0) + sp * 0.025)); }
+      if (d > hold && !u.stay && Math.abs(diff) < A.tolMarxa) { const sp = aiSp(dt); aiMove(u, Math.cos(u.h) * sp, Math.sin(u.h) * sp); aiDis(u, Math.min(0.6, (u.dis || 0) + sp * 0.025)); }
     }
     if (best && d <= hold && Math.abs(diff) < 0.08 && !av) { u.ph = 'stop'; u.gap = GAP; }   // ja és al lloc: s'atura i espera abans de la següent ordre
     return;
@@ -4829,7 +4853,7 @@ let autoStepT = 0;
 const VOICE = { on: false, rec: null, running: false, tested: false, seg: {}, interim: '', state: '', failT: 0, lastFail: null,
   learn: { phr: {}, ex: {} }, shared: { phr: {}, ex: {} }, opt: { mode: 'cont', vol: true, log: false, tele: true, engine: '' }, log: [], recentExec: null, ptt: false, db: false, loading: false };
 // Connexió amb Supabase (la mateixa de la web: si el joc s'obre dins la web, agafa window.APP_CONFIG) i fonts del motor local Vosk
-const GAME_VERSION = '1.8.57';
+const GAME_VERSION = '1.8.58';
 const CFG = Object.assign({
   SUPABASE_URL: 'https://ltopullwhasagnkuqaek.supabase.co',
   SUPABASE_ANON_KEY: 'sb_publishable_DhHFUh-UrbBrI0l476Vcnw_tSn-Gmkr',
@@ -7040,18 +7064,29 @@ function buildCampaign5() {
   const REDF = { cf: '#c8352b', cs: '#6e1410' }, HESF = { cf: '#1b2a5c', cs: '#e8871e' };
   const U = (name, flag, x, y, nf, extra) => Object.assign({ name, flag, cx: x, cy: y, h: Math.PI, nFiles: nf, shoots: true, ai: true, stay: true, noRetreat: true, hold: 30, off: 0 }, flag[0] === 'h' ? HESF : REDF, extra || {});
   const resAlive = () => ENEMY.filter(e => e.reserve && enAlive(e) > 0).length;
+  const UNL = ['gir', 'mov', 'pace', 'parfile', 'bataille', 'align', 'obl', 'conv', 'tournez', 'ligne', 'form', 'repos', 'musket', 'skirm', 'carre'];
   const steps = [
     { title: 'La Càrrega a Hondschoote', pose: 'serios', hl: [], unlock: ['gir', 'mov', 'pace', 'parfile', 'bataille', 'align', 'obl', 'conv', 'tournez', 'ligne', 'form', 'repos', 'musket', 'skirm', 'carre'], tag: 'Hondschoote · 6 de setembre de 1793 · tarda', intro: true, btn: 'Endavant',
       text: ['«Hondschoote, 6 de setembre de 1793, a la tarda. Els anglo-hannoverians s\'han fortificat darrere d\'una <b>línia d\'estaques</b> amb canons als flancs, i la República vol aquest camp avui.»',
         '«Els regiments de línia avançaran amb nosaltres. El 9e hi va amb <b>quaranta homes</b>: entrarem per les <b>obertures</b> de l\'estacada, perquè fora d\'elles les estaques ens aturen sota el foc.»',
         '«Dins hi ha la <b>zona protegida</b>. Cal entrar-hi i <b>mantenir-s\'hi un minut</b>: la reserva enemiga contraatacarà. <b>Vive la République!</b>»'],
       done: () => TUT.intro },
-    { title: 'Captura la zona protegida', pose: 'assenyala', hl: [], unlock: ['gir', 'mov', 'pace', 'parfile', 'bataille', 'align', 'obl', 'conv', 'tournez', 'ligne', 'form', 'repos', 'musket', 'skirm', 'carre'],
+    { title: 'Separar la tropa', pose: 'assenyala', hl: [], unlock: UNL, tag: 'Esquadres', hlSq: true, btn: 'Entesos',
+      text: ['«Abans d\'atacar, una cosa nova: pots <b>separar la tropa en dues esquadres</b>. La meitat esquerra la comanda el capità Le Jay i actua <b>sola</b>, amb les mateixes ordres que tu. Quan vulguis, la <b>reagrupes</b>.»',
+        '«Prova-ho: prem <b>Separar en dues esquadres</b>, a baix a l\'esquerra.»'],
+      done: () => !!SQ },
+    { title: 'Mira com es separen', pose: 'assenyala', hl: [], unlock: UNL,
+      mini: () => 'Mira com la <b>Première escouade</b> avança sola amb les ordres En avant i Halte.', resetStep: () => 1,
+      done: () => !!SQ && !!SQ.G.sepDone && performance.now() - SQ.G.sepAt > 1500 },
+    { title: 'Reagrupar les esquadres', pose: 'assenyala', hl: [], unlock: UNL, hlSq: true,
+      mini: () => 'Ara prem <b>Reagrupar les esquadres</b>: la Première escouade torna caminant al seu lloc.', resetStep: () => 1,
+      done: () => !SQ },
+    { title: 'Captura la zona protegida', pose: 'assenyala', hl: [], unlock: UNL,
       mini: () => !st.crossed ? 'Avança fins a l\'estacada i travessa-la per una <b>obertura</b>.' : st.cap > 0 ? 'Captura: <b>' + Math.floor(st.cap) + ' / ' + CAP + ' s</b>.' : 'Entra a la <b>zona protegida</b> i mantén-t\'hi ' + CAP + ' s.',
-      resetStep: () => 1, done: () => false }
+      resetStep: () => 4, done: () => false }
   ];
   return {
-    w: W, h: H, pad: 36, files: 20, split: true, freeStab: true, localStab: true, start: { x: 14, y: 55 }, obstacles: [], scene: MapKit.scene(sc), zone: null, musket: true, skirm: true, driftScale: 0.5, goalHeading: 0, minMen: 12, cover, mudK,
+    w: W, h: H, pad: 36, files: 20, split: true, aiPace: 'ordinari', sqIdle: () => TUT.step < 4, freeStab: true, localStab: true, start: { x: 14, y: 55 }, obstacles: [], scene: MapKit.scene(sc), zone: null, musket: true, skirm: true, driftScale: 0.5, goalHeading: 0, minMen: 12, cover, mudK,
     guns: [30].map((y, i) => ({ x: SX + 5, y, h: Math.PI, name: 'Canó anglès ' + (i + 1), crew: 5, adv: true, half: true, range: 95, vis: 62, cone: 1.0, can: 25, rt: 14, rot: 0.3 })),
     enemies: [
       U('33rd Regiment of Foot', 'b33', SX + 5, 30, 20), U('14th Regiment of Foot', 'b14', SX + 5, 55, 20), U('Regiment hessià Prinz Karl', 'hpk', SX + 5, 80, 20),
@@ -7074,9 +7109,9 @@ function buildCampaign5() {
     },
     onReset() {
       st.t = 0; st.crossed = false; st.cap = 0; st.done = false; st.res = false;
-      for (const e of ENEMY.filter(e => e.ai)) { e.reload = 6 + Math.random() * 6; e.supp = 0; e.state = ''; e.n0 = e.men.length; e.last = null; e.helped = false; }
+      for (const e of ENEMY.filter(e => e.ai)) { e.reload = 12 + Math.random() * 10; e.supp = 0; e.state = ''; e.n0 = e.men.length; e.last = null; e.helped = false; }
       [['22e demi-brigade de ligne', 'f22', 22, 12, 0], ['28e demi-brigade de ligne', 'f28', 55, 4, 0], ['40e demi-brigade de ligne', 'f40', 88, 12, 0], ['Reserva francesa (22e)', 'f22', 38, -2, 1], ['Reserva francesa (40e)', 'f40', 72, -2, 1]].forEach(([nm, fl, y, x, rs]) => {
-        const u = Object.assign(buildEnemy({ name: nm, flag: fl, cx: x, cy: y, h: 0, nFiles: 14 }), { ai: true, hold: 26, reload: 4 + Math.random() * 5, supp: 0, state: '', off: 0, last: { x: SX, y }, noRetreat: true, reserve: !!rs, stay: !!rs, helped: false });
+        const u = Object.assign(buildEnemy({ name: nm, flag: fl, cx: x, cy: y, h: 0, nFiles: 14 }), { ai: true, hold: 26, reload: 12 + Math.random() * 10, supp: 0, state: '', off: 0, last: { x: SX, y }, noRetreat: true, reserve: !!rs, stay: !!rs, helped: false });
         u.n0 = u.men.length; ALLY.push(u);
       });
     },
@@ -7084,6 +7119,7 @@ function buildCampaign5() {
       if (screen !== 'game' || paused || tutOpen() || co.lost) return;
       if (TUT.step < 1) return;
       st.t += dt;
+      if (TUT.step < 4) return;                                                                                // primer, el tutorial de les esquadres; la batalla comença al pas 4
       const c = unitCentre();
       if (c.x > SX + 2) st.crossed = true;
       if (!st.res && (c.x > SX + 4 || Math.hypot(c.x - ZN.x, c.y - ZN.y) < 30)) {                              // la reserva contraataca quan entres a l'estacada
@@ -7097,6 +7133,12 @@ function buildCampaign5() {
         }
       };
       sendRes(ENEMY.filter(e => e.ai), 0.5, 'en'); sendRes(ALLY.filter(a => !a.script), 0.75, 'fr');
+      if (!ENEMY.some(q => q.reserve && !q.mergeTo && !q.routed && enAlive(q) > 0)) {                          // sense reserves: els regiments que arriben al 50% de baixes fugen
+        for (const e of ENEMY) if (e.ai && !e.reserve && !e.routed && e.state !== 'retreat' && e.n0 && enAlive(e) > 0 && enAlive(e) <= e.n0 * 0.5 && !ENEMY.some(q => q.mergeTo === e)) {
+          e.state = 'retreat'; e.awayH = 0; e.stay = false; reac('louis', '<b>Louis:</b> Han perdut la meitat dels homes: es retiren!', 4000);
+        }
+      }
+      for (const e of ENEMY) if (e.ai && !e.routed && e.state === 'retreat' && (e.cx > W - 1.5 || e.cx < 1.5 || e.cy < 1.5 || e.cy > H - 1.5)) { for (const m of e.men) m.alive = false; e.routed = true; }
       aiTickAll(dt);
       for (const a of ALLY) if (!a.script) { const n = enAlive(a); if (n > 0 && n <= 3) { a.lowT = (a.lowT || 0) + dt; if (a.lowT > 6) for (const v of a.men) if (v.alive) { v.alive = false; addCorpse(v.x, v.y, a.h, true, v.rank); } } else a.lowT = 0; }
       if (Math.hypot(c.x - ZN.x, c.y - ZN.y) <= ZN.r) { const was = st.cap; st.cap += dt; if (was < 1 && st.cap >= 1) reac('assenyala', '<b>Capità Le Jay:</b> Mantingueu la posició! Un minut!', 4500); if (st.cap >= CAP) st.done = true; } else st.cap = 0;
