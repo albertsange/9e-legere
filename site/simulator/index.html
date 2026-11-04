@@ -3091,18 +3091,20 @@ function squareSlots(n, c, h) {               // bola: els homes s'apinyen al vo
   for (let i = 0; i < n; i++) { const r = 0.52 * Math.sqrt(i + 0.3), a = i * 2.39996 + h; out.push({ x: c.x + Math.cos(a) * r, y: c.y + Math.sin(a) * r, h: i ? a : h }); }
   return out;
 }
+const SQ_RUN = 3.2;                            // m/s: el ralliement es fa corrent
 function formSquare() {
   const n = co.members.length, c = unitCentre(), h = co.members[0].h, slots = squareSlots(n, c, h);
   const ord = co.members.map(m => ({ m, a: wrapA(Math.atan2(m.y - c.y, m.x - c.x) - h) })).sort((p, q) => p.a - q.a); slots.sort((p, q) => wrapA(Math.atan2(p.y - c.y, p.x - c.x) - h) - wrapA(Math.atan2(q.y - c.y, q.x - c.x) - h));
   co.sqForming = true;
-  startAuto([{ list: ord.map((o, i) => ({ m: o.m, tasks: [{ path: [{ x: slots[i].x, y: slots[i].y }], i: 0 }, { rot: slots[i].h }] })) }], false, ORD_SPEED * 1.5, true);
-  co.auto.onEnd = () => { co.sq = { h0: h }; co.sqForming = false; lastKey = ''; reac('aprova', '<b>Louis:</b> Reagrupats! Baionetes enfora!', 2500); };
+  const rel = new Map(co.members.map(m => [m, { a: (m.x - c.x) * Math.cos(h) + (m.y - c.y) * Math.sin(h), l: -(m.x - c.x) * Math.sin(h) + (m.y - c.y) * Math.cos(h) }]));   // lloc de cadascú: hi tornarà en desfer la bola
+  startAuto([{ list: ord.map((o, i) => ({ m: o.m, tasks: [{ path: [{ x: slots[i].x, y: slots[i].y }], i: 0 }, { rot: slots[i].h }] })) }], false, SQ_RUN, true);
+  co.auto.onEnd = () => { co.sq = { h0: h, rel }; co.sqForming = false; lastKey = ''; reac('aprova', '<b>Louis:</b> Reagrupats! Baionetes enfora!', 2500); };
 }
 function breakSquare() {
-  const h = co.sq.h0, c = unitCentre(), fw = { x: Math.cos(h), y: Math.sin(h) }, lt = { x: -Math.sin(h), y: Math.cos(h) }, n = co.members.length, nf = Math.ceil(n / 2);
+  const h = co.sq.h0, rel = co.sq.rel, c = unitCentre(), fw = { x: Math.cos(h), y: Math.sin(h) }, lt = { x: -Math.sin(h), y: Math.cos(h) }, n = co.members.length, nf = Math.ceil(n / 2);
   co.sq = null;
   const ord = co.members.slice().sort((p, q) => (Math.atan2(p.y - c.y, p.x - c.x) - Math.atan2(q.y - c.y, q.x - c.x)));
-  startAuto([{ list: ord.map((m, i) => { const rk = i % 2, fl = Math.floor(i / 2), a = -rk * RANK_GAP + RANK_GAP / 2, l = (nf / 2 - 0.5 - fl) * FRONT; return { m, tasks: [{ path: [{ x: c.x + fw.x * a + lt.x * l, y: c.y + fw.y * a + lt.y * l }], i: 0 }, { rot: h }] }; }) }], true, ORD_SPEED * 1.5, false);
+  startAuto([{ list: ord.map((m, i) => { const rk = i % 2, fl = Math.floor(i / 2), a = -rk * RANK_GAP + RANK_GAP / 2, l = (nf / 2 - 0.5 - fl) * FRONT; const o = rel && rel.get(m), aa = o ? o.a : a, ll = o ? o.l : l; return { m, tasks: [{ path: [{ x: c.x + fw.x * aa + lt.x * ll, y: c.y + fw.y * aa + lt.y * ll }], i: 0 }, { rot: h }] }; }) }], true, SQ_RUN * 0.85, false);
 }
 function startAuto(phases, relabelEnd, speed, keepDrift) {
   co.state = 'auto';
@@ -4623,7 +4625,7 @@ let autoStepT = 0;
 const VOICE = { on: false, rec: null, running: false, tested: false, seg: {}, interim: '', state: '', failT: 0, lastFail: null,
   learn: { phr: {}, ex: {} }, shared: { phr: {}, ex: {} }, opt: { mode: 'cont', vol: true, log: false, tele: true, engine: '' }, log: [], recentExec: null, ptt: false, db: false, loading: false };
 // Connexió amb Supabase (la mateixa de la web: si el joc s'obre dins la web, agafa window.APP_CONFIG) i fonts del motor local Vosk
-const GAME_VERSION = '1.8.48';
+const GAME_VERSION = '1.8.49';
 const CFG = Object.assign({
   SUPABASE_URL: 'https://ltopullwhasagnkuqaek.supabase.co',
   SUPABASE_ANON_KEY: 'sb_publishable_DhHFUh-UrbBrI0l476Vcnw_tSn-Gmkr',
@@ -6657,15 +6659,15 @@ function buildCampaign3() {
                 else if (n <= u.n0 / 2) { u.cstate = 'rout'; u.ct = 0; reac('aprova', '<b>Louis:</b> Fugen! Els hem aturat amb les descàrregues!', 4500); }
               } else if (u.cstate === 'volley') {
                 u.vt += dt; const ang = Math.atan2(dy, dx); for (const m of alive) m.h = ang;
-                if (u.vt >= (u.nv ? 8 : 1.2)) {                                                            // apunten, disparen i recarreguen (~8 s)
-                  u.vt = 0; u.nv++;
+                if (u.vt >= (u.nv ? u.rl : 1.2)) {                                                         // apunten, disparen i recarreguen amb les normes d'IA (recàrrega nostra × 1,25–1,75)
+                  u.vt = 0; u.nv++; u.rl = TUNE.mosquet.carrega * (TUNE.ia.recMin + Math.random() * TUNE.ia.recVar);
                   for (const m of alive) { FX.push({ k: 'shot', x: m.x + Math.cos(ang) * 1.25, y: m.y + Math.sin(ang) * 1.25, a: ang, t: -Math.random() * 0.3 }); SFX.shot(Math.random() * 0.3); }
                   SFX.rumble(0.08, 1.5);
                   let k = 0; for (const m of alive) if (Math.random() < 0.14) { let near = null, nd = 1e9; for (const o of co.members) { const dd = Math.hypot(o.x - m.x, o.y - m.y); if (dd < nd) { nd = dd; near = o; } } if (near) { killOwn(near); k++; } }
                   reac(k ? 'decebut' : 'aprova', '<b>Louis:</b> ' + (k ? 'Ens disparen! Hem perdut <b>' + k + '</b> ' + (k === 1 ? 'home' : 'homes') + '.' : 'Ens han disparat, però han errat!'), 4500);
                 }
                 if (n <= u.n0 / 2) { u.cstate = 'rout'; u.ct = 0; reac('aprova', '<b>Louis:</b> Fugen! Els hem aturat amb les descàrregues!', 4500); }
-                else if (u.nv >= 3 && u.vt >= 6) { u.charged = true; u.cstate = 'run'; reac('alerta', '<b>Louis:</b> Ens carreguen a la baioneta!', 4000); }   // després de tres descàrregues carreguen a la baioneta
+                else if (u.nv >= 2 && u.vt >= 8) { u.charged = true; u.cstate = 'run'; reac('alerta', '<b>Louis:</b> Ens carreguen a la baioneta!', 4000); }   // després de dues descàrregues carreguen a la baioneta
                 else if (dist > 32) u.cstate = 'run';
               } else if (u.cstate === 'melee') {
                 u.mt += dt; u.tk += dt;
