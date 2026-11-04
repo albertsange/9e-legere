@@ -1819,7 +1819,7 @@ function updateStamina(dt) {
   }
 }
 function updateCo(dt) {
-  tickPending(dt);
+  if (!SWAPPED) tickPending(dt);                    // l'ordre pendent és del jugador: la guàrdia no la pot cancel·lar ni executar
   updateMusket(dt);
   updateStamina(dt);
   updateChaos();
@@ -3037,6 +3037,7 @@ function parFile(dir) {
   const rows = [];
   for (let f = 0; f < FILES; f++) {
     const members = co.members.filter(m => m.file === f);
+    if (!members.length) continue;                       // unitats més petites (nivell 4): sense fileres buides invisibles
     const row = { members, turning: false, k: 0, turnT: 0 };
     members.forEach(m => { m.row = row; });
     rows.push(row);
@@ -3304,6 +3305,7 @@ function contremarche() {
   const g = lineAxes(), h0 = g.h, wing = pivotMan(-1), ks = TUNE.desordre.cop * ORDER_BY_ID['CD-06'].des * driftK();
   const Ai = m => (m.x - m.dx) * g.rx + (m.y - m.dy) * g.ry, Bi = m => (m.x - m.dx) * g.fx + (m.y - m.dy) * g.fy;    // coordenades ideals (a = dreta, b = endavant)
   const aw = Ai(wing), bw = Bi(wing);
+  const nF = co.members.filter(m => !m.rank).length;      // homes per filera (10 a la unitat gran, 5 a mitja unitat)
   const files = { 0: [], 1: [] };
   for (const m of co.members) if (m !== wing) files[m.rank ? 1 : 0].push(m);
   const byA = (x, y) => Ai(x) - Ai(y);
@@ -3313,7 +3315,7 @@ function contremarche() {
     const all = co.members.filter(m => (m.rank ? 1 : 0) === rk).sort(byA);        // de l'esquerra a la dreta
     all.forEach((m, k) => {
       if (m === wing) return;
-      const j = 9 - (rk === 0 ? k : k);                                              // 0 = cap de la columna (extrem dret)
+      const j = (nF - 1) - k;                                              // 0 = cap de la columna (extrem dret)
       const bm = Bi(m), bRet = bw + CM_U + (rk ? RANK_GAP : 0), aStop = aw + FRONT * (1 + j);
       const aTm = aT + (rk ? 2 * RANK_GAP : 0), pts = [{ x: m.x, y: m.y }, w(aTm, bm), w(aTm, bRet), w(aStop, bRet)];
       let L = 0; const seg = [];
@@ -3322,7 +3324,7 @@ function contremarche() {
     });
   }
   const head = items.filter(i => i.rk === 0).reduce((a, b) => a.L < b.L ? a : b);
-  const aEnd = aw + FRONT * 10;
+  const aEnd = aw + FRONT * nF;
   co.conv = { kind: 'cm', px: wing.x, py: wing.y, R: 1, theta: 0, total: 1, cad: ORD_CADENCE, stepT: 0, pace: 'ordinari', t: 0, st: 0, items, wing, h0, T: head.L / ORD_SPEED,
               wpath: [{ x: wing.x, y: wing.y }, w(aw, bw - 0.7), w(aEnd, bw - 0.7), w(aEnd, bw)], wl: 0, ws: 0 };
   co.state = 'conv'; co.haltReq = false; co.stepT = 0; lastKey = '';
@@ -3459,6 +3461,7 @@ function parPelotonEnLigne() {
   const rows = [];
   for (let f = 0; f < FILES; f++) {
     const mem = co.members.filter(m => m.file === f).sort((a, b) => V(b) - V(a));   // el de la dreta primer
+    if (!mem.length) continue;
     rows.push({ mem, u: mem.reduce((s, m) => s + U(m), 0) / mem.length });
   }
   rows.sort((a, b) => b.u - a.u);
@@ -4632,7 +4635,7 @@ let autoStepT = 0;
 const VOICE = { on: false, rec: null, running: false, tested: false, seg: {}, interim: '', state: '', failT: 0, lastFail: null,
   learn: { phr: {}, ex: {} }, shared: { phr: {}, ex: {} }, opt: { mode: 'cont', vol: true, log: false, tele: true, engine: '' }, log: [], recentExec: null, ptt: false, db: false, loading: false };
 // Connexió amb Supabase (la mateixa de la web: si el joc s'obre dins la web, agafa window.APP_CONFIG) i fonts del motor local Vosk
-const GAME_VERSION = '1.8.53';
+const GAME_VERSION = '1.8.54';
 const CFG = Object.assign({
   SUPABASE_URL: 'https://ltopullwhasagnkuqaek.supabase.co',
   SUPABASE_ANON_KEY: 'sb_publishable_DhHFUh-UrbBrI0l476Vcnw_tSn-Gmkr',
