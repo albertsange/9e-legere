@@ -63,4 +63,4 @@ Snapshot: simulator version **1.8.61** (4 November 2026). This note lets a new C
 - Check a reported odd pivot point on conversions after splitting and regrouping the squads. It could not be reproduced; ask the owner for the exact conversion, whether Le Jay or the whole unit turned, and whether the unit was halted or marching.
 - Levels 3 and 4 of the campaign (`c1n3`, `c1n4`) have not had a full end-to-end check.
 - Update the levels document and the command reference artifact for the squad system and level 5.
-- Check that the 33 unit-test expectations in `test/run_tests.py` still hold after the recent changes.
+- Check that the tests in `test/run_tests.py` still pass after the recent changes.
