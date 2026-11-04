@@ -292,10 +292,14 @@
   #controls .act.danger{background:#b3261e !important;color:#fff !important;border-color:#b3261e !important;}
   #controls.menuOpen #rlPick{display:none !important;}
   #sqBox{position:absolute;bottom:calc(100% + 14px);left:14px;z-index:90;}
-  #sqBox button{position:relative;overflow:hidden;font-family:inherit;cursor:pointer;height:44px;padding:0 20px;border-radius:999px;border:1px solid var(--bleu);background:var(--sheet);color:var(--bleu);font-weight:700;font-size:14px;box-shadow:0 6px 18px rgba(0,0,0,.18);}
+  #sqPick{position:absolute;bottom:calc(100% + 10px);left:0;display:none;align-items:center;gap:6px;padding:6px 8px 6px 14px;background:var(--sheet);border:1px solid var(--line);border-radius:999px;box-shadow:0 6px 18px rgba(0,0,0,.18);white-space:nowrap;}
+  #sqPick.open{display:flex;} #sqPick .t{color:var(--bleu);font-size:13px;margin-right:2px;}
+  #sqPick button{font-family:inherit;cursor:pointer;height:34px;padding:0 14px;font-size:13px;font-weight:700;border-radius:999px;border:1px solid var(--line);background:var(--sheet);color:var(--bleu);box-shadow:none;}
+  #sqPick button.x{border:none;background:transparent;color:var(--muted);height:28px;padding:0 8px;font-size:18px;}
+  #sqBox button.main{position:relative;overflow:hidden;font-family:inherit;cursor:pointer;height:44px;padding:0 20px;border-radius:999px;border:1px solid var(--bleu);background:var(--sheet);color:var(--bleu);font-weight:700;font-size:14px;box-shadow:0 6px 18px rgba(0,0,0,.18);}
   #sqBox button:hover:not(:disabled){background:var(--bleu);color:#fff;}
   #sqBox button.split{border-color:#b3261e;color:#b3261e;} #sqBox button.split:hover{background:#b3261e;color:#fff;}
-  #sqBox button:disabled{cursor:default;opacity:1;}
+  #sqBox button.main:disabled{cursor:default;opacity:1;}
   #sqBox .l{position:relative;z-index:1;}
   #sqBox .pb{position:absolute;left:0;right:0;bottom:0;height:5px;background:rgba(31,58,120,.12);} #sqBox .pb i{display:block;height:100%;width:0;background:#2e7d32;transition:width .2s;}
   #skPick{position:absolute;bottom:calc(100% + 14px);right:370px;display:none;align-items:center;gap:10px;z-index:91;padding:8px 8px 8px 16px;background:var(--sheet);border:1px solid var(--line);border-radius:18px;box-shadow:0 6px 22px rgba(0,0,0,.22);}
@@ -1651,60 +1655,82 @@ let co, lastKey = '', level = null, screen = 'title', paused = false;
 let SWAPPED = false;                           // true mentre una segona unitat (la guàrdia del nivell 4) fa servir les mateixes ordres que el jugador
 function withCo(c, f) { const r = co, nb = bubbles.length; co = c; SWAPPED = true; try { return f(); } finally { co = r; SWAPPED = false; bubbles.length = Math.min(bubbles.length, nb); } }
 // ---- Esquadres separades (nivell 5): la Première escouade del capità Le Jay actua sola amb les MATEIXES ordres i moviments que el jugador ----
-let SQ = null;                                   // { G: unitat del Le Jay, mode: 'split' | 'regroup', d0, rem }
-const SQ_SAY = t => reac('assenyala', '<b>Capità Le Jay:</b> ' + t, 4500);
-function sqCan() {                               // es pot separar? (cal la unitat aturada, en línia i sense cap maniobra)
+let SQ = null;                                   // { G: unitat del Le Jay, mode: 'split' | 'regroup' | 'follow', join: reagrupa dins el desplegament, d0, rem, prog }
+const SQ_SAY = (t, ms) => reac('assenyala', '<b>Capità Le Jay:</b> ' + t, ms || 4500);
+const sqFiles = men => [...new Set(men.map(m => m.file))].sort((a, b) => a - b);
+function sqCan() {                               // es pot separar? (cal la unitat aturada, en línia o desplegada i sense cap maniobra)
   if (!(level && level.split)) return 'no disponible en aquest nivell';
   if (co.members.length < 8) return 'queden massa pocs homes';
   if (co.state !== 'parat' || busy() || pendingCmd) return 'cal estar aturat';
-  if (formationName() !== 'línia') return 'cal estar en línia';
   if (co.sk || co.sq) return 'cal estar en línia';
+  if (!co.open && formationName() !== 'línia') return 'cal estar en línia';
   return true;
 }
 function sqSplit() {
   const r = sqCan(); if (r !== true) { showMsg(i18nTr('No es pot separar: ') + i18nTr(r), 2500); return; }
-  const n0 = co.members.filter(m => !m.rank).length, nh = Math.ceil(n0 / 2);
-  const keep = co.members.filter(m => m.file < nh), go = co.members.filter(m => m.file >= nh);
-  if (!go.length) return;
-  co.members = keep; relabel();
-  const G = makeCo(0, 0); G.members = go; G.atencio = co.atencio; G.arm = co.arm === 'charge' ? 'portez' : co.arm; G.loaded = co.loaded; G.cansament = co.cansament; G.aiT = 1.2; G.jT = 0;
+  const open = co.open, files = sqFiles(co.members), nh = Math.ceil(files.length / 2), keepF = new Set(files.slice(0, nh));
+  const keep = co.members.filter(m => keepF.has(m.file)), go = co.members.filter(m => !keepF.has(m.file));
+  if (!go.length || !keep.length) return;
+  co.members = keep; if (!open) relabel();                                   // desplegats: cada home conserva la seva filera (no es renumera)
+  const G = makeCo(0, 0); G.members = go; G.atencio = co.atencio; G.arm = co.arm === 'charge' ? 'portez' : co.arm; G.loaded = co.loaded; G.cansament = co.cansament; G.aiT = 1.2; G.jT = 0; G.open = open || null; G.needRel = !!open;
   for (const m of G.members) m.row = null;
-  withCo(G, () => relabel());
+  if (!open) withCo(G, () => relabel());
   SQ = { G, mode: 'split' };
   SQ_SAY('D\'acord, m\'emporto la meitat dels homes, bona sort!');
   sqButton();
 }
-function sqSlots() {                             // llocs de la Première escouade a l'esquerra de la nostra línia
-  const g = lineAxes(), Ai = m => m.x * g.rx + m.y * g.ry;
-  const r0 = co.members.filter(m => !m.rank), L = r0.length ? r0.reduce((a, b) => Ai(a) < Ai(b) ? a : b) : co.members[0];
-  const bx = L.x + g.fx * (L.rank ? RANK_GAP : 0), by = L.y + g.fy * (L.rank ? RANK_GAP : 0);
-  return m => ({ x: bx - g.rx * FRONT * (m.file + 1) - g.fx * RANK_GAP * (m.rank ? 1 : 0), y: by - g.ry * FRONT * (m.file + 1) - g.fy * RANK_GAP * (m.rank ? 1 : 0) });
+function sqSlots(spacing, extra) {               // llocs de la Première escouade a l'esquerra de la nostra línia (amb el pas entre files de la nostra formació)
+  const g = lineAxes(), Ai = m => m.x * g.rx + m.y * g.ry, r0 = co.members.filter(m => !m.rank), pool = r0.length ? r0 : co.members;
+  const L = pool.reduce((a, b) => Ai(a) < Ai(b) ? a : b), gf = sqFiles(SQ.G.members);
+  return m => { const lat = spacing * (gf.indexOf(m.file) + 1) + (extra || 0), dp = RANK_GAP * (m.rank ? 1 : 0); return { x: L.x - g.rx * lat - g.fx * dp, y: L.y - g.ry * lat - g.fy * dp }; };
+}
+function sqGo(kind) {                            // kind: 'merge' | 'join' (dins del nostre desplegament) | 'follow' (al nostre costat, formats)
+  const G = SQ.G; G.state = 'parat'; G.conv = null; G.auto = null; G.pf = null; G.flank = null; G.fix = null; G.sk = null; G.haltReq = false; G.hdT = 0;
+  if (G.arm !== 'croise') G.arm = 'portez';
+  SQ.mode = kind === 'follow' ? 'follow' : 'regroup'; SQ.join = kind === 'join'; SQ.d0 = null; SQ.rem = 0; SQ.prog = 0;
+  document.getElementById('sqPick').classList.remove('open');
+  sqButton();
 }
 function sqRegroup() {
-  if (!SQ || SQ.mode !== 'split') return;
-  const G = SQ.G; G.state = 'parat'; G.conv = null; G.auto = null; G.pf = null; G.flank = null; G.fix = null; G.sk = null; G.haltReq = false;
-  if (G.arm !== 'croise') G.arm = 'portez';
-  withCo(G, () => relabel());
-  SQ.mode = 'regroup'; SQ.d0 = null; SQ.rem = 0;
+  if (!SQ || SQ.mode === 'regroup') return;
+  if (co.open) {                                 // nosaltres desplegats: el capità pregunta com vol que es reagrupin
+    SQ_SAY('Veig que esteu desplegats en tiradors: voleu que ens unim a la formació o que ens quedem formats com una sola esquadra al vostre costat?', 14000);
+    const pk = document.getElementById('sqPick'); pk.querySelector('.t').textContent = i18nTr('Com ens reagrupem?'); pk.querySelector('[data-k=join]').textContent = i18nTr('Unir-nos al desplegament'); pk.querySelector('[data-k=follow]').textContent = i18nTr('Seguir-vos al costat'); pk.classList.add('open');
+    return;
+  }
   SQ_SAY('Entesos! La Première escouade torna amb vosaltres.');
-  sqButton();
+  sqGo('merge');
+}
+function sqPickChoice(k) {
+  if (!SQ) return;
+  if (k === 'x') { document.getElementById('sqPick').classList.remove('open'); return; }
+  SQ_SAY(k === 'join' ? 'Entesos! Ens unim al desplegament.' : 'Entesos! Anem al vostre costat, formats.');
+  sqGo(k);
 }
 function sqTick(dt) {
   if (!SQ) return;
   const G = SQ.G;
   if (!G.members.length) { SQ = null; sqButton(); return; }
-  if (SQ.mode === 'regroup') {                   // tornen caminant a pas ordinari cap als seus llocs, a l'esquerra de la nostra línia
-    const slot = sqSlots(), sp = ORD_SPEED * dt; let dmax = 0;
+  if (SQ.mode === 'regroup' || SQ.mode === 'follow') {         // caminen (a velocitat normal) cap als seus llocs, a l'esquerra de la nostra formació
+    const useOpen = SQ.join && co.open, slot = sqSlots(useOpen ? co.open : FRONT, SQ.mode === 'follow' ? 2.5 : 0);
+    const sp = (SQ.mode === 'follow' && co.state === 'marxa' ? Math.max(ORD_SPEED, curSpeed() * 1.08) : ORD_SPEED) * dt; let dmax = 0;
     for (const m of G.members) {
       const t = slot(m), dx = t.x - m.x, dy = t.y - m.y, d = Math.hypot(dx, dy); dmax = Math.max(dmax, d);
-      if (d > 0.02) { const k = Math.min(1, sp / d); m.x += dx * k; m.y += dy * k; if (d > 0.3) m.h = Math.atan2(dy, dx); }
-      if (d < 0.3) m.h = co.members[0].h;
+      if (d > 0.02) { const k = Math.min(1, sp / d); m.x += dx * k; m.y += dy * k; }
+      m.h = d > 0.3 ? Math.atan2(dy, dx) : co.members[0].h;
     }
+    if (SQ.mode === 'follow') { sqButton(); return; }
     if (SQ.d0 == null) SQ.d0 = Math.max(dmax, 0.5);
     SQ.rem = dmax / ORD_SPEED; SQ.prog = Math.max(0, Math.min(1, 1 - dmax / SQ.d0));
     if (dmax < 0.06) {                           // han arribat: tornen a formar part de la unitat
-      for (const m of G.members) { m.h = co.members[0].h; m.row = null; m.hd = 0; m.ht = 0; co.members.push(m); }
-      SQ = null; relabel(); SQ_SAY('Première escouade, al seu lloc!'); sqButton(); return;
+      const maxF = Math.max(...co.members.map(f => f.file)), gf = sqFiles(G.members);
+      for (const m of G.members) {
+        const t = slot(m); m.x = t.x; m.y = t.y; m.h = co.members[0].h; m.row = null; m.hd = 0; m.ht = 0; m.dx = 0; m.dy = 0; m.gd = null;
+        if (useOpen) m.file = maxF + 1 + gf.indexOf(m.file);
+        co.members.push(m);
+      }
+      SQ = null; if (!useOpen) { co.open = null; relabel(); } co.lineH = co.members[0].h; lastKey = '';
+      SQ_SAY('Première escouade, al seu lloc!'); sqButton(); return;
     }
     sqButton(); return;
   }
@@ -1712,14 +1738,16 @@ function sqTick(dt) {
   G.aiT -= dt; if (G.aiT > 0) return; G.aiT = 0.25;
   withCo(G, () => sqBrain(G));
 }
-function sqBrain(G) {                            // què faria un capità: girar-se cap a l'enemic, apropar-s'hi, carregar, apuntar i disparar
+function sqBrain(G) {                            // què faria un capità: tancar files si calia, girar-se cap a l'enemic, apropar-s'hi, carregar, apuntar i disparar
   const O = id => ORDER_BY_ID[id], go = (o, a) => { if (o.avail(a) === true) { o.run(a); return true; } return false; };
   const c = unitCentre(), h = co.members[0].h;
+  if (co.state === 'auto' || co.arm === 'charge' || co.sk) return;
+  if (co.open && co.state === 'parat' && !busy()) { go(O('SK-04'), 1); return; }                         // desplegats: primer Serrez les files
+  if (!co.open && G.needRel) { relabel(); G.needRel = false; }
   let best = null, bd = 1e9;
   for (const e of ENEMY) { if (e.routed || e.state === 'retreat') continue; const l = e.men.filter(v => v.alive); if (!l.length) continue;
     const ex = l.reduce((t, v) => t + v.x, 0) / l.length, ey = l.reduce((t, v) => t + v.y, 0) / l.length, d = Math.hypot(ex - c.x, ey - c.y) - (e.gun ? 6 : 0);
     if (d < bd) { bd = d; best = { x: ex, y: ey, d: Math.hypot(ex - c.x, ey - c.y) }; } }
-  if (co.state === 'auto' || co.arm === 'charge' || co.sk) return;
   if (!best) { if (co.state === 'marxa') HALTE.run(); return; }
   const ang = wrapA(Math.atan2(best.y - c.y, best.x - c.x) - h), RNG = TUNE.mosquet.abast * 0.72;
   if (co.state === 'conv') { if (co.conv.kind !== 'cm' && co.conv.kind !== 'turn' && Math.abs(ang) < 0.07) HALTE.run(); return; }
@@ -1740,19 +1768,20 @@ function sqButton() {
   const b = document.getElementById('sqBox'); if (!b) return;
   const on = !!(level && level.split);
   b.style.display = on ? '' : 'none'; if (!on) return;
-  const bt = b.querySelector('button'), lb = bt.querySelector('.l'), pb = bt.querySelector('.pb i');
+  const bt = b.querySelector('button.main'), lb = bt.querySelector('.l'), pb = bt.querySelector('.pb i');
   const mode = SQ ? SQ.mode : 'joined';
-  const txt = mode === 'split' ? i18nTr('Reagrupar les esquadres') : mode === 'regroup' ? i18nTr('Reagrupant les esquadres…') + ' ' + Math.ceil(SQ.rem || 0) + ' s' : i18nTr('Separar en dues esquadres');
+  const txt = mode === 'split' || mode === 'follow' ? i18nTr('Reagrupar les esquadres') : mode === 'regroup' ? i18nTr('Reagrupant les esquadres…') + ' ' + Math.ceil(SQ.rem || 0) + ' s' : i18nTr('Separar en dues esquadres');
   if (lb.textContent !== txt) lb.textContent = txt;
-  bt.classList.toggle('busy', mode === 'regroup'); bt.classList.toggle('split', mode === 'split');
+  bt.classList.toggle('busy', mode === 'regroup'); bt.classList.toggle('split', mode === 'split' || mode === 'follow');
   pb.style.width = mode === 'regroup' ? Math.round((SQ.prog || 0) * 100) + '%' : '0%';
   bt.disabled = mode === 'regroup';
+  if (mode === 'joined' || mode === 'regroup') document.getElementById('sqPick').classList.remove('open');
 }
-function sqClick() { if (tutLocked()) return; if (!SQ) sqSplit(); else if (SQ.mode === 'split') sqRegroup(); }
+function sqClick() { if (tutLocked()) return; if (!SQ) sqSplit(); else if (SQ.mode === 'split' || SQ.mode === 'follow') sqRegroup(); }
 // ---------- Puntuació i rànquing ----------
 // Cada nivell dóna fins a 1000 punts: 4 parts de 250 (temps, baixes, ordres donades i ordre mitjà del regiment). Es guarda la millor de cada nivell.
 const STAT = { t: 0, ord: 0, dead: 0, oSum: 0, men0: 20, kInf: 0, kCav: 0, kGun: 0 };
-const SCORE_REF = { 1: { t: 90, o: 12 }, 2: { t: 100, o: 14 }, 3: { t: 110, o: 16 }, 4: { t: 140, o: 20 }, 5: { t: 200, o: 25 }, 6: { t: 120, o: 14 }, 7: { t: 150, o: 20 }, 8: { t: 170, o: 30 }, 9: { t: 150, o: 10 }, 10: { t: 300, o: 35 }, c1n1: { t: 360, o: 32, k: 15 }, c1n2: { t: 300, o: 30, k: 40 }, c1n3: { t: 570, o: 30, k: 14 }, c1n4: { t: 420, o: 30, k: 30 }, c1n5: { t: 600, o: 30, k: 120 } };   // temps (s) i ordres de referència: 250 punts; amb el triple, 0
+const SCORE_REF = { 1: { t: 90, o: 12 }, 2: { t: 100, o: 14 }, 3: { t: 110, o: 16 }, 4: { t: 140, o: 20 }, 5: { t: 200, o: 25 }, 6: { t: 120, o: 14 }, 7: { t: 150, o: 20 }, 8: { t: 170, o: 30 }, 9: { t: 150, o: 10 }, 10: { t: 300, o: 35 }, c1n1: { t: 360, o: 32, k: 15 }, c1n2: { t: 300, o: 30, k: 40 }, c1n3: { t: 570, o: 30, k: 14 }, c1n4: { t: 420, o: 30, k: 30 }, c1n5: { t: 600, o: 30, k: 160 } };   // temps (s) i ordres de referència: 250 punts; amb el triple, 0
 function statReset() { STAT.kInf = 0; STAT.kCav = 0; STAT.kGun = 0; STAT.t = 0; STAT.ord = 0; STAT.dead = 0; STAT.oSum = 0; STAT.men0 = co ? co.members.length : 20; }
 const killPts = () => STAT.kInf + 2 * STAT.kCav + 10 * STAT.kGun;      // campanya: infanteria 1, cavalleria 2, canó destrossat 10 (5 de la dotació + 5 del canó)
 function scoreCalc(n) {
@@ -2792,7 +2821,23 @@ function aiClose(u, live, dt) {                  // «Serrez les files»: quan c
   u.men.forEach((v, i) => { if (!v.alive) return; const dx = tg[i].x - v.x, dy = tg[i].y - v.y, d = Math.hypot(dx, dy), s = 2.2 * dt; if (d > 0.05) { moving = true; const f = Math.min(1, s / d); v.x += dx * f; v.y += dy * f; } });
   if (!moving) u.closing = false;
 }
+function aiMergeStep(u, dt) {                  // reserva que va cap al regiment que ha caigut i s'hi ajunta (un sol regiment)
+  const t = u.mergeTo, live = u.men.filter(v => v.alive);
+  if (!live.length) { u.mergeTo = null; return; }
+  if (!t || t.routed || enAlive(t) === 0) { u.mergeTo = null; u.stay = false; return; }              // el regiment ja no existeix: la reserva lluita pel seu compte
+  const dx = t.cx - u.cx, dy = t.cy - u.cy, d = Math.hypot(dx, dy), diff = wrapA(Math.atan2(dy, dx) - u.h);
+  if (d > 3.5) {
+    if (Math.abs(diff) > 0.02) aiRot(u, Math.max(-TUNE.ia.retirada.gir * dt, Math.min(TUNE.ia.retirada.gir * dt, diff)));
+    if (Math.abs(diff) < 0.5) { const sp = STEP * PACES.carrega.cad / 60 * dt; aiMove(u, Math.cos(u.h) * sp, Math.sin(u.h) * sp); }      // la reserva hi va al pas de charge
+    return;
+  }
+  const n1 = enAlive(t);
+  for (const v of live) { t.men.push(v); }
+  u.men = []; u.routed = true; u.mergeTo = null;
+  t.nf0 = Math.max(t.nf0 || t.nf || 10, Math.ceil((n1 + live.length) / 2)); t.n0 = (t.n0 || n1) + live.length; t.nAl = -1; t.closing = true; t.ph = 'move'; t.supp = 0;
+}
 function aiUnitTick(u, side, dt) {
+  if (u.mergeTo) { aiMergeStep(u, dt); return; }
   const T = TUNE.mosquet, A = TUNE.ia, GAP = A.pausa, live = u.men.filter(v => v.alive); if (!live.length) return;
   u.supp = Math.max(0, (u.supp || 0) - T.supDecau * dt);
   if (u.reload > 0) u.reload -= dt;
@@ -4314,8 +4359,9 @@ function buildOrderPanel() {
   }
   if (!document.getElementById('sqBox')) {                   // separar / reagrupar les esquadres (nivell 5): fora de la barra, a l'esquerra (oposat a la barra de foc)
     const qb = document.createElement('div'); qb.id = 'sqBox'; qb.style.display = 'none';
-    qb.innerHTML = '<button type="button"><span class="l"></span><span class="pb"><i></i></span></button>';
-    qb.querySelector('button').onclick = () => sqClick();
+    qb.innerHTML = '<div id="sqPick"><span class="t"></span><button type="button" data-k="join"></button><button type="button" data-k="follow"></button><button type="button" data-k="x" class="x">×</button></div><button type="button" class="main"><span class="l"></span><span class="pb"><i></i></span></button>';
+    qb.querySelector('button.main').onclick = () => sqClick();
+    qb.querySelectorAll('#sqPick button').forEach(b => { b.onclick = () => sqPickChoice(b.dataset.k); });
     document.getElementById('controls').appendChild(qb);
   }
   if (!document.getElementById('skBox')) {                   // foc en avançant / reculant: botó que fa saltar els rengles
@@ -4783,7 +4829,7 @@ let autoStepT = 0;
 const VOICE = { on: false, rec: null, running: false, tested: false, seg: {}, interim: '', state: '', failT: 0, lastFail: null,
   learn: { phr: {}, ex: {} }, shared: { phr: {}, ex: {} }, opt: { mode: 'cont', vol: true, log: false, tele: true, engine: '' }, log: [], recentExec: null, ptt: false, db: false, loading: false };
 // Connexió amb Supabase (la mateixa de la web: si el joc s'obre dins la web, agafa window.APP_CONFIG) i fonts del motor local Vosk
-const GAME_VERSION = '1.8.56';
+const GAME_VERSION = '1.8.57';
 const CFG = Object.assign({
   SUPABASE_URL: 'https://ltopullwhasagnkuqaek.supabase.co',
   SUPABASE_ANON_KEY: 'sb_publishable_DhHFUh-UrbBrI0l476Vcnw_tSn-Gmkr',
@@ -6992,7 +7038,7 @@ function buildCampaign5() {
   const mudK = () => { const c = unitCentre(); return Math.abs(c.x - SX) < 1.4 && !inGap(c.y) ? 0.08 : 1; };            // fora de les obertures, les estaques frenen la unitat
   const st = { t: 0, crossed: false, cap: 0, done: false, res: false, allyN: 0 };
   const REDF = { cf: '#c8352b', cs: '#6e1410' }, HESF = { cf: '#1b2a5c', cs: '#e8871e' };
-  const U = (name, flag, x, y, nf, extra) => Object.assign({ name, flag, cx: x, cy: y, h: Math.PI, nFiles: nf, shoots: true, ai: true, stay: true, hold: 30, off: 0 }, flag[0] === 'h' ? HESF : REDF, extra || {});
+  const U = (name, flag, x, y, nf, extra) => Object.assign({ name, flag, cx: x, cy: y, h: Math.PI, nFiles: nf, shoots: true, ai: true, stay: true, noRetreat: true, hold: 30, off: 0 }, flag[0] === 'h' ? HESF : REDF, extra || {});
   const resAlive = () => ENEMY.filter(e => e.reserve && enAlive(e) > 0).length;
   const steps = [
     { title: 'La Càrrega a Hondschoote', pose: 'serios', hl: [], unlock: ['gir', 'mov', 'pace', 'parfile', 'bataille', 'align', 'obl', 'conv', 'tournez', 'ligne', 'form', 'repos', 'musket', 'skirm', 'carre'], tag: 'Hondschoote · 6 de setembre de 1793 · tarda', intro: true, btn: 'Endavant',
@@ -7008,10 +7054,10 @@ function buildCampaign5() {
     w: W, h: H, pad: 36, files: 20, split: true, freeStab: true, localStab: true, start: { x: 14, y: 55 }, obstacles: [], scene: MapKit.scene(sc), zone: null, musket: true, skirm: true, driftScale: 0.5, goalHeading: 0, minMen: 12, cover, mudK,
     guns: [30].map((y, i) => ({ x: SX + 5, y, h: Math.PI, name: 'Canó anglès ' + (i + 1), crew: 5, adv: true, half: true, range: 95, vis: 62, cone: 1.0, can: 25, rt: 14, rot: 0.3 })),
     enemies: [
-      U('33rd Regiment of Foot', 'b33', SX + 5, 30, 16), U('14th Regiment of Foot', 'b14', SX + 5, 55, 16), U('Regiment hessià Prinz Karl', 'hpk', SX + 5, 80, 16),
-      U('Granaders britànics', 'b14', SX - 42, 12, 12, { h: Math.PI / 2 + 0.6 }), U('Regiment hessià Landgraf', 'hlg', SX - 42, 98, 12, { h: -Math.PI / 2 - 0.6 }),
-      U('Avançada britànica (14th)', 'b14', SX - 30, 40, 14, { stay: false, hold: 26 }), U('Avançada hessiana (Landgraf)', 'hlg', SX - 30, 70, 14, { stay: false, hold: 26 }),
-      U('Reserva britànica (33rd)', 'b33', ZN.x + 22, 42, 14, { reserve: true }), U('Reserva hessiana (Prinz Karl)', 'hpk', ZN.x + 22, 68, 14, { reserve: true })
+      U('33rd Regiment of Foot', 'b33', SX + 5, 30, 20), U('14th Regiment of Foot', 'b14', SX + 5, 55, 20), U('Regiment hessià Prinz Karl', 'hpk', SX + 5, 80, 20),
+      U('Granaders britànics', 'b14', SX - 42, 12, 16, { h: Math.PI / 2 + 0.6 }), U('Regiment hessià Landgraf', 'hlg', SX - 42, 98, 16, { h: -Math.PI / 2 - 0.6 }),
+      U('Avançada britànica (14th)', 'b14', SX - 30, 40, 18, { stay: false, hold: 26 }), U('Avançada hessiana (Landgraf)', 'hlg', SX - 30, 70, 18, { stay: false, hold: 26 }),
+      U('Reserva britànica (33rd)', 'b33', ZN.x + 22, 42, 16, { reserve: true }), U('Reserva hessiana (Prinz Karl)', 'hpk', ZN.x + 22, 68, 16, { reserve: true })
     ],
     tutorial: { steps, figs: [], startAtencio: true, resetStep: () => 1 },
     over(ctx, M, mini) {
@@ -7028,10 +7074,10 @@ function buildCampaign5() {
     },
     onReset() {
       st.t = 0; st.crossed = false; st.cap = 0; st.done = false; st.res = false;
-      for (const e of ENEMY.filter(e => e.ai)) { e.reload = 6 + Math.random() * 6; e.supp = 0; e.state = ''; e.n0 = e.men.length; e.last = null; }
-      [['22e demi-brigade de ligne', 'f22', 22], ['28e demi-brigade de ligne', 'f28', 55], ['40e demi-brigade de ligne', 'f40', 88]].forEach(([nm, fl, y], i) => {
-        const u = Object.assign(buildEnemy({ name: nm, flag: fl, cx: i === 1 ? 4 : 12, cy: y, h: 0, nFiles: 10 }), { ai: true, hold: 26, reload: 4 + Math.random() * 5, supp: 0, state: '', off: 0, last: { x: SX, y }, n0: 20, noRetreat: true });
-        ALLY.push(u);
+      for (const e of ENEMY.filter(e => e.ai)) { e.reload = 6 + Math.random() * 6; e.supp = 0; e.state = ''; e.n0 = e.men.length; e.last = null; e.helped = false; }
+      [['22e demi-brigade de ligne', 'f22', 22, 12, 0], ['28e demi-brigade de ligne', 'f28', 55, 4, 0], ['40e demi-brigade de ligne', 'f40', 88, 12, 0], ['Reserva francesa (22e)', 'f22', 38, -2, 1], ['Reserva francesa (40e)', 'f40', 72, -2, 1]].forEach(([nm, fl, y, x, rs]) => {
+        const u = Object.assign(buildEnemy({ name: nm, flag: fl, cx: x, cy: y, h: 0, nFiles: 14 }), { ai: true, hold: 26, reload: 4 + Math.random() * 5, supp: 0, state: '', off: 0, last: { x: SX, y }, noRetreat: true, reserve: !!rs, stay: !!rs, helped: false });
+        u.n0 = u.men.length; ALLY.push(u);
       });
     },
     tick(dt) {
@@ -7041,9 +7087,16 @@ function buildCampaign5() {
       const c = unitCentre();
       if (c.x > SX + 2) st.crossed = true;
       if (!st.res && (c.x > SX + 4 || Math.hypot(c.x - ZN.x, c.y - ZN.y) < 30)) {                              // la reserva contraataca quan entres a l'estacada
-        st.res = true; for (const e of ENEMY) if (e.reserve) { e.stay = false; e.onlyPlayer = true; e.hold = 16; e.ph = 'move'; }
+        st.res = true; for (const e of ENEMY) if (e.reserve && !e.mergeTo && !e.routed) { e.stay = false; e.onlyPlayer = true; e.hold = 16; e.ph = 'move'; }
         reac('alerta', '<b>Louis:</b> La reserva surt! Ens contraataquen!', 5000);
       }
+      const sendRes = (list, lossMin, who) => {                                                          // un regiment que perd molts homes rep una reserva que hi va i s'hi ajunta
+        for (const u of list) if (!u.reserve && !u.helped && u.n0 && enAlive(u) > 0 && enAlive(u) <= u.n0 * (1 - lossMin)) {
+          const r = list.find(q => q.reserve && !q.mergeTo && !q.routed && enAlive(q) > 0); if (!r) break;
+          u.helped = true; r.mergeTo = u; r.stay = false; if (who === 'fr') reac('assenyala', '<b>Capità Le Jay:</b> Un regiment nostre trontolla! Una reserva hi va a reforçar-lo!', 4500);
+        }
+      };
+      sendRes(ENEMY.filter(e => e.ai), 0.5, 'en'); sendRes(ALLY.filter(a => !a.script), 0.75, 'fr');
       aiTickAll(dt);
       for (const a of ALLY) if (!a.script) { const n = enAlive(a); if (n > 0 && n <= 3) { a.lowT = (a.lowT || 0) + dt; if (a.lowT > 6) for (const v of a.men) if (v.alive) { v.alive = false; addCorpse(v.x, v.y, a.h, true, v.rank); } } else a.lowT = 0; }
       if (Math.hypot(c.x - ZN.x, c.y - ZN.y) <= ZN.r) { const was = st.cap; st.cap += dt; if (was < 1 && st.cap >= 1) reac('assenyala', '<b>Capità Le Jay:</b> Mantingueu la posició! Un minut!', 4500); if (st.cap >= CAP) st.done = true; } else st.cap = 0;
