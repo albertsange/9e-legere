@@ -1339,6 +1339,7 @@
  "Prem el botó <b>Veu</b> (el micròfon sota el mapa) i accepta el permís del micròfon. La primera vegada es fa una petita prova.": "Press the <b>Voice</b> button (the microphone below the map) and accept the microphone permission. The first time, a short test is run.",
  "Prem el botó <b>Veu</b> (el micròfon sota el mapa) i accepta el permís del micròfon. La primera vegada es fa una petita prova.<br><button type=\"button\" class=\"btn-sec\" style=\"margin-top:6px;padding:4px 10px\" onclick=\"L9noMic()\">No puc fer servir el micròfon</button>": "Press the <b>Voice</b> button (the microphone below the map) and accept the microphone permission. The first time, a short test is run.<br><button type=\"button\" class=\"btn-sec\" style=\"margin-top:6px;padding:4px 10px\" onclick=\"L9noMic()\">I cannot use the microphone</button>",
  "Prem «Escoltar» i digues-ho com ho diries jugant.": "Press «Listen» and say it the way you would while playing.",
+ "Première escouade": "Première escouade",
  "Preparant el model… (uns segons)": "Preparing the model… (a few seconds)",
  "Preparant el reconeixement de veu": "Preparing speech recognition",
  "Pressió del foc": "Fire pressure",
