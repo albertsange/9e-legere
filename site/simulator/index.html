@@ -4855,7 +4855,7 @@ let autoStepT = 0;
 const VOICE = { on: false, rec: null, running: false, tested: false, seg: {}, interim: '', state: '', failT: 0, lastFail: null,
   learn: { phr: {}, ex: {} }, shared: { phr: {}, ex: {} }, opt: { mode: 'cont', vol: true, log: false, tele: true, engine: '' }, log: [], recentExec: null, ptt: false, db: false, loading: false };
 // Connexió amb Supabase (la mateixa de la web: si el joc s'obre dins la web, agafa window.APP_CONFIG) i fonts del motor local Vosk
-const GAME_VERSION = '1.8.61';
+const GAME_VERSION = '1.8.62';
 const CFG = Object.assign({
   SUPABASE_URL: 'https://ltopullwhasagnkuqaek.supabase.co',
   SUPABASE_ANON_KEY: 'sb_publishable_DhHFUh-UrbBrI0l476Vcnw_tSn-Gmkr',
@@ -7090,11 +7090,9 @@ function buildCampaign5() {
   return {
     w: W, h: H, pad: 36, files: 20, split: true, aiPace: 'ordinari', sqIdle: () => TUT.step < 4, freeStab: true, localStab: true, start: { x: 14, y: 55 }, obstacles: [], scene: MapKit.scene(sc), zone: null, musket: true, skirm: true, driftScale: 0.5, goalHeading: 0, minMen: 12, cover, mudK,
     guns: [30].map((y, i) => ({ x: SX + 5, y, h: Math.PI, name: 'Canó anglès ' + (i + 1), crew: 5, adv: true, half: true, range: 95, vis: 62, cone: 1.0, can: 25, rt: 14, rot: 0.3 })),
-    enemies: [
+    enemies: [                                                                                             // 7 regiments: 3 de línia, 1 guarnició dins de l'estacada i 3 reserves (els francesos en tenen 6)
       U('33rd Regiment of Foot', 'b33', SX + 5, 30, 20), U('14th Regiment of Foot', 'b14', SX + 5, 55, 20), U('Regiment hessià Prinz Karl', 'hpk', SX + 5, 80, 20),
-      U('Granaders britànics', 'b14', SX - 42, 12, 16, { h: Math.PI / 2 + 0.6 }), U('Regiment hessià Landgraf', 'hlg', SX - 42, 98, 16, { h: -Math.PI / 2 - 0.6 }),
-      U('Avançada britànica (14th)', 'b14', SX - 30, 40, 18, { stay: false, hold: 26 }), U('Avançada hessiana (Landgraf)', 'hlg', SX - 30, 70, 18, { stay: false, hold: 26 }),
-      U('Guarnició britànica (33rd)', 'b33', ZN.x + 22, 42, 16, { garrison: true }), U('Guarnició hessiana (Prinz Karl)', 'hpk', ZN.x + 22, 68, 16, { garrison: true }),
+      U('Guarnició britànica (33rd)', 'b33', ZN.x + 22, 42, 16, { garrison: true }),
       U('Reserva britànica (33rd)', 'b33', SX + 18, 20, 10, { rsv: true }), U('Reserva britànica (14th)', 'b14', SX + 18, 55, 10, { rsv: true }), U('Reserva hessiana (Prinz Karl)', 'hpk', SX + 18, 90, 10, { rsv: true })
     ],
     tutorial: { steps, figs: [], startAtencio: true, resetStep: () => 1 },
