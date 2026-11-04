@@ -4623,7 +4623,7 @@ let autoStepT = 0;
 const VOICE = { on: false, rec: null, running: false, tested: false, seg: {}, interim: '', state: '', failT: 0, lastFail: null,
   learn: { phr: {}, ex: {} }, shared: { phr: {}, ex: {} }, opt: { mode: 'cont', vol: true, log: false, tele: true, engine: '' }, log: [], recentExec: null, ptt: false, db: false, loading: false };
 // Connexió amb Supabase (la mateixa de la web: si el joc s'obre dins la web, agafa window.APP_CONFIG) i fonts del motor local Vosk
-const GAME_VERSION = '1.8.47';
+const GAME_VERSION = '1.8.48';
 const CFG = Object.assign({
   SUPABASE_URL: 'https://ltopullwhasagnkuqaek.supabase.co',
   SUPABASE_ANON_KEY: 'sb_publishable_DhHFUh-UrbBrI0l476Vcnw_tSn-Gmkr',
@@ -6652,19 +6652,21 @@ function buildCampaign3() {
                 const ang = Math.atan2(dy, dx); const vI = STEP * PACES.carrega.cad / 60; moveCav(u, Math.cos(ang) * vI, Math.sin(ang) * vI, dt); for (const m of alive) m.h = ang;
                 let touch = false; for (const m of alive) for (const o of co.members) if (Math.hypot(o.x - m.x, o.y - m.y) < 1.6) { touch = true; break; }
                 let dmin = 1e9; for (const m of alive) for (const o of co.members) dmin = Math.min(dmin, Math.hypot(o.x - m.x, o.y - m.y));
-                if (dmin < 2.4 && !touch) { u.cstate = 'volley'; u.vt = 0; u.fired = false; }                  // es planten a un parell de metres i disparen a boca de canó
+                if (dmin < 22 && !touch && !u.charged) { u.cstate = 'volley'; u.vt = 0; u.nv = 0; }                // s'aturen a uns 22 m i disparen
                 else if (touch) { u.cstate = 'melee'; u.mt = 0; u.tk = 0; }
                 else if (n <= u.n0 / 2) { u.cstate = 'rout'; u.ct = 0; reac('aprova', '<b>Louis:</b> Fugen! Els hem aturat amb les descàrregues!', 4500); }
               } else if (u.cstate === 'volley') {
                 u.vt += dt; const ang = Math.atan2(dy, dx); for (const m of alive) m.h = ang;
-                if (!u.fired && u.vt >= 0.5) {
-                  u.fired = true;
-                  for (const m of alive) { FX.push({ k: 'shot', x: m.x + Math.cos(ang) * 1.25, y: m.y + Math.sin(ang) * 1.25, a: ang, t: -Math.random() * 0.25 }); SFX.shot(Math.random() * 0.25); }
-                  SFX.rumble(0.08, 1.4);
-                  let k = 0; for (const m of alive) if (Math.random() < 0.3) { let near = null, nd = 1e9; for (const o of co.members) { const dd = Math.hypot(o.x - m.x, o.y - m.y); if (dd < nd) { nd = dd; near = o; } } if (near) { killOwn(near); k++; } }
-                  reac(k ? 'decebut' : 'aprova', '<b>Louis:</b> ' + (k ? 'Ens han disparat a boca de canó! Hem perdut <b>' + k + '</b> ' + (k === 1 ? 'home' : 'homes') + '.' : 'Ens han disparat a boca de canó, però han errat!'), 4500);
+                if (u.vt >= (u.nv ? 8 : 1.2)) {                                                            // apunten, disparen i recarreguen (~8 s)
+                  u.vt = 0; u.nv++;
+                  for (const m of alive) { FX.push({ k: 'shot', x: m.x + Math.cos(ang) * 1.25, y: m.y + Math.sin(ang) * 1.25, a: ang, t: -Math.random() * 0.3 }); SFX.shot(Math.random() * 0.3); }
+                  SFX.rumble(0.08, 1.5);
+                  let k = 0; for (const m of alive) if (Math.random() < 0.14) { let near = null, nd = 1e9; for (const o of co.members) { const dd = Math.hypot(o.x - m.x, o.y - m.y); if (dd < nd) { nd = dd; near = o; } } if (near) { killOwn(near); k++; } }
+                  reac(k ? 'decebut' : 'aprova', '<b>Louis:</b> ' + (k ? 'Ens disparen! Hem perdut <b>' + k + '</b> ' + (k === 1 ? 'home' : 'homes') + '.' : 'Ens han disparat, però han errat!'), 4500);
                 }
-                if (u.vt >= 1.6) { u.cstate = 'melee'; u.mt = 0; u.tk = 0; }
+                if (n <= u.n0 / 2) { u.cstate = 'rout'; u.ct = 0; reac('aprova', '<b>Louis:</b> Fugen! Els hem aturat amb les descàrregues!', 4500); }
+                else if (u.nv >= 3 && u.vt >= 6) { u.charged = true; u.cstate = 'run'; reac('alerta', '<b>Louis:</b> Ens carreguen a la baioneta!', 4000); }   // després de tres descàrregues carreguen a la baioneta
+                else if (dist > 32) u.cstate = 'run';
               } else if (u.cstate === 'melee') {
                 u.mt += dt; u.tk += dt;
                 if (u.tk >= 1) {
