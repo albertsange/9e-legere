@@ -1060,7 +1060,7 @@ function i18nSetDict(rows) {
   I18N.map = new Map(); I18N.memo.clear();
   for (const r of rows) if (r && r.src && r.dst) I18N.map.set(r.src, r.dst);
   I18N.frag = [...I18N.map.keys()].filter(k => k.length >= 8 && !/<[^>]+>/.test(k)).sort((a, b) => b.length - a.length);
-  I18N.htmlKeys = [...I18N.map.keys()].filter(k => k.indexOf('<') >= 0 && k.length >= 12).sort((a, b) => b.length - a.length); I18N.hmemo = new Map();
+  I18N.htmlKeys = [...I18N.map.keys()].filter(k => k.indexOf('<') >= 0 && k.length >= 10).sort((a, b) => b.length - a.length); I18N.hmemo = new Map();
   I18N.ready = I18N.map.size > 0;
 }
 function i18nCached() { const c = store.get(SK.i18n(I18N.lang)); if (c && c.rows && c.rows.length) { i18nSetDict(c.rows); return true; } return false; }
@@ -2344,7 +2344,7 @@ function updateGuns(dt) {
       const rx = v.x - b.ox, ry = v.y - b.oy, uu = rx * b.dx + ry * b.dy, w = Math.abs(-rx * b.dy + ry * b.dx);
       if (uu >= a0 && uu <= a1 && w < TUNE.art.ample) { v.alive = false; addCorpse(v.x, v.y, u.h, true, v.rank); }
     }
-    if (b.s >= b.end) { BALLS.splice(i, 1); if (b.kills) reac('decebut', '<b>Louis:</b> Una bala de canó s\'ha endut <b>' + b.kills + '</b> homes!', 3500); lastKey = ''; }
+    if (b.s >= b.end) { BALLS.splice(i, 1); if (b.kills) reac('decebut', '<b>Louis:</b> Una bala de canó s\'ha endut <b>' + b.kills + '</b> ' + (b.kills === 1 ? 'home' : 'homes') + '!', 3500); lastKey = ''; }
   }
   if (screen !== 'game' || paused || tutOpen() || co.lost) return;
   const A = TUNE.art, c = unitCentre();
@@ -2411,7 +2411,7 @@ function advGunTick(g, dt) {                     // bateria d'IA: tria objectiu 
       if (d <= g.can + 6 && Math.abs(wrapA(Math.atan2(dy, dx) - g.h)) <= 0.2 && Math.random() < 0.6) { killOwn(m); k++; }
     }
     for (let i = 0; i < 6; i++) FX.push({ k: 'shot', x: g.x + Math.cos(g.h + (i - 2.5) * 0.07) * 2.4, y: g.y + Math.sin(g.h + (i - 2.5) * 0.07) * 2.4, a: g.h + (i - 2.5) * 0.07, t: -0.001, big: true });
-    lastKey = ''; reac('decebut', '<b>Louis:</b> <b>Metralla!</b> ' + (k ? 'Hem perdut <b>' + k + '</b> homes.' : 'Per sort no ens ha tocat.'), 3500);
+    lastKey = ''; reac('decebut', '<b>Louis:</b> <b>Metralla!</b> ' + (k ? 'Hem perdut <b>' + k + '</b> ' + (k === 1 ? 'home' : 'homes') + '.' : 'Per sort no ens ha tocat.'), 3500);
   } else {
     const d = tgt.d, along = d + (Math.random() - 0.5) * 2 * A.errLong * 0.7, lat = (Math.random() - 0.5) * 2 * A.errLat, ux = (tgt.x - g.x) / d, uy = (tgt.y - g.y) / d;
     const tx = g.x + ux * along - uy * lat, ty = g.y + uy * along + ux * lat, L = Math.hypot(tx - g.x, ty - g.y);
@@ -2522,7 +2522,7 @@ function feu() {
       co.volley = { t: performance.now(), ok, hits, d: near };
       if (!ok && near > TUNE.mosquet.abast) reac('assenyala', 'Massa lluny, chasseur: a <b>' + Math.round(near) + ' m</b> les bales no arriben. Cal estar a menys de <b>' + TUNE.mosquet.abast + ' m</b>.', 5000);
       else if (!ok) reac('assenyala', 'No miren cap als austríacs: <b>gira la unitat</b> cap a ells abans de disparar.', 5000);
-      else setTimeout(() => reac('aprova', (hits ? 'Impacte! Els austríacs han perdut <b>' + hits + '</b> homes.' : 'Han passat per sobre dels caps… ha estat una mala descàrrega.') + (exp < tot * 0.6 ? ' Només <b>' + exp + '</b> dels <b>' + tot + '</b> homes eren dins la franja.' : ''), 4600), 900);
+      else setTimeout(() => reac('aprova', (hits ? 'Impacte! Els austríacs han perdut <b>' + hits + '</b> ' + (hits === 1 ? 'home' : 'homes') + '.' : 'Han passat per sobre dels caps… ha estat una mala descàrrega.') + (exp < tot * 0.6 ? ' Només <b>' + exp + '</b> dels <b>' + tot + '</b> homes eren dins la franja.' : ''), 4600), 900);
       if (level && level.onVolley) level.onVolley();
     }
   }
@@ -2535,8 +2535,12 @@ function updateBayonet() {                      // càrrega a la baioneta: amb l
   if (!(co.volley && co.volley.ok) && !(level && level.freeStab)) { if (!co.stabWarn || performance.now() - co.stabWarn > 8000) { co.stabWarn = performance.now(); reac('louis', '<b>Louis:</b> Sense haver disparat primer? Així no, chasseur: <b>recula</b>, carrega i fes una <b>descàrrega</b> abans de la baioneta.', 5000); } return; }
   let dead = 0, fled = 0;
   if (level && level.localStab) {                // nivells de campanya: la baioneta només afecta els homes que toquem (no tot el mapa)
-    for (const e of ENEMY) for (const v of e.men) if (v.alive && co.members.some(m => Math.hypot(m.x - v.x, m.y - v.y) < 2.5) && (e.picket || Math.random() < 0.6)) { killEnemy(v, e); dead++; }
-    for (const e of ENEMY) if (e.picket && dead && e.men.some(v => !v.alive) && e.men.some(v => v.alive)) for (const v of e.men) if (v.alive) { killEnemy(v, e); dead++; }   // piquet: si cau un home, la resta cau en silenci (no queden entre les baionetes)
+    for (const e of ENEMY) {
+      let k = 0;
+      for (const v of e.men) if (v.alive && co.members.some(m => Math.hypot(m.x - v.x, m.y - v.y) < 2.5) && (e.picket || Math.random() < 0.85)) { killEnemy(v, e); k++; }
+      if (k && (e.picket || e.men.filter(v => v.alive).length <= 3)) for (const v of e.men) if (v.alive) { killEnemy(v, e); k++; }   // piquets i restes de 3 homes o menys: cauen tots (no queden entre les baionetes)
+      dead += k;
+    }
     co.stab = { t: performance.now(), n: dead, dead, fled: 0 }; SFX.hit(); SFX.cry(8, 0.08);
     reac('aprova', 'A la baioneta! <b>' + dead + '</b> austríacs han caigut.', 4500);
     return;
@@ -2554,7 +2558,7 @@ function enemyVolley(e, S, all) {
   const r = hitMen(S, co.members, live.length / 20 * T.enPunteria * (1 - (e.supp || 0))), n = r.dead.length;
   for (const m of r.dead) killOwn(m);
   e.reload = T.enRecarrega; e.aimT = 0; lastKey = '';
-  setTimeout(() => reac(n ? 'decebut' : 'aprova', '<b>Louis:</b> ' + (n ? 'Ens disparen! Hem perdut <b>' + n + '</b> homes.' : 'Ens han disparat, però han errat!'), 4600), 700);
+  setTimeout(() => reac(n ? 'decebut' : 'aprova', '<b>Louis:</b> ' + (n ? 'Ens disparen! Hem perdut <b>' + n + '</b> ' + (n === 1 ? 'home' : 'homes') + '.' : 'Ens han disparat, però han errat!'), 4600), 700);
   if (level && level.minMen && co.members.length < level.minMen && !co.lost) {
     co.lost = true; setTimeout(() => deathRetry('La unitat ha quedat destrossada: torna-ho a provar'), TUNE.mort.destrossadaMs);
   }
@@ -2640,7 +2644,7 @@ function aiVolley(u, g, side) {
   const r = hitMen(S, g.men, n);
   if (g.own) {
     const k = r.dead.length; for (const m of r.dead) killOwn(m); lastKey = '';
-    setTimeout(() => reac(k ? 'decebut' : 'aprova', '<b>Louis:</b> ' + (k ? 'Ens disparen! Hem perdut <b>' + k + '</b> homes.' : 'Ens han disparat, però han errat!'), 4600), 700);
+    setTimeout(() => reac(k ? 'decebut' : 'aprova', '<b>Louis:</b> ' + (k ? 'Ens disparen! Hem perdut <b>' + k + '</b> ' + (k === 1 ? 'home' : 'homes') + '.' : 'Ens han disparat, però han errat!'), 4600), 700);
     if (level && level.minMen && co.members.length < level.minMen && !co.lost) { co.lost = true; setTimeout(() => deathRetry('La unitat ha quedat destrossada: torna-ho a provar'), TUNE.mort.destrossadaMs); }
   } else if (g.ally) {
     for (const v of r.dead) { v.alive = false; addCorpse(v.x, v.y, g.ally.h, true, v.rank); }
@@ -3594,6 +3598,8 @@ const POSES = ['saluda', 'assenyala', 'serios', 'assenyala', 'serios', 'crida', 
 let reacT = 0;
 function reac(pose, text, ms, guide) {         // ms = -1: es queda fins que es canviï (instrucció guiada)
   const el = document.getElementById('reac');
+  const sp = /^\s*<b>(Louis|Lefon|Capità Le Jay):<\/b>\s*/.exec(text);          // qui parla ho diu el retrat (no un nom al text): el rètol s'esborra
+  if (sp) { text = text.slice(sp[0].length); if (sp[1] === 'Louis') pose = 'louis'; else if (sp[1] === 'Lefon') pose = 'lefon'; }
   el.querySelector('img').src = AV[pose]; el.querySelector('.t').innerHTML = text;
   el.classList.toggle('guide', !!guide); el.classList.add('show'); clearTimeout(reacT);
   if (ms !== -1) reacT = setTimeout(() => el.classList.remove('show'), ms || 2200);
@@ -4617,7 +4623,7 @@ let autoStepT = 0;
 const VOICE = { on: false, rec: null, running: false, tested: false, seg: {}, interim: '', state: '', failT: 0, lastFail: null,
   learn: { phr: {}, ex: {} }, shared: { phr: {}, ex: {} }, opt: { mode: 'cont', vol: true, log: false, tele: true, engine: '' }, log: [], recentExec: null, ptt: false, db: false, loading: false };
 // Connexió amb Supabase (la mateixa de la web: si el joc s'obre dins la web, agafa window.APP_CONFIG) i fonts del motor local Vosk
-const GAME_VERSION = '1.8.46';
+const GAME_VERSION = '1.8.47';
 const CFG = Object.assign({
   SUPABASE_URL: 'https://ltopullwhasagnkuqaek.supabase.co',
   SUPABASE_ANON_KEY: 'sb_publishable_DhHFUh-UrbBrI0l476Vcnw_tSn-Gmkr',
@@ -6656,7 +6662,7 @@ function buildCampaign3() {
                   for (const m of alive) { FX.push({ k: 'shot', x: m.x + Math.cos(ang) * 1.25, y: m.y + Math.sin(ang) * 1.25, a: ang, t: -Math.random() * 0.25 }); SFX.shot(Math.random() * 0.25); }
                   SFX.rumble(0.08, 1.4);
                   let k = 0; for (const m of alive) if (Math.random() < 0.3) { let near = null, nd = 1e9; for (const o of co.members) { const dd = Math.hypot(o.x - m.x, o.y - m.y); if (dd < nd) { nd = dd; near = o; } } if (near) { killOwn(near); k++; } }
-                  reac(k ? 'decebut' : 'aprova', '<b>Louis:</b> ' + (k ? 'Ens han disparat a boca de canó! Hem perdut <b>' + k + '</b> homes.' : 'Ens han disparat a boca de canó, però han errat!'), 4500);
+                  reac(k ? 'decebut' : 'aprova', '<b>Louis:</b> ' + (k ? 'Ens han disparat a boca de canó! Hem perdut <b>' + k + '</b> ' + (k === 1 ? 'home' : 'homes') + '.' : 'Ens han disparat a boca de canó, però han errat!'), 4500);
                 }
                 if (u.vt >= 1.6) { u.cstate = 'melee'; u.mt = 0; u.tk = 0; }
               } else if (u.cstate === 'melee') {
