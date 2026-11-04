@@ -291,6 +291,13 @@
   #rlPick button.x{border:none;background:transparent;color:var(--muted);height:28px;padding:0 8px;font-size:18px;}
   #controls .act.danger{background:#b3261e !important;color:#fff !important;border-color:#b3261e !important;}
   #controls.menuOpen #rlPick{display:none !important;}
+  #sqBox{position:absolute;bottom:calc(100% + 14px);left:14px;z-index:90;}
+  #sqBox button{position:relative;overflow:hidden;font-family:inherit;cursor:pointer;height:44px;padding:0 20px;border-radius:999px;border:1px solid var(--bleu);background:var(--sheet);color:var(--bleu);font-weight:700;font-size:14px;box-shadow:0 6px 18px rgba(0,0,0,.18);}
+  #sqBox button:hover:not(:disabled){background:var(--bleu);color:#fff;}
+  #sqBox button.split{border-color:#b3261e;color:#b3261e;} #sqBox button.split:hover{background:#b3261e;color:#fff;}
+  #sqBox button:disabled{cursor:default;opacity:1;}
+  #sqBox .l{position:relative;z-index:1;}
+  #sqBox .pb{position:absolute;left:0;right:0;bottom:0;height:5px;background:rgba(31,58,120,.12);} #sqBox .pb i{display:block;height:100%;width:0;background:#2e7d32;transition:width .2s;}
   #skPick{position:absolute;bottom:calc(100% + 14px);right:370px;display:none;align-items:center;gap:10px;z-index:91;padding:8px 8px 8px 16px;background:var(--sheet);border:1px solid var(--line);border-radius:18px;box-shadow:0 6px 22px rgba(0,0,0,.22);}
   #skPick.open{display:flex;}
   #controls.menuOpen #skPick{display:none !important;}
@@ -1643,10 +1650,109 @@ function makeCo(cx, cy) {
 let co, lastKey = '', level = null, screen = 'title', paused = false;
 let SWAPPED = false;                           // true mentre una segona unitat (la guàrdia del nivell 4) fa servir les mateixes ordres que el jugador
 function withCo(c, f) { const r = co, nb = bubbles.length; co = c; SWAPPED = true; try { return f(); } finally { co = r; SWAPPED = false; bubbles.length = Math.min(bubbles.length, nb); } }
+// ---- Esquadres separades (nivell 5): la Première escouade del capità Le Jay actua sola amb les MATEIXES ordres i moviments que el jugador ----
+let SQ = null;                                   // { G: unitat del Le Jay, mode: 'split' | 'regroup', d0, rem }
+const SQ_SAY = t => reac('assenyala', '<b>Capità Le Jay:</b> ' + t, 4500);
+function sqCan() {                               // es pot separar? (cal la unitat aturada, en línia i sense cap maniobra)
+  if (!(level && level.split)) return 'no disponible en aquest nivell';
+  if (co.members.length < 8) return 'queden massa pocs homes';
+  if (co.state !== 'parat' || busy() || pendingCmd) return 'cal estar aturat';
+  if (formationName() !== 'línia') return 'cal estar en línia';
+  if (co.sk || co.sq) return 'cal estar en línia';
+  return true;
+}
+function sqSplit() {
+  const r = sqCan(); if (r !== true) { showMsg(i18nTr('No es pot separar: ') + i18nTr(r), 2500); return; }
+  const n0 = co.members.filter(m => !m.rank).length, nh = Math.ceil(n0 / 2);
+  const keep = co.members.filter(m => m.file < nh), go = co.members.filter(m => m.file >= nh);
+  if (!go.length) return;
+  co.members = keep; relabel();
+  const G = makeCo(0, 0); G.members = go; G.atencio = co.atencio; G.arm = co.arm === 'charge' ? 'portez' : co.arm; G.loaded = co.loaded; G.cansament = co.cansament; G.aiT = 1.2; G.jT = 0;
+  for (const m of G.members) m.row = null;
+  withCo(G, () => relabel());
+  SQ = { G, mode: 'split' };
+  SQ_SAY('D\'acord, m\'emporto la meitat dels homes, bona sort!');
+  sqButton();
+}
+function sqSlots() {                             // llocs de la Première escouade a l'esquerra de la nostra línia
+  const g = lineAxes(), Ai = m => m.x * g.rx + m.y * g.ry;
+  const r0 = co.members.filter(m => !m.rank), L = r0.length ? r0.reduce((a, b) => Ai(a) < Ai(b) ? a : b) : co.members[0];
+  const bx = L.x + g.fx * (L.rank ? RANK_GAP : 0), by = L.y + g.fy * (L.rank ? RANK_GAP : 0);
+  return m => ({ x: bx - g.rx * FRONT * (m.file + 1) - g.fx * RANK_GAP * (m.rank ? 1 : 0), y: by - g.ry * FRONT * (m.file + 1) - g.fy * RANK_GAP * (m.rank ? 1 : 0) });
+}
+function sqRegroup() {
+  if (!SQ || SQ.mode !== 'split') return;
+  const G = SQ.G; G.state = 'parat'; G.conv = null; G.auto = null; G.pf = null; G.flank = null; G.fix = null; G.sk = null; G.haltReq = false;
+  if (G.arm !== 'croise') G.arm = 'portez';
+  withCo(G, () => relabel());
+  SQ.mode = 'regroup'; SQ.d0 = null; SQ.rem = 0;
+  SQ_SAY('Entesos! La Première escouade torna amb vosaltres.');
+  sqButton();
+}
+function sqTick(dt) {
+  if (!SQ) return;
+  const G = SQ.G;
+  if (!G.members.length) { SQ = null; sqButton(); return; }
+  if (SQ.mode === 'regroup') {                   // tornen caminant a pas ordinari cap als seus llocs, a l'esquerra de la nostra línia
+    const slot = sqSlots(), sp = ORD_SPEED * dt; let dmax = 0;
+    for (const m of G.members) {
+      const t = slot(m), dx = t.x - m.x, dy = t.y - m.y, d = Math.hypot(dx, dy); dmax = Math.max(dmax, d);
+      if (d > 0.02) { const k = Math.min(1, sp / d); m.x += dx * k; m.y += dy * k; if (d > 0.3) m.h = Math.atan2(dy, dx); }
+      if (d < 0.3) m.h = co.members[0].h;
+    }
+    if (SQ.d0 == null) SQ.d0 = Math.max(dmax, 0.5);
+    SQ.rem = dmax / ORD_SPEED; SQ.prog = Math.max(0, Math.min(1, 1 - dmax / SQ.d0));
+    if (dmax < 0.06) {                           // han arribat: tornen a formar part de la unitat
+      for (const m of G.members) { m.h = co.members[0].h; m.row = null; m.hd = 0; m.ht = 0; co.members.push(m); }
+      SQ = null; relabel(); SQ_SAY('Première escouade, al seu lloc!'); sqButton(); return;
+    }
+    sqButton(); return;
+  }
+  withCo(G, () => updateCo(dt));
+  G.aiT -= dt; if (G.aiT > 0) return; G.aiT = 0.25;
+  withCo(G, () => sqBrain(G));
+}
+function sqBrain(G) {                            // què faria un capità: girar-se cap a l'enemic, apropar-s'hi, carregar, apuntar i disparar
+  const O = id => ORDER_BY_ID[id], go = (o, a) => { if (o.avail(a) === true) { o.run(a); return true; } return false; };
+  const c = unitCentre(), h = co.members[0].h;
+  let best = null, bd = 1e9;
+  for (const e of ENEMY) { if (e.routed || e.state === 'retreat') continue; const l = e.men.filter(v => v.alive); if (!l.length) continue;
+    const ex = l.reduce((t, v) => t + v.x, 0) / l.length, ey = l.reduce((t, v) => t + v.y, 0) / l.length, d = Math.hypot(ex - c.x, ey - c.y) - (e.gun ? 6 : 0);
+    if (d < bd) { bd = d; best = { x: ex, y: ey, d: Math.hypot(ex - c.x, ey - c.y) }; } }
+  if (co.state === 'auto' || co.arm === 'charge' || co.sk) return;
+  if (!best) { if (co.state === 'marxa') HALTE.run(); return; }
+  const ang = wrapA(Math.atan2(best.y - c.y, best.x - c.x) - h), RNG = TUNE.mosquet.abast * 0.72;
+  if (co.state === 'conv') { if (co.conv.kind !== 'cm' && co.conv.kind !== 'turn' && Math.abs(ang) < 0.07) HALTE.run(); return; }
+  if (co.state === 'marxa') { if (best.d < RNG || Math.abs(ang) > 0.45) HALTE.run(); return; }
+  if (co.state !== 'parat' || busy() || co.hdT !== 0) return;
+  const moveArm = () => { if (co.arm === 'joue') return go(O('FI-03')); if (co.arm === 'apprete' || co.arm === 'repose') return go(O('MD-01')); return false; };
+  if (Math.abs(ang) > 0.12) { if (moveArm()) return; go(O('WH-01'), ang > 0 ? 1 : -1); return; }
+  if (best.d > RNG) { if (moveArm()) return; go(O('MA-01')); return; }
+  if (!co.loaded) { if (co.arm === 'apprete') { go(O('MD-01')); return; } go(O('LS-01')); return; }
+  if (co.arm === 'portez' || co.arm === 'croise' || co.arm === 'repose') { if (co.arm !== 'portez') { go(O('MD-01')); return; } go(O('FI-01')); return; }
+  if (co.arm === 'apprete') { go(O('FI-02')); G.jT = 0; return; }
+  if (co.arm === 'joue') { G.jT += 0.25; if (G.jT >= 0.75) go(O('FI-04')); }
+}
+function sqHit(G, dead) {                        // baixes de la Première escouade (foc enemic)
+  for (const m of dead) withCo(G, () => { const i = co.members.indexOf(m); if (i < 0) return; if (co.members.length <= 1) { addCorpse(m.x, m.y, m.h, true, m.rank); co.members.splice(i, 1); STAT.dead++; return; } killOwn(m); });
+}
+function sqButton() {
+  const b = document.getElementById('sqBox'); if (!b) return;
+  const on = !!(level && level.split);
+  b.style.display = on ? '' : 'none'; if (!on) return;
+  const bt = b.querySelector('button'), lb = bt.querySelector('.l'), pb = bt.querySelector('.pb i');
+  const mode = SQ ? SQ.mode : 'joined';
+  const txt = mode === 'split' ? i18nTr('Reagrupar les esquadres') : mode === 'regroup' ? i18nTr('Reagrupant les esquadres…') + ' ' + Math.ceil(SQ.rem || 0) + ' s' : i18nTr('Separar en dues esquadres');
+  if (lb.textContent !== txt) lb.textContent = txt;
+  bt.classList.toggle('busy', mode === 'regroup'); bt.classList.toggle('split', mode === 'split');
+  pb.style.width = mode === 'regroup' ? Math.round((SQ.prog || 0) * 100) + '%' : '0%';
+  bt.disabled = mode === 'regroup';
+}
+function sqClick() { if (tutLocked()) return; if (!SQ) sqSplit(); else if (SQ.mode === 'split') sqRegroup(); }
 // ---------- Puntuació i rànquing ----------
 // Cada nivell dóna fins a 1000 punts: 4 parts de 250 (temps, baixes, ordres donades i ordre mitjà del regiment). Es guarda la millor de cada nivell.
 const STAT = { t: 0, ord: 0, dead: 0, oSum: 0, men0: 20, kInf: 0, kCav: 0, kGun: 0 };
-const SCORE_REF = { 1: { t: 90, o: 12 }, 2: { t: 100, o: 14 }, 3: { t: 110, o: 16 }, 4: { t: 140, o: 20 }, 5: { t: 200, o: 25 }, 6: { t: 120, o: 14 }, 7: { t: 150, o: 20 }, 8: { t: 170, o: 30 }, 9: { t: 150, o: 10 }, 10: { t: 300, o: 35 }, c1n1: { t: 360, o: 32, k: 15 }, c1n2: { t: 300, o: 30, k: 40 }, c1n3: { t: 570, o: 30, k: 14 }, c1n4: { t: 420, o: 30, k: 30 }, c1n5: { t: 600, o: 30, k: 70 } };   // temps (s) i ordres de referència: 250 punts; amb el triple, 0
+const SCORE_REF = { 1: { t: 90, o: 12 }, 2: { t: 100, o: 14 }, 3: { t: 110, o: 16 }, 4: { t: 140, o: 20 }, 5: { t: 200, o: 25 }, 6: { t: 120, o: 14 }, 7: { t: 150, o: 20 }, 8: { t: 170, o: 30 }, 9: { t: 150, o: 10 }, 10: { t: 300, o: 35 }, c1n1: { t: 360, o: 32, k: 15 }, c1n2: { t: 300, o: 30, k: 40 }, c1n3: { t: 570, o: 30, k: 14 }, c1n4: { t: 420, o: 30, k: 30 }, c1n5: { t: 600, o: 30, k: 120 } };   // temps (s) i ordres de referència: 250 punts; amb el triple, 0
 function statReset() { STAT.kInf = 0; STAT.kCav = 0; STAT.kGun = 0; STAT.t = 0; STAT.ord = 0; STAT.dead = 0; STAT.oSum = 0; STAT.men0 = co ? co.members.length : 20; }
 const killPts = () => STAT.kInf + 2 * STAT.kCav + 10 * STAT.kGun;      // campanya: infanteria 1, cavalleria 2, canó destrossat 10 (5 de la dotació + 5 del canó)
 function scoreCalc(n) {
@@ -1740,6 +1846,7 @@ const UNLOCK_ALL = false;       // només a la còpia de proves
 function levelUnlocked(i) { const L = LEVELS[i]; if (!L || L.locked) return false; if (UNLOCK_ALL) return true; return i === 0 || !!PROG.levels[LEVELS[i - 1].n]; }
 
 function reset() {
+  SQ = null; setTimeout(sqButton, 0);
   FILES = (level && level.files) || 10;                  // nivell 5: 40 homes (20 files)
   const st = level ? level.start : { x: 30, y: MAP_H / 2 };
   co = makeCo(st.x, st.y);
@@ -2635,6 +2742,7 @@ function aiGroups(side) {                       // contra qui lluita una unitat:
   if (side === 'au') {
     if (co.members.length) { const c = unitCentre(); g.push({ own: true, men: co.members, h: co.members[0].h, cx: c.x, cy: c.y }); }
     for (const a of ALLY) { if (a.script) continue; const l = a.men.filter(v => v.alive); if (l.length) g.push({ ally: a, men: l, h: a.h, cx: a.cx, cy: a.cy }); }
+    if (SQ && SQ.G.members.length) { const G = SQ.G, cx = G.members.reduce((t, m) => t + m.x, 0) / G.members.length, cy = G.members.reduce((t, m) => t + m.y, 0) / G.members.length; g.push({ sq: G, men: G.members, h: G.members[0].h, cx, cy }); }
   } else for (const e of ENEMY) { if (e.routed || e.state === 'retreat' || e.gun) continue;       // els aliats no disparen mai als servidors dels canons: els silencia el jugador
     const l = e.men.filter(v => v.alive); if (l.length) g.push({ en: e, men: l, h: e.h, cx: e.cx, cy: e.cy }); }
   return g;
@@ -2651,6 +2759,8 @@ function aiVolley(u, g, side) {
     const k = r.dead.length; for (const m of r.dead) killOwn(m); lastKey = '';
     setTimeout(() => reac(k ? 'decebut' : 'aprova', '<b>Louis:</b> ' + (k ? 'Ens disparen! Hem perdut <b>' + k + '</b> ' + (k === 1 ? 'home' : 'homes') + '.' : 'Ens han disparat, però han errat!'), 4600), 700);
     if (level && level.minMen && co.members.length < level.minMen && !co.lost) { co.lost = true; setTimeout(() => deathRetry('La unitat ha quedat destrossada: torna-ho a provar'), TUNE.mort.destrossadaMs); }
+  } else if (g.sq) {
+    sqHit(g.sq, r.dead);
   } else if (g.ally) {
     for (const v of r.dead) { v.alive = false; addCorpse(v.x, v.y, g.ally.h, true, v.rank); }
     if (r.inside.length) g.ally.supp = Math.min(1, (g.ally.supp || 0) + T.supDescarrega * TUNE.ia.supFrac);
@@ -2719,10 +2829,10 @@ function aiUnitTick(u, side, dt) {
   for (const g of vis) {
     const d = Math.hypot(g.cx - u.cx, g.cy - u.cy), face = Math.abs(wrapA(Math.atan2(u.cy - g.cy, u.cx - g.cx) - g.h));
     let sc = d - (face > A.flanc ? A.flancBonus : 0) - (g.men.length < A.feble ? A.febleBonus : 0) - (g.own ? A.jugadorBonus : 0);
-    if (u.curK && (g.en || g.ally || (g.own && 'own')) === u.curK) sc -= 12;                  // histèresi: no salta d'un objectiu a l'altre cada tick (evita que «dubti» entre dos blancs i es mogui sense parar)
+    if (u.curK && (g.en || g.ally || g.sq || (g.own && 'own')) === u.curK) sc -= 12;                  // histèresi: no salta d'un objectiu a l'altre cada tick (evita que «dubti» entre dos blancs i es mogui sense parar)
     if (sc < bs) { bs = sc; best = g; }
   }
-  u.curK = best ? (best.en || best.ally || (best.own && 'own')) : null;
+  u.curK = best ? (best.en || best.ally || best.sq || (best.own && 'own')) : null;
   if (!best && fo) u.last = { x: fo.cx, y: fo.cy };                        // la unitat amb qui lluita no la veu (cases pel mig): sap on és
   if (!best && u.onlyPlayer) { const c0 = unitCentre(); u.last = { x: c0.x, y: c0.y }; }
   let tx, ty;
@@ -2844,7 +2954,7 @@ function drawCaptain() {                        // el capità Le Jay: una bola d
   ctx.restore();
 }
 function updateMusket(dt) {
-  if (SWAPPED) return;
+  if (SWAPPED) { updateGlide(dt); if (co.arm === 'charge') { let done = 0; for (const m of co.members) { if (m.ld < 1) { m.ld = Math.min(1, m.ld + dt / m.ldDur); if (m.ld >= 1) m.okT = 1.4; } else { done++; if (m.okT > 0) m.okT -= dt; } } if (done === co.members.length) { co.arm = 'portez'; co.loaded = true; say('Portez vos armes!'); } } else for (const m of co.members) if (m.okT > 0) m.okT -= dt; return; }
   if (level && level.tick) level.tick(dt);
   updateBayonet(); updateEnemies(dt); updateGlide(dt); updateSkirm(dt); updateReload(dt); updateGuns(dt); for (const c of CORPSES) c.t += dt;
   for (const e of ENEMY) for (const v of e.men) if (v.fl && !v.gone) { v.fl.t += dt; if (v.fl.t > 0) { v.x += v.fl.vx * dt; v.y += v.fl.vy * dt; } if (v.fl.t > 4) v.gone = true; }
@@ -3547,6 +3657,7 @@ function formationName() {
 
 // ---------- Missatges ----------
 function showMsg(text, ms) {
+  if (SWAPPED) return;
   msgEl.textContent = text;
   msgEl.style.display = 'block';
   if (ms) setTimeout(() => { msgEl.style.display = 'none'; }, ms);
@@ -3608,6 +3719,7 @@ const POSES = ['saluda', 'assenyala', 'serios', 'assenyala', 'serios', 'crida', 
 (function () { const set = (id, k) => { const t = document.getElementById(id); if (t) t.src = AV[k]; }; set('avJay', 'saluda'); set('avLefon', 'lefon'); set('avLouis', 'louis'); })();
 let reacT = 0;
 function reac(pose, text, ms, guide) {         // ms = -1: es queda fins que es canviï (instrucció guiada)
+  if (SWAPPED) return;                                  // missatges de la Première escouade (nivell 5): no són per al jugador
   const el = document.getElementById('reac');
   const sp = /^\s*<b>(Louis|Lefon|Capità Le Jay):<\/b>\s*/.exec(text);          // qui parla ho diu el retrat (no un nom al text): el rètol s'esborra
   if (sp) { text = text.slice(sp[0].length); if (sp[1] === 'Louis') pose = 'louis'; else if (sp[1] === 'Lefon') pose = 'lefon'; }
@@ -3703,7 +3815,7 @@ function tutSnap() {
   if (!tutOn()) return;
   const s = level.tutorial.steps[TUT.step]; if (!s || s.guide) return;
   if (co.state === 'conv' || co.state === 'gir' || co.state === 'auto' || co.pf || co.flank || co.fix || pendingCmd) return;
-  try { TUT.snap = { step: TUT.step, co: structuredClone(co), en: structuredClone(ENEMY), al: structuredClone(ALLY), gn: structuredClone(GUNS), cp: structuredClone(CORPSES) }; } catch (e) { TUT.snap = null; }
+  try { TUT.snap = { step: TUT.step, co: structuredClone(co), en: structuredClone(ENEMY), al: structuredClone(ALLY), gn: structuredClone(GUNS), cp: structuredClone(CORPSES), sq: SQ ? structuredClone(SQ) : null }; } catch (e) { TUT.snap = null; }
 }
 function canRetry() { return tutOn() && !!TUT.snap && TUT.snap.step === TUT.step; }
 function retryStep() {
@@ -3714,6 +3826,7 @@ function retryStep() {
 function snapRestore() {                        // torna la unitat (i els enemics) a l'últim punt de control
   const sn = TUT.snap;
   co = structuredClone(sn.co); pendingCmd = null; lastKey = ''; co.lost = false;
+  SQ = sn.sq ? structuredClone(sn.sq) : null; setTimeout(sqButton, 0);
   for (const [arr, src] of [[ENEMY, sn.en], [ALLY, sn.al], [GUNS, sn.gn], [CORPSES, sn.cp]]) if (src) { arr.length = 0; arr.push(...structuredClone(src)); }
   BALLS.length = 0; FX.length = 0;
   msgEl.style.display = 'none'; centreCam(); TUT.cued = -1; TUT.idleSince = 0;
@@ -3821,9 +3934,36 @@ function drawMini() {
   c.beginPath();
   [[0, 0], [canvas.width, 0], [canvas.width, canvas.height], [0, canvas.height]].forEach(([qx, qy], i) => { const w = toWorldPx(qx, qy); i ? c.lineTo(w.x / M * s, w.y / M * s) : c.moveTo(w.x / M * s, w.y / M * s); });
   c.closePath(); c.stroke();
-  if (!(level && level.fogR)) for (const e of ENEMY) if (enAlive(e)) { c.fillStyle = '#f7f5ee'; c.strokeStyle = '#6c6a63'; c.lineWidth = 1.3; c.beginPath(); c.arc(e.cx * s, e.cy * s, 3.6, 0, 7); c.fill(); c.stroke(); }
-  c.fillStyle = '#1f3a78'; c.beginPath(); c.arc(u.x * s, u.y * s, 3.6, 0, 7); c.fill();
-  c.strokeStyle = '#1f3a78'; c.lineWidth = 1.8; c.beginPath(); c.moveTo(u.x * s, u.y * s); c.lineTo(u.x * s + Math.cos(h) * 10, u.y * s + Math.sin(h) * 10); c.stroke();
+  // les unitats es veuen com a línies (el seu front real) amb una ratlla curta cap on miren; els canons, amb un símbol propi
+  const uline = (men, hh, fill, edge, tick) => {
+    const L = men.filter(m => m.alive !== false); if (!L.length) return;
+    const rx = -Math.sin(hh), ry = Math.cos(hh); let cx = 0, cy = 0; for (const m of L) { cx += m.x; cy += m.y; } cx /= L.length; cy /= L.length;
+    let lo = 0, hi = 0; for (const m of L) { const q = (m.x - cx) * rx + (m.y - cy) * ry; lo = Math.min(lo, q); hi = Math.max(hi, q); }
+    const mid = (lo + hi) / 2, half = Math.max((hi - lo) / 2, 2.6 / s), X = cx + rx * mid, Y = cy + ry * mid;
+    const x0 = (X - rx * half) * s, y0 = (Y - ry * half) * s, x1 = (X + rx * half) * s, y1 = (Y + ry * half) * s;
+    c.lineCap = 'round';
+    if (edge) { c.strokeStyle = edge; c.lineWidth = 5.2; c.beginPath(); c.moveTo(x0, y0); c.lineTo(x1, y1); c.stroke(); }
+    c.strokeStyle = fill; c.lineWidth = 3.2; c.beginPath(); c.moveTo(x0, y0); c.lineTo(x1, y1); c.stroke();
+    if (tick) { c.strokeStyle = tick; c.lineWidth = 1.6; c.beginPath(); c.moveTo(X * s, Y * s); c.lineTo(X * s + Math.cos(hh) * 6, Y * s + Math.sin(hh) * 6); c.stroke(); }
+    c.lineCap = 'butt';
+  };
+  const gunSym = g => {                                                                                   // canó: canya i roda (gris i ratllat si està desarmat)
+    const x = g.x * s, y = g.y * s, a = g.h, ca = Math.cos(a), sa = Math.sin(a);
+    c.save(); c.translate(x, y); c.rotate(a);
+    c.fillStyle = g.down ? '#9a968c' : '#2b2b2b'; c.strokeStyle = '#f7f5ee'; c.lineWidth = 1;
+    c.beginPath(); c.rect(-3, -1.6, 10, 3.2); c.fill(); c.stroke();
+    c.beginPath(); c.arc(-1.5, 0, 3.2, 0, 7); c.fill(); c.stroke();
+    c.restore();
+    if (g.down) { c.strokeStyle = '#b3261e'; c.lineWidth = 1.6; c.beginPath(); c.moveTo(x - 4, y - 4); c.lineTo(x + 4, y + 4); c.moveTo(x + 4, y - 4); c.lineTo(x - 4, y + 4); c.stroke(); }
+    void ca; void sa;
+  };
+  if (!(level && level.fogR)) {
+    for (const e of ENEMY) if (!e.gun && enAlive(e)) uline(e.men, e.h, e.cf || '#f7f5ee', e.cs || '#6c6a63', e.cs || '#6c6a63');
+    for (const g of GUNS) gunSym(g);
+  }
+  for (const a of ALLY) if (!a.script && enAlive(a)) uline(a.men, a.h, '#5b86cf', '#fff', '#2f5fae');
+  if (SQ) uline(SQ.G.members, SQ.G.members[0].h, '#3b63b8', '#fff', '#1f3a78');
+  uline(co.members, h, '#1f3a78', '#fff', '#1f3a78');
 }
 function buildMapControls() {
   mapBox.innerHTML = '';
@@ -4171,6 +4311,12 @@ function buildOrderPanel() {
     jm.onclick = ev => { const bt = ev.target.closest('button'); if (!bt) return; jm.classList.remove('open'); const v = +bt.dataset.v; fire(ORDER_BY_ID['FI-02'], v || undefined); };
     box.appendChild(jm);
     document.getElementById('controls').appendChild(box);
+  }
+  if (!document.getElementById('sqBox')) {                   // separar / reagrupar les esquadres (nivell 5): fora de la barra, a l'esquerra (oposat a la barra de foc)
+    const qb = document.createElement('div'); qb.id = 'sqBox'; qb.style.display = 'none';
+    qb.innerHTML = '<button type="button"><span class="l"></span><span class="pb"><i></i></span></button>';
+    qb.querySelector('button').onclick = () => sqClick();
+    document.getElementById('controls').appendChild(qb);
   }
   if (!document.getElementById('skBox')) {                   // foc en avançant / reculant: botó que fa saltar els rengles
     const sb = document.createElement('div'); sb.id = 'skBox';
@@ -4615,6 +4761,7 @@ function draw() {
   drawTerrain();
   drawTrees();
   drawLevel(ctx, M);
+  if (SQ) withCo(SQ.G, () => drawCo());
   drawCo();
   ctx.restore();
   drawAlignPick();
@@ -4636,7 +4783,7 @@ let autoStepT = 0;
 const VOICE = { on: false, rec: null, running: false, tested: false, seg: {}, interim: '', state: '', failT: 0, lastFail: null,
   learn: { phr: {}, ex: {} }, shared: { phr: {}, ex: {} }, opt: { mode: 'cont', vol: true, log: false, tele: true, engine: '' }, log: [], recentExec: null, ptt: false, db: false, loading: false };
 // Connexió amb Supabase (la mateixa de la web: si el joc s'obre dins la web, agafa window.APP_CONFIG) i fonts del motor local Vosk
-const GAME_VERSION = '1.8.55';
+const GAME_VERSION = '1.8.56';
 const CFG = Object.assign({
   SUPABASE_URL: 'https://ltopullwhasagnkuqaek.supabase.co',
   SUPABASE_ANON_KEY: 'sb_publishable_DhHFUh-UrbBrI0l476Vcnw_tSn-Gmkr',
@@ -5321,7 +5468,7 @@ function loop(now) {
   if (screen === 'game') {
     if (!paused && !tutOpen() && !vtestOpen()) {
       STAT.t += dt; STAT.oSum += orderPct() * dt;
-      updateCo(dt); serrezTick(dt); checkTrees(); checkLevel(); objUpdate(); tutUpdate();
+      updateCo(dt); sqTick(dt); serrezTick(dt); checkTrees(); checkLevel(); objUpdate(); tutUpdate();
       if (co.state === 'auto') { autoStepT += dt; if (autoStepT >= 60 / 76) { autoStepT = 0; SFX.step(co.members.length, false); } } else autoStepT = 0;
     }
     stepZoom(dt);
@@ -6858,12 +7005,13 @@ function buildCampaign5() {
       resetStep: () => 1, done: () => false }
   ];
   return {
-    w: W, h: H, pad: 36, files: 20, freeStab: true, localStab: true, start: { x: 14, y: 55 }, obstacles: [], scene: MapKit.scene(sc), zone: null, musket: true, skirm: true, driftScale: 0.5, goalHeading: 0, minMen: 12, cover, mudK,
+    w: W, h: H, pad: 36, files: 20, split: true, freeStab: true, localStab: true, start: { x: 14, y: 55 }, obstacles: [], scene: MapKit.scene(sc), zone: null, musket: true, skirm: true, driftScale: 0.5, goalHeading: 0, minMen: 12, cover, mudK,
     guns: [30].map((y, i) => ({ x: SX + 5, y, h: Math.PI, name: 'Canó anglès ' + (i + 1), crew: 5, adv: true, half: true, range: 95, vis: 62, cone: 1.0, can: 25, rt: 14, rot: 0.3 })),
     enemies: [
-      U('33rd Regiment of Foot', 'b33', SX + 9, 30, 10), U('14th Regiment of Foot', 'b14', SX + 9, 55, 10), U('Regiment hessià Prinz Karl', 'hpk', SX + 9, 80, 10),
-      U('Granaders britànics', 'b14', SX - 24, 10, 6, { h: Math.PI / 2 + 0.5 }), U('Regiment hessià Landgraf', 'hlg', SX - 24, 100, 6, { h: -Math.PI / 2 - 0.5 }),
-      U('Reserva britànica (33rd)', 'b33', ZN.x + 22, 42, 10, { reserve: true }), U('Reserva hessiana (Prinz Karl)', 'hpk', ZN.x + 22, 68, 10, { reserve: true })
+      U('33rd Regiment of Foot', 'b33', SX + 5, 30, 16), U('14th Regiment of Foot', 'b14', SX + 5, 55, 16), U('Regiment hessià Prinz Karl', 'hpk', SX + 5, 80, 16),
+      U('Granaders britànics', 'b14', SX - 42, 12, 12, { h: Math.PI / 2 + 0.6 }), U('Regiment hessià Landgraf', 'hlg', SX - 42, 98, 12, { h: -Math.PI / 2 - 0.6 }),
+      U('Avançada britànica (14th)', 'b14', SX - 30, 40, 14, { stay: false, hold: 26 }), U('Avançada hessiana (Landgraf)', 'hlg', SX - 30, 70, 14, { stay: false, hold: 26 }),
+      U('Reserva britànica (33rd)', 'b33', ZN.x + 22, 42, 14, { reserve: true }), U('Reserva hessiana (Prinz Karl)', 'hpk', ZN.x + 22, 68, 14, { reserve: true })
     ],
     tutorial: { steps, figs: [], startAtencio: true, resetStep: () => 1 },
     over(ctx, M, mini) {
