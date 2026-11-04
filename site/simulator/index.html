@@ -503,6 +503,7 @@
   #tut .av img{width:100%;display:block;filter:drop-shadow(0 3px 4px rgba(10,15,40,.35));}
   #tut .av span{display:block;font-family:var(--label);font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-top:2px;}
   #tut .figs{clear:both;}
+  body.hasSq #reac{bottom:246px;}
   #reac{position:fixed;left:16px;bottom:182px;z-index:80;display:flex;align-items:flex-end;gap:8px;pointer-events:none;opacity:0;transform:translateY(8px);transition:opacity .25s,transform .25s;}
   #reac.show{opacity:1;transform:none;}
   #reac img{width:92px;filter:drop-shadow(0 3px 4px rgba(10,15,40,.4));}
@@ -1791,7 +1792,7 @@ function sqHit(G, dead) {                        // baixes de la Première escou
 function sqButton() {
   const b = document.getElementById('sqBox'); if (!b) return;
   const on = !!(level && level.split);
-  b.style.display = on ? '' : 'none'; if (!on) return;
+  b.style.display = on ? '' : 'none'; document.body.classList.toggle('hasSq', on); if (!on) return;
   const bt = b.querySelector('button.main'), lb = bt.querySelector('.l'), pb = bt.querySelector('.pb i');
   const mode = SQ ? SQ.mode : 'joined';
   const txt = mode === 'split' || mode === 'follow' ? i18nTr('Reagrupar les esquadres') : mode === 'regroup' ? i18nTr('Reagrupant les esquadres…') + ' ' + Math.ceil(SQ.rem || 0) + ' s' : i18nTr('Separar en dues esquadres');
@@ -2853,7 +2854,7 @@ function aiMergeStep(u, dt) {                  // reserva que va cap al regiment
   const dx = t.cx - u.cx, dy = t.cy - u.cy, d = Math.hypot(dx, dy), diff = wrapA(Math.atan2(dy, dx) - u.h);
   if (d > 3.5) {
     if (Math.abs(diff) > 0.02) aiRot(u, Math.max(-TUNE.ia.retirada.gir * dt, Math.min(TUNE.ia.retirada.gir * dt, diff)));
-    if (Math.abs(diff) < 0.5) { const sp = aiSp(dt); aiMove(u, Math.cos(u.h) * sp, Math.sin(u.h) * sp); }
+    if (Math.abs(diff) < 0.5) { const sp = STEP * PACES.carrega.cad / 60 * dt; aiMove(u, Math.cos(u.h) * sp, Math.sin(u.h) * sp); }
     return;
   }
   const n1 = enAlive(t);
@@ -4854,7 +4855,7 @@ let autoStepT = 0;
 const VOICE = { on: false, rec: null, running: false, tested: false, seg: {}, interim: '', state: '', failT: 0, lastFail: null,
   learn: { phr: {}, ex: {} }, shared: { phr: {}, ex: {} }, opt: { mode: 'cont', vol: true, log: false, tele: true, engine: '' }, log: [], recentExec: null, ptt: false, db: false, loading: false };
 // Connexió amb Supabase (la mateixa de la web: si el joc s'obre dins la web, agafa window.APP_CONFIG) i fonts del motor local Vosk
-const GAME_VERSION = '1.8.59';
+const GAME_VERSION = '1.8.60';
 const CFG = Object.assign({
   SUPABASE_URL: 'https://ltopullwhasagnkuqaek.supabase.co',
   SUPABASE_ANON_KEY: 'sb_publishable_DhHFUh-UrbBrI0l476Vcnw_tSn-Gmkr',
@@ -7093,7 +7094,8 @@ function buildCampaign5() {
       U('33rd Regiment of Foot', 'b33', SX + 5, 30, 20), U('14th Regiment of Foot', 'b14', SX + 5, 55, 20), U('Regiment hessià Prinz Karl', 'hpk', SX + 5, 80, 20),
       U('Granaders britànics', 'b14', SX - 42, 12, 16, { h: Math.PI / 2 + 0.6 }), U('Regiment hessià Landgraf', 'hlg', SX - 42, 98, 16, { h: -Math.PI / 2 - 0.6 }),
       U('Avançada britànica (14th)', 'b14', SX - 30, 40, 18, { stay: false, hold: 26 }), U('Avançada hessiana (Landgraf)', 'hlg', SX - 30, 70, 18, { stay: false, hold: 26 }),
-      U('Reserva britànica (33rd)', 'b33', ZN.x + 22, 42, 16, { reserve: true }), U('Reserva hessiana (Prinz Karl)', 'hpk', ZN.x + 22, 68, 16, { reserve: true })
+      U('Guarnició britànica (33rd)', 'b33', ZN.x + 22, 42, 16, { garrison: true }), U('Guarnició hessiana (Prinz Karl)', 'hpk', ZN.x + 22, 68, 16, { garrison: true }),
+      U('Reserva britànica (33rd)', 'b33', SX + 18, 20, 10, { rsv: true }), U('Reserva britànica (14th)', 'b14', SX + 18, 55, 10, { rsv: true }), U('Reserva hessiana (Prinz Karl)', 'hpk', SX + 18, 90, 10, { rsv: true })
     ],
     tutorial: { steps, figs: [], startAtencio: true, resetStep: () => 1 },
     over(ctx, M, mini) {
@@ -7110,8 +7112,8 @@ function buildCampaign5() {
     },
     onReset() {
       st.t = 0; st.crossed = false; st.cap = 0; st.done = false; st.res = false;
-      for (const e of ENEMY.filter(e => e.ai)) { e.reload = 12 + Math.random() * 10; e.supp = 0; e.state = ''; e.n0 = e.men.length; e.last = null; e.helped = false; }
-      [['22e demi-brigade de ligne', 'f22', 22, 12, 0], ['28e demi-brigade de ligne', 'f28', 55, 4, 0], ['40e demi-brigade de ligne', 'f40', 88, 12, 0], ['Reserva francesa (22e)', 'f22', 38, -2, 1], ['Reserva francesa (40e)', 'f40', 72, -2, 1]].forEach(([nm, fl, y, x, rs]) => {
+      for (const e of ENEMY.filter(e => e.ai)) { e.reload = 12 + Math.random() * 10; e.supp = 0; e.state = ''; e.n0 = e.men.length; e.last = null; e.helped = false; e.taken = false; e.retTo = null; }
+      [['22e demi-brigade de ligne', 'f22', 22, 12, 0], ['28e demi-brigade de ligne', 'f28', 55, 4, 0], ['40e demi-brigade de ligne', 'f40', 88, 12, 0], ['Reserva francesa (22e)', 'f22', 38, -2, 1], ['Reserva francesa (40e)', 'f40', 72, -2, 1], ['Reserva francesa (28e)', 'f28', 55, -2, 1]].forEach(([nm, fl, y, x, rs]) => {
         const u = Object.assign(buildEnemy({ name: nm, flag: fl, cx: x, cy: y, h: 0, nFiles: 14 }), { ai: true, hold: 26, reload: 12 + Math.random() * 10, supp: 0, state: '', off: 0, last: { x: SX, y }, noRetreat: true, reserve: !!rs, stay: !!rs, helped: false });
         u.n0 = u.men.length; ALLY.push(u);
       });
@@ -7124,7 +7126,7 @@ function buildCampaign5() {
       const c = unitCentre();
       if (c.x > SX + 2) st.crossed = true;
       if (!st.res && (c.x > SX + 4 || Math.hypot(c.x - ZN.x, c.y - ZN.y) < 30)) {                              // la reserva contraataca quan entres a l'estacada
-        st.res = true; for (const e of ENEMY) if (e.reserve && !e.mergeTo && !e.routed) { e.stay = false; e.onlyPlayer = true; e.hold = 16; e.ph = 'move'; }
+        st.res = true; for (const e of ENEMY) if (e.garrison && !e.routed) { e.stay = false; e.onlyPlayer = true; e.hold = 16; e.ph = 'move'; }
         reac('alerta', '<b>Louis:</b> La reserva surt! Ens contraataquen!', 5000);
       }
       const sendRes = (list, lossMin, who) => {                                                          // un regiment que perd molts homes rep una reserva que hi va i s'hi ajunta
@@ -7134,10 +7136,25 @@ function buildCampaign5() {
           u.helped = true; r.mergeTo = u; r.stay = false; if (who === 'fr') reac('assenyala', '<b>Capità Le Jay:</b> Un regiment nostre trontolla! Una reserva hi va a reforçar-lo!', 4500);
         }
       };
-      sendRes(ENEMY.filter(e => e.ai), 0.5, 'en'); sendRes(ALLY.filter(a => !a.script), 0.75, 'fr');
-      for (const e of ENEMY) if (e.ai && !e.routed && !e.mergeTo && e.state !== 'retreat' && e.n0 && enAlive(e) > 0 && enAlive(e) <= e.n0 * 0.5 && !ENEMY.some(q => q.mergeTo === e)                      // sense reserves per enviar-hi (les reserves que ja han sortit a lluitar també compten): fugen al 50% de baixes
-        && !ENEMY.some(q => q !== e && q.reserve && !q.mergeTo && !q.routed && q.state !== 'retreat' && enAlive(q) > 0)) {
-        e.state = 'retreat'; e.awayH = 0; e.stay = false; reac('louis', '<b>Louis:</b> Han perdut la meitat dels homes: es retiren!', 4000);
+      sendRes(ALLY.filter(a => !a.script), 0.5, 'fr');
+      const freeRsv = () => ENEMY.filter(q => q.rsv && !q.taken && !q.routed && enAlive(q) > 0);                // reserves petites lliures (la guarnició de dins de l'estacada no compta)
+      const near = (e, l) => l.sort((a, b) => Math.hypot(a.cx - e.cx, a.cy - e.cy) - Math.hypot(b.cx - e.cx, b.cy - e.cy))[0];
+      for (const e of ENEMY) if (e.ai && !e.routed && !e.garrison && !e.rsv && e.state !== 'retreat' && e.n0 && enAlive(e) > 0 && enAlive(e) <= e.n0 * 0.5) {
+        const r = near(e, freeRsv());                                                                       // perd el 50%: es retira fins a una reserva i s'hi uneix; sense reserves, fuig del tot
+        e.state = 'retreat'; e.stay = false;
+        if (r) { r.taken = true; e.retTo = r; e.awayH = Math.atan2(r.cy - e.cy, r.cx - e.cx); reac('louis', '<b>Louis:</b> Es retiren a reagrupar-se amb la reserva!', 4000); }
+        else { e.retTo = null; e.awayH = 0; reac('louis', '<b>Louis:</b> Han perdut la meitat dels homes: es retiren del tot!', 4000); }
+      }
+      for (const e of ENEMY) if (e.retTo && e.state === 'retreat' && !e.routed) {
+        let r = e.retTo;
+        if (r.routed || enAlive(r) === 0) { r = near(e, freeRsv()); if (r) r.taken = true; e.retTo = r; if (!r) { e.awayH = 0; continue; } }
+        e.awayH = Math.atan2(r.cy - e.cy, r.cx - e.cx);
+        if (Math.hypot(r.cx - e.cx, r.cy - e.cy) < 3.5) {                                                   // s'ajunten i tornen a atacar
+          const n1 = enAlive(e), live = r.men.filter(v => v.alive); for (const v of live) e.men.push(v);
+          r.men = []; r.routed = true; e.retTo = null; e.state = ''; e.stay = false; e.hold = 26; e.onlyPlayer = false;
+          e.nf0 = Math.max(e.nf0 || e.nf || 10, Math.ceil((n1 + live.length) / 2)); e.n0 = n1 + live.length; e.nAl = -1; e.closing = true; e.ph = 'move'; e.supp = 0; e.reload = 6;
+          reac('louis', '<b>Louis:</b> S\'han reagrupat i tornen a atacar!', 3500);
+        }
       }
       for (const e of ENEMY) if (e.ai && !e.routed && e.state === 'retreat' && (e.cx > W - 1.5 || e.cx < 1.5 || e.cy < 1.5 || e.cy > H - 1.5)) { for (const m of e.men) m.alive = false; e.routed = true; }
       aiTickAll(dt);
