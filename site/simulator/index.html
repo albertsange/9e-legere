@@ -1657,6 +1657,7 @@ let co, lastKey = '', level = null, screen = 'title', paused = false;
 let SWAPPED = false;                           // true mentre una segona unitat (la guàrdia del nivell 4) fa servir les mateixes ordres que el jugador
 function withCo(c, f) { const r = co, nb = bubbles.length; co = c; SWAPPED = true; try { return f(); } finally { co = r; SWAPPED = false; bubbles.length = Math.min(bubbles.length, nb); } }
 // ---- Esquadres separades (nivell 5): la Première escouade del capità Le Jay actua sola amb les MATEIXES ordres i moviments que el jugador ----
+const totalMen = () => co.members.length + (SQ && !SWAPPED ? SQ.G.members.length : 0);          // tota la tropa (amb la Première escouade, si és separada)
 let SQ = null;                                   // { G: unitat del Le Jay, mode: 'split' | 'regroup' | 'follow', join: reagrupa dins el desplegament, d0, rem, prog }
 const SQ_SAY = (t, ms) => reac('assenyala', '<b>Capità Le Jay:</b> ' + t, ms || 4500);
 const sqFiles = men => [...new Set(men.map(m => m.file))].sort((a, b) => a - b);
@@ -2723,7 +2724,7 @@ function enemyVolley(e, S, all) {
   for (const m of r.dead) killOwn(m);
   e.reload = T.enRecarrega; e.aimT = 0; lastKey = '';
   setTimeout(() => reac(n ? 'decebut' : 'aprova', '<b>Louis:</b> ' + (n ? 'Ens disparen! Hem perdut <b>' + n + '</b> ' + (n === 1 ? 'home' : 'homes') + '.' : 'Ens han disparat, però han errat!'), 4600), 700);
-  if (level && level.minMen && co.members.length < level.minMen && !co.lost) {
+  if (level && level.minMen && totalMen() < level.minMen && !co.lost) {
     co.lost = true; setTimeout(() => deathRetry('La unitat ha quedat destrossada: torna-ho a provar'), TUNE.mort.destrossadaMs);
   }
 }
@@ -2810,7 +2811,7 @@ function aiVolley(u, g, side) {
   if (g.own) {
     const k = r.dead.length; for (const m of r.dead) killOwn(m); lastKey = '';
     setTimeout(() => reac(k ? 'decebut' : 'aprova', '<b>Louis:</b> ' + (k ? 'Ens disparen! Hem perdut <b>' + k + '</b> ' + (k === 1 ? 'home' : 'homes') + '.' : 'Ens han disparat, però han errat!'), 4600), 700);
-    if (level && level.minMen && co.members.length < level.minMen && !co.lost) { co.lost = true; setTimeout(() => deathRetry('La unitat ha quedat destrossada: torna-ho a provar'), TUNE.mort.destrossadaMs); }
+    if (level && level.minMen && totalMen() < level.minMen && !co.lost) { co.lost = true; setTimeout(() => deathRetry('La unitat ha quedat destrossada: torna-ho a provar'), TUNE.mort.destrossadaMs); }
   } else if (g.sq) {
     sqHit(g.sq, r.dead);
   } else if (g.ally) {
@@ -4853,7 +4854,7 @@ let autoStepT = 0;
 const VOICE = { on: false, rec: null, running: false, tested: false, seg: {}, interim: '', state: '', failT: 0, lastFail: null,
   learn: { phr: {}, ex: {} }, shared: { phr: {}, ex: {} }, opt: { mode: 'cont', vol: true, log: false, tele: true, engine: '' }, log: [], recentExec: null, ptt: false, db: false, loading: false };
 // Connexió amb Supabase (la mateixa de la web: si el joc s'obre dins la web, agafa window.APP_CONFIG) i fonts del motor local Vosk
-const GAME_VERSION = '1.8.58';
+const GAME_VERSION = '1.8.59';
 const CFG = Object.assign({
   SUPABASE_URL: 'https://ltopullwhasagnkuqaek.supabase.co',
   SUPABASE_ANON_KEY: 'sb_publishable_DhHFUh-UrbBrI0l476Vcnw_tSn-Gmkr',
@@ -7127,16 +7128,16 @@ function buildCampaign5() {
         reac('alerta', '<b>Louis:</b> La reserva surt! Ens contraataquen!', 5000);
       }
       const sendRes = (list, lossMin, who) => {                                                          // un regiment que perd molts homes rep una reserva que hi va i s'hi ajunta
-        for (const u of list) if (!u.reserve && !u.helped && u.n0 && enAlive(u) > 0 && enAlive(u) <= u.n0 * (1 - lossMin)) {
-          const r = list.find(q => q.reserve && !q.mergeTo && !q.routed && enAlive(q) > 0); if (!r) break;
+        for (const u of list) { if (u.helped && !list.some(q => q.mergeTo === u && enAlive(q) > 0)) u.helped = false; }          // la reserva que hi anava ha caigut o ja s'ha fusionat: pot demanar-ne una altra
+        for (const u of list) if (!u.helped && !u.mergeTo && u.n0 && enAlive(u) > 0 && enAlive(u) <= u.n0 * (1 - lossMin)) {
+          const r = list.find(q => q !== u && q.reserve && !q.mergeTo && !q.routed && q.state !== 'retreat' && enAlive(q) > 0); if (!r) break;
           u.helped = true; r.mergeTo = u; r.stay = false; if (who === 'fr') reac('assenyala', '<b>Capità Le Jay:</b> Un regiment nostre trontolla! Una reserva hi va a reforçar-lo!', 4500);
         }
       };
       sendRes(ENEMY.filter(e => e.ai), 0.5, 'en'); sendRes(ALLY.filter(a => !a.script), 0.75, 'fr');
-      if (!ENEMY.some(q => q.reserve && !q.mergeTo && !q.routed && enAlive(q) > 0)) {                          // sense reserves: els regiments que arriben al 50% de baixes fugen
-        for (const e of ENEMY) if (e.ai && !e.reserve && !e.routed && e.state !== 'retreat' && e.n0 && enAlive(e) > 0 && enAlive(e) <= e.n0 * 0.5 && !ENEMY.some(q => q.mergeTo === e)) {
-          e.state = 'retreat'; e.awayH = 0; e.stay = false; reac('louis', '<b>Louis:</b> Han perdut la meitat dels homes: es retiren!', 4000);
-        }
+      for (const e of ENEMY) if (e.ai && !e.routed && !e.mergeTo && e.state !== 'retreat' && e.n0 && enAlive(e) > 0 && enAlive(e) <= e.n0 * 0.5 && !ENEMY.some(q => q.mergeTo === e)                      // sense reserves per enviar-hi (les reserves que ja han sortit a lluitar també compten): fugen al 50% de baixes
+        && !ENEMY.some(q => q !== e && q.reserve && !q.mergeTo && !q.routed && q.state !== 'retreat' && enAlive(q) > 0)) {
+        e.state = 'retreat'; e.awayH = 0; e.stay = false; reac('louis', '<b>Louis:</b> Han perdut la meitat dels homes: es retiren!', 4000);
       }
       for (const e of ENEMY) if (e.ai && !e.routed && e.state === 'retreat' && (e.cx > W - 1.5 || e.cx < 1.5 || e.cy < 1.5 || e.cy > H - 1.5)) { for (const m of e.men) m.alive = false; e.routed = true; }
       aiTickAll(dt);
@@ -7147,7 +7148,7 @@ function buildCampaign5() {
     objectives: [
       { t: 'Travessar l\'estacada per una obertura', ok: () => st.crossed },
       { t: 'Capturar la zona protegida (mantenir-hi la unitat 60 s)', ok: () => st.done },
-      { t: 'Mantenir la unitat amb almenys 12 homes', ok: () => co.members.length >= 12 }
+      { t: 'Mantenir la unitat amb almenys 12 homes', ok: () => totalMen() >= 12 }
     ],
     goalText: 'Avança amb els regiments de línia, travessa l\'estacada per una obertura, entra a la zona protegida i mantén-t\'hi un minut malgrat el contraatac de la reserva.',
     endText: 'Molt bé, chasseur: has creuat l\'estacada sota el foc creuat, has aguantat el contraatac de la reserva i la zona protegida és nostra. Hondschoote és de la República.'
