@@ -4629,7 +4629,7 @@ let autoStepT = 0;
 const VOICE = { on: false, rec: null, running: false, tested: false, seg: {}, interim: '', state: '', failT: 0, lastFail: null,
   learn: { phr: {}, ex: {} }, shared: { phr: {}, ex: {} }, opt: { mode: 'cont', vol: true, log: false, tele: true, engine: '' }, log: [], recentExec: null, ptt: false, db: false, loading: false };
 // Connexió amb Supabase (la mateixa de la web: si el joc s'obre dins la web, agafa window.APP_CONFIG) i fonts del motor local Vosk
-const GAME_VERSION = '1.8.50';
+const GAME_VERSION = '1.8.51';
 const CFG = Object.assign({
   SUPABASE_URL: 'https://ltopullwhasagnkuqaek.supabase.co',
   SUPABASE_ANON_KEY: 'sb_publishable_DhHFUh-UrbBrI0l476Vcnw_tSn-Gmkr',
@@ -6405,7 +6405,7 @@ function buildCampaign2() {
   const VC = { x: 66, y: 16.5 };                                                                           // centre del poble
   const vil = [];                                                                                          // cases del poble (amb el seu desgast)
   const house = (x, y, w, h, rot, kind) => { sc.push(A.building({ x, y, w, h, rot, kind })); const m = Math.max(w, h) / 2 * 0.9, r = { x0: x - m * (w >= h ? 1 : 0.7), y0: y - m * (w >= h ? 0.7 : 1), x1: x + m * (w >= h ? 1 : 0.7), y1: y + m * (w >= h ? 0.7 : 1) }; obs.push(Object.assign({ msg: MSG_H }, r)); walls.push(r); return { x, y, w, h, rot, dmg: 0, hid: kind === 'church' }; };
-  sc.push(A.field([[-16, -16], [W + 16, -16], [W + 16, H + 16], [-16, H + 16]], { kind: 'meadow' }));
+  sc.push(A.field([[-36, -36], [W + 36, -36], [W + 36, H + 36], [-36, H + 36]], { kind: 'meadow' }));
   // camins: el principal passa sota el poble i va cap a la bateria; un camí del nord s'hi uneix; un altre baixa cap al sud-est
   const main = [[0, 38.5], [28, 38], [50, 40.5], [75, 41.5], [96, 40], [112, 36.5], [128, 35], [140, 36], [152, 40]];
   const north = [[96, 4], [97.5, 16], [96.5, 28], [96, 40]], se = [[112, 36.5], [124, 43], [136, 51], [144, 58]];
@@ -6432,7 +6432,7 @@ function buildCampaign2() {
   const woods = [wd([[100, 45], [110, 43.5], [122, 44.5], [125, 52], [113, 56], [102, 54]], 'mixed', 61), wd([[0, 69], [40, 68], [90, 70], [130, 68.5], [170, 69.5], [170, 80], [0, 80]], 'broad', 64), wd([[158, 2], [168, 3], [168, 14], [160, 13]], 'broad', 62), wd([[2, 48], [16, 47], [20, 56], [4, 57]], 'mixed', 63)];
   sc.push(...woods); cover.push(...woods.flatMap(w => w.trees));
   const ew = (pts, kind, seed) => A.wood(pts, { kind, spacing: 2.6, seed });
-  sc.push(ew([[-16, -16], [W + 16, -16], [W + 16, -2], [-16, -2]], 'mixed', 71), ew([[-16, H + 2], [W + 16, H + 2], [W + 16, H + 16], [-16, H + 16]], 'broad', 72), ew([[-16, -2], [-2, -2], [-2, H + 2], [-16, H + 2]], 'mixed', 73), ew([[W + 2, -2], [W + 16, -2], [W + 16, H + 2], [W + 2, H + 2]], 'broad', 74));
+  sc.push(ew([[-36, -36], [W + 36, -36], [W + 36, -2], [-36, -2]], 'mixed', 71), ew([[-36, H + 2], [W + 36, H + 2], [W + 36, H + 36], [-36, H + 36]], 'broad', 72), ew([[-36, -2], [-2, -2], [-2, H + 2], [-36, H + 2]], 'mixed', 73), ew([[W + 2, -2], [W + 36, -2], [W + 36, H + 2], [W + 2, H + 2]], 'broad', 74));
   sc.push(A.label('Neerwinden', VC.x, 3.2, { kind: 'town', scale: 0.7 }), A.label('Línia francesa', 8, 5, { kind: 'place', scale: 0.5 }), A.label('Camps', 70, 43.5, { kind: 'place', scale: 0.5 }), A.label('Prats', 70, 52, { kind: 'place', scale: 0.55 }), A.label('Bateria austríaca', 150, 8, { kind: 'place', scale: 0.5 }));
   // la bateria: tres canons de cara a l'oest, amb una tanca darrere
   sc.push(A.hedge([[160, 10], [161, 28], [160.5, 46]], { seed: 12 }));
@@ -6453,7 +6453,7 @@ function buildCampaign2() {
   ];
   const ash = (v, i) => ((Math.sin(v * 12.9898 + i * 78.233) * 43758.5453) % 1 + 1) % 1;
   return {
-    w: W, h: H, pad: 16, freeStab: true, localStab: true, obertura: 0.1, start: { x: 22, y: 34 }, obstacles: obs, scene: MapKit.scene(sc), zone: null, musket: true, skirm: true, driftScale: 0.5, goalHeading: 0,
+    w: W, h: H, pad: 36, freeStab: true, localStab: true, obertura: 0.1, start: { x: 22, y: 34 }, obstacles: obs, scene: MapKit.scene(sc), zone: null, musket: true, skirm: true, driftScale: 0.5, goalHeading: 0,
     cover, walls,
     guns: GYS.map((y, i) => ({ x: GX, y, h: Math.PI, name: 'Canó austríac ' + (i + 1), crew: 5, adv: true, half: true, range: 95, vis: 62, cone: 1.0, can: 25, rt: 14, rot: 0.3, vil: { x: VC.x, y: 14, r: 16 } })),
     enemies: [
@@ -6545,7 +6545,7 @@ function buildCampaign2() {
 }
 function buildCampaign3() {
   const A = MapKit.A, W = 160, H = 60, sc = [], obs = [], R = MapKit.rng(33), BX = 144, BY = 30;
-  sc.push(A.field([[-16, -16], [W + 16, -16], [W + 16, H + 16], [-16, H + 16]], { kind: 'meadow' }));
+  sc.push(A.field([[-36, -36], [W + 36, -36], [W + 36, H + 36], [-36, H + 36]], { kind: 'meadow' }));
   const road = [[0, 31], [30, 29.5], [60, 31], [95, 29.5], [125, 30.5], [160, 30]];
   sc.push(A.road(road, { kind: 'track' }));
   sc.push(A.field([[8, 6], [40, 5], [42, 22], [10, 23]], { kind: 'arable', seed: 3 }), A.field([[50, 38], [86, 37], [88, 54], [52, 55]], { kind: 'arable', seed: 4 }), A.field([[96, 8], [128, 7], [130, 22], [98, 23]], { kind: 'arable', seed: 5 }));
@@ -6556,7 +6556,7 @@ function buildCampaign3() {
   const wd = (pts, kind, seed) => A.wood(pts, { kind, spacing: 2.6, seed }), cover = [];
   const woods = [wd([[60, 4], [78, 3], [80, 14], [64, 15]], 'mixed', 41), wd([[20, 42], [36, 41], [38, 52], [22, 54]], 'broad', 42), wd([[108, 40], [124, 39], [126, 52], [110, 53]], 'mixed', 43)];
   sc.push(...woods); cover.push(...woods.flatMap(w => w.trees));
-  sc.push(wd([[-16, -16], [W + 16, -16], [W + 16, -2], [-16, -2]], 'mixed', 71), wd([[-16, H + 2], [W + 16, H + 2], [W + 16, H + 16], [-16, H + 16]], 'broad', 72), wd([[-16, -2], [-2, -2], [-2, H + 2], [-16, H + 2]], 'mixed', 73), wd([[W + 2, -2], [W + 16, -2], [W + 16, H + 2], [W + 2, H + 2]], 'mixed', 74));
+  sc.push(wd([[-36, -36], [W + 36, -36], [W + 36, -2], [-36, -2]], 'mixed', 71), wd([[-36, H + 2], [W + 36, H + 2], [W + 36, H + 36], [-36, H + 36]], 'broad', 72), wd([[-36, -2], [-2, -2], [-2, H + 2], [-36, H + 2]], 'mixed', 73), wd([[W + 2, -2], [W + 36, -2], [W + 36, H + 2], [W + 2, H + 2]], 'mixed', 74));
   sc.push(A.label('Camí de retirada', 72, 26, { kind: 'place', scale: 0.55 }), A.label('Pont segur', BX + 12, BY - 6, { kind: 'place', scale: 0.55 }));
   const roadY = x => { for (let i = 1; i < road.length; i++) if (x <= road[i][0]) { const a = road[i - 1], b = road[i]; return a[1] + (b[1] - a[1]) * (x - a[0]) / (b[0] - a[0]); } return 30; };
   const QUEUE = ['c', 'i', 'c', 'c', 'i', 'c'], FINAL = ['i', 'c', 'c'];                                   // c = cavalleria (cal Ralliement), i = infanteria a la baioneta (cal línia i foc)
@@ -6588,7 +6588,7 @@ function buildCampaign3() {
   };
   const resolveWave = () => { const u = st.act; if (!u) return; for (const m of u.men) m.alive = false; u.routed = true; const i = ENEMY.indexOf(u); if (i >= 0) ENEMY.splice(i, 1); st.act = null; st.resolved++; st.wait = 7 + Math.random() * 5; lastKey = ''; };
   return {
-    w: W, h: H, pad: 16, freeStab: true, localStab: true, square: true, start: { x: 10, y: 30 }, obstacles: obs, scene: MapKit.scene(sc), zone: null, musket: true, skirm: true, driftScale: 0.5, goalHeading: 0, minMen: 8, cover,
+    w: W, h: H, pad: 36, freeStab: true, localStab: true, square: true, start: { x: 10, y: 30 }, obstacles: obs, scene: MapKit.scene(sc), zone: null, musket: true, skirm: true, driftScale: 0.5, goalHeading: 0, minMen: 8, cover,
     guns: [], enemies: [],
     tutorial: { steps, figs: [], startAtencio: true, resetStep: () => 1 },
     over(ctx, M, mini) {
@@ -6600,7 +6600,7 @@ function buildCampaign3() {
         ctx.fillStyle = '#2d1f10'; for (const [dx, dy] of [[-1.1, -1.05], [1.1, -1.05], [-1.1, 1.05], [1.1, 1.05]]) ctx.fillRect((dx - 0.35) * M, (dy - 0.12) * M, 0.7 * M, 0.24 * M);
         ctx.restore();
       } else if (mini && cartOk()) { ctx.fillStyle = '#7a5a34'; ctx.fillRect((c.x - 1.5) * M, (c.y - 1) * M, 3 * M, 2 * M); }
-      if (!mini) { ctx.save(); ctx.fillStyle = 'rgba(24,22,60,.22)'; ctx.fillRect(-20 * M, -20 * M, (W + 40) * M, (H + 40) * M); ctx.restore(); }
+      if (!mini) { ctx.save(); ctx.fillStyle = 'rgba(24,22,60,.22)'; ctx.fillRect(-600 * M, -600 * M, (W + 1200) * M, (H + 1200) * M); ctx.restore(); }
     },
     onReset() {
       st.t = 0; st.go = false; st.ncav = 0; st.cart = { x: 22, y: roadY(22), hp: 3, idle: 0 }; st.q = QUEUE.slice(); st.act = null; st.wait = 12; st.resolved = 0; st.volleyT = -9; st.done = false; st.fin = undefined; st.warnedFar = 0; st.finalOn = false;
@@ -6630,7 +6630,7 @@ function buildCampaign3() {
               if (u.cstate === 'charge') {
                 if (dist > 14) u.cdir = Math.atan2(dy, dx);
                 const vC = u.trot ? 4.2 : 7.5; moveCav(u, Math.cos(u.cdir) * vC, Math.sin(u.cdir) * vC, dt);
-                if (co.sq) { let hit = 0; for (const m of alive) if (!m.imp && co.members.some(o => Math.hypot(o.x - m.x, o.y - m.y) < 2.6)) { m.imp = true; if (Math.random() < 0.4) { killEnemy(m, u); hit++; } } if (hit) reac('aprova', '<b>Louis:</b> Un cavall s\'ha empalat a les baionetes!', 3500); }   // si la bola és a punt, els cavalls s'hi claven
+                if (co.sq && co.arm === 'croise') { let hit = 0; for (const m of alive) if (!m.imp && co.members.some(o => Math.hypot(o.x - m.x, o.y - m.y) < 2.6)) { m.imp = true; if (Math.random() < 0.4) { killEnemy(m, u); hit++; } } if (hit) reac('aprova', '<b>Louis:</b> Un cavall s\'ha empalat a les baionetes!', 3500); }   // si la bola és a punt, els cavalls s'hi claven
                 if (co.sq && dist < 4.5) {                                                                  // reagrupats: els genets no s'hi llancen, hi giren al voltant
                   u.cstate = 'circle'; u.t0 = st.t;
                   alive.forEach((m, i) => { const a = Math.atan2(m.y - c.y, m.x - c.x); m.oa = a + i * 0.12; m.orad = 6 + (i % 3) * 1.3; m.ow = 6.5 / m.orad; m.acc = 0; });
@@ -6706,7 +6706,7 @@ function buildCampaign3() {
 }
 function buildCampaign4() {
   const A = MapKit.A, W = 150, H = 70, sc = [], obs = [], R = MapKit.rng(44), FOG = 24, BH = { x: 133, y: 35, r: 8 };
-  sc.push(A.field([[-16, -16], [W + 16, -16], [W + 16, H + 16], [-16, H + 16]], { kind: 'meadow' }));
+  sc.push(A.field([[-36, -36], [W + 36, -36], [W + 36, H + 36], [-36, H + 36]], { kind: 'meadow' }));
   sc.push(A.road([[0, 35], [20, 34], [24, 35]], { kind: 'track' }), A.road([[120, 35], [134, 35.5], [150, 35]], { kind: 'track' }));
   const swamp = [[22, -2], [120, -2], [120, H + 2], [22, H + 2]];                                                   // pantà: fang poc fondo a tot arreu
   sc.push(A.field(swamp, { kind: 'marsh', seed: 7 }));
@@ -6715,18 +6715,18 @@ function buildCampaign4() {
   const wd = (pts, kind, seed) => A.wood(pts, { kind, spacing: 2.6, seed }), cover = [];
   const woods = [wd([[126, 6], [150, 6], [150, 28], [128, 30]], 'mixed', 81), wd([[126, 42], [150, 42], [150, 64], [128, 62]], 'broad', 82), wd([[2, 4], [18, 5], [16, 18], [3, 17]], 'mixed', 83), wd([[2, 50], [18, 51], [17, 64], [3, 63]], 'broad', 84)];
   sc.push(...woods); cover.push(...woods.flatMap(w => w.trees));
-  sc.push(wd([[-16, -16], [W + 16, -16], [W + 16, -2], [-16, -2]], 'mixed', 91), wd([[-16, H + 2], [W + 16, H + 2], [W + 16, H + 16], [-16, H + 16]], 'broad', 92), wd([[-16, -2], [-2, -2], [-2, H + 2], [-16, H + 2]], 'mixed', 93), wd([[W + 2, -2], [W + 16, -2], [W + 16, H + 2], [W + 2, H + 2]], 'mixed', 94));
+  sc.push(wd([[-36, -36], [W + 36, -36], [W + 36, -2], [-36, -2]], 'mixed', 91), wd([[-36, H + 2], [W + 36, H + 2], [W + 36, H + 36], [-36, H + 36]], 'broad', 92), wd([[-36, -2], [-2, -2], [-2, H + 2], [-36, H + 2]], 'mixed', 93), wd([[W + 2, -2], [W + 36, -2], [W + 36, H + 2], [W + 2, H + 2]], 'mixed', 94));
   sc.push(A.label('Pantà', 70, 12, { kind: 'place', scale: 0.7 }), A.label('Vora del bosc', BH.x, BH.y - 12, { kind: 'place', scale: 0.55 }));
   const inDeep = (x, y) => DEEP.some(([dx, dy, r]) => ((x - dx) / r) ** 2 + ((y - dy) / (r * 0.8)) ** 2 < 1);
   const mudK = () => { const c = unitCentre(); return inDeep(c.x, c.y) ? 0.3 : (c.x > 22 && c.x < 120) ? 0.62 : 1; };
   const PK = [[34, 33, 3], [52, 22, 4], [70, 44, 3], [90, 40, 3], [108, 34, 4]];                           // piquets anglo-hannoverians: x, y, files
-  const st = { alarmed: false, crossed: false, bh: 0, done: false, shot0: 0, vol: 0 };
+  const st = { alarmed: false, crossed: false, bh: 0, done: false, shot0: 0, vol: 0, gT: 0 };
   const det = new Array(PK.length).fill(0);
   const pk = () => ENEMY.filter(e => e.picket), pkAlive = () => pk().filter(e => enAlive(e) > 0).length;
   const fail = msg => { if (st.alarmed) return; st.alarmed = true; SFX.hit(); reac('decebut', '<b>Louis:</b> Ens han descobert! Han donat l\'alarma!', 3000); setTimeout(() => deathRetry(msg), 600); };
   const steps = [
     { title: 'Avançada cap a Hondschoote', pose: 'serios', hl: [], unlock: ['gir', 'mov', 'pace', 'parfile', 'bataille', 'align', 'obl', 'conv', 'tournez', 'ligne', 'form', 'repos', 'musket', 'skirm', 'carre'], tag: 'Hondschoote · setembre de 1793 · matinada', intro: true, btn: 'Endavant',
-      text: ['«Hondschoote, setembre de 1793, i la boira és tan espessa que no es veu a vint passos. Els anglo-hanoverians han deixat <b>cinc piquets</b> al pantà que ens separa del bosc.»',
+      text: ['«Per no fer tant soroll, emporteu-vos només una <b>escouade</b>: l\'altra meitat es quedarà aquí fent guàrdia.»', '«Hondschoote, setembre de 1793, i la boira és tan espessa que no es veu a vint passos. Els anglo-hanoverians han deixat <b>cinc piquets</b> al pantà que ens separa del bosc.»',
         '«Avui <b>no es dispara</b>: un sol tret desperta tot el campament. Fiqueu <b>baioneta</b> amb <b>Croisez la baïonnette</b> i ataqueu els piquets <b>pels flancs o per darrere</b>: només hi veuen en un con davant seu.»',
         '«Compte amb el <b>fang</b>: el fang fosc és fondo i ens frena molt. Voregeu-lo. Quan els cinc piquets hagin caigut, <b>assegureu la capçalera de pont</b> a la vora del bosc. <b>Vive le 9e!</b>»'],
       done: () => TUT.intro },
@@ -6735,7 +6735,7 @@ function buildCampaign4() {
       resetStep: () => 1, done: () => false }
   ];
   return {
-    w: W, h: H, pad: 16, freeStab: true, localStab: true, start: { x: 8, y: 35 }, obstacles: obs, scene: MapKit.scene(sc), zone: null, musket: true, skirm: true, driftScale: 0.5, goalHeading: 0, minMen: 8, cover, fogR: FOG, mudK,
+    w: W, h: H, pad: 36, freeStab: true, localStab: true, start: { x: 8, y: 35 }, obstacles: obs, scene: MapKit.scene(sc), zone: null, musket: true, skirm: true, driftScale: 0.5, goalHeading: 0, minMen: 5, cover, fogR: FOG, mudK,
     guns: [], enemies: PK.map(([x, y, nf], i) => ({ name: 'Piquet anglo-hannoverià', cx: x, cy: y, h: Math.PI, nFiles: nf, picket: true, shoots: false, idx: i })),
     tutorial: { steps, figs: [], startAtencio: true, resetStep: () => 1 },
     over(ctx, M, mini) {
@@ -6752,11 +6752,23 @@ function buildCampaign4() {
       ctx.fillStyle = g; ctx.fillRect(-40 * M, -40 * M, (W + 80) * M, (H + 80) * M);
       ctx.restore();
     },
-    onReset() { st.alarmed = false; st.crossed = false; st.bh = 0; st.done = false; st.shot0 = co.lastShot || 0; det.fill(0); },
+    onReset() {
+      st.alarmed = false; st.crossed = false; st.bh = 0; st.done = false; st.shot0 = co.lastShot || 0; det.fill(0); st.gT = 0;
+      const keep = co.members.filter(m => m.file < 5), go = co.members.filter(m => m.file >= 5);                  // només una escouade surt; l'altra meitat fa guàrdia
+      co.members = keep; relabel();
+      const U = buildEnemy({ name: 'Escouade de guàrdia', flag: '9e', cx: 8, cy: 34, h: 0, nFiles: 5 });
+      U.men = go.map((m, i) => ({ x: m.x, y: m.y, alive: true, t: 0, rank: m.rank, h: 0, x0: m.x, y0: m.y, tx: 18.5 + (i % 2) * 0.8, ty: 13 + i * (44 / 9) }));
+      Object.assign(U, { script: true, shoots: false, guard: true }); ALLY.push(U);
+    },
     onVolley() { if (pkAlive()) fail('Un tret ha donat l\'alarma: torna-ho a provar'); },
     tick(dt) {
       if (screen !== 'game' || paused || tutOpen() || co.lost || st.alarmed) return;
       if (TUT.step < 1) return;
+      if (st.gT < 7) {                                                                                         // la meitat de la tropa fa demi-tour à droite i es desplega en tiradors al llarg del pantà
+        if (st.gT === 0) reac('assenyala', '<b>Capità Le Jay:</b> Escouade de garde, demi-tour à droite! Deployez en tiralleurs!', 5500);
+        st.gT += dt; const p0 = Math.min(1, st.gT / 6), p = p0 * p0 * (3 - 2 * p0), G = ALLY.find(a => a.guard);
+        if (G) { for (const m of G.men) { m.x = m.x0 + (m.tx - m.x0) * p; m.y = m.y0 + (m.ty - m.y0) * p; m.h = Math.PI * Math.min(1, p0 * 1.6); } G.cx = 13; G.cy = 35; G.h = Math.PI; }
+      }
       const c = unitCentre();
       if (co.lastShot && co.lastShot > st.shot0 + 1 && pkAlive()) { st.shot0 = co.lastShot; fail('Un tret ha donat l\'alarma: torna-ho a provar'); return; }
       if (c.x > 120) st.crossed = true;
@@ -6778,7 +6790,7 @@ function buildCampaign4() {
       { t: 'Creuar el pantà fins a la riba est', ok: () => st.crossed },
       { t: 'Silenciar els cinc piquets amb la baioneta, sense donar l\'alarma', ok: () => !pkAlive() },
       { t: 'Assegurar la capçalera de pont a la vora del bosc (8 s aturats)', ok: () => st.done },
-      { t: 'Mantenir la unitat amb almenys 8 homes', ok: () => co.members.length >= 8 }
+      { t: 'Mantenir l\'escouade amb almenys 5 homes', ok: () => co.members.length >= 5 }
     ],
     goalText: 'Creua el pantà enmig de la boira, silencia els cinc piquets amb la baioneta (sense disparar ni deixar que et vegin) i assegura la vora del bosc.',
     endText: 'Molt bé, chasseur: els cinc piquets han caigut sense un crit i la capçalera de pont és nostra. A la boira, el silenci val més que la pólvora: l\'exèrcit podrà creuar el pantà abans que els anglesos se n\'adonin.'
