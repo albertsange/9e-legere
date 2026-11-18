@@ -665,3 +665,77 @@ body.sim-fit{overflow:hidden}
 
 .camp-wrap{margin-top:2.2rem;padding-top:1.4rem;border-top:1px solid var(--line,#ccc)}
 .camp-main{font-size:1.35rem;margin:0 0 .4rem}
+
+/* Depot: catalogue (grid or list) and product page; purchase buttons are placeholders */
+.dp-intro{max-width:70ch;color:var(--muted);margin:.2rem 0 1.2rem}
+.dp-tools{display:flex;flex-wrap:wrap;gap:.6rem;align-items:center;margin:0 0 1.2rem;padding:.7rem;border:1px solid var(--line);border-radius:4px;background:var(--sheet)}
+.dp-search{flex:1 1 16rem;margin:0}
+.dp-q{width:100%;font:inherit;padding:.5rem .75rem;border:1px solid var(--line);border-radius:3px;background:var(--paper);color:var(--ink)}
+.dp-tools select,.dp-fld select,.dp-fld input,.dp-stock select,.dp-stock input,.dp-qty{font:inherit;font-size:.95rem;padding:.4rem .5rem;border:1px solid var(--line);border-radius:3px;background:var(--paper);color:var(--ink)}
+.dp-views{display:inline-flex;border:1px solid var(--line);border-radius:3px;overflow:hidden}
+.dp-vbtn{display:inline-flex;align-items:center;gap:.35rem;font-family:var(--label);font-size:.85rem;letter-spacing:.04em;padding:.4rem .65rem;border:0;background:transparent;color:var(--bleu);cursor:pointer}
+.dp-vbtn[aria-pressed="true"]{background:var(--bleu);color:var(--on-bleu)}
+.dp-count{font-family:var(--label);font-size:.85rem;margin-left:auto}
+.dp-items{list-style:none;margin:0;padding:0}
+.dp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:1rem}
+.dp-card{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:4px;background:var(--sheet);overflow:hidden}
+.dp-card[hidden]{display:none}
+.dp-grid .dp-img{display:block;width:100%;aspect-ratio:4/3;object-fit:contain;background:#fff}
+.dp-grid .img-ph.dp-img{display:block;width:100%;aspect-ratio:4/3}
+.dp-body{display:flex;flex-direction:column;gap:.2rem;padding:.7rem .8rem .3rem;flex:1}
+.dp-name{font-weight:700;color:var(--ink);text-decoration:none;line-height:1.3}
+.dp-name:hover{color:var(--bleu);text-decoration:underline}
+.dp-cat{font-family:var(--label);letter-spacing:.05em;font-size:.8rem;color:var(--muted);margin:0}
+.dp-av{font-size:.85rem;margin:0}
+.dp-av::before{content:"";display:inline-block;width:.55rem;height:.55rem;border-radius:50%;margin-right:.4rem;background:var(--muted);vertical-align:.05rem}
+.dp-av.in::before{background:var(--chasseur)}
+.dp-av.out{color:var(--muted)}
+.dp-buy{display:flex;align-items:center;justify-content:space-between;gap:.5rem;padding:.4rem .8rem .8rem;flex-wrap:wrap}
+.dp-price{font-family:var(--label);font-size:1.1rem;letter-spacing:.03em;color:var(--ink);font-weight:700}
+.dp-price.big{font-size:1.6rem;margin:.3rem 0}
+.dp-cart:active,.dp-order:active{transform:translateY(1px)}
+.dp-list .dp-card{flex-direction:row;align-items:center;margin-bottom:.5rem}
+.dp-list .dp-link{flex:0 0 auto}
+.dp-list .dp-img{display:block;width:96px;height:72px;object-fit:contain;background:#fff}
+.dp-list .dp-body{padding:.5rem .9rem}
+.dp-list .dp-buy{padding:.5rem .9rem;flex-wrap:nowrap}
+@media (max-width:640px){.dp-list .dp-card{flex-wrap:wrap}.dp-list .dp-buy{width:100%}}
+.dp-detail{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:2rem;align-items:start;margin:.6rem 0 1.5rem}
+@media (max-width:860px){.dp-detail{grid-template-columns:1fr}}
+.dp-main{margin:0;border:1px solid var(--line);border-radius:4px;background:#fff;display:flex;align-items:center;justify-content:center}
+.dp-main img{display:block;max-width:100%;max-height:520px;object-fit:contain}
+.img-ph.dp-main{display:block;aspect-ratio:4/3}
+.dp-thumbs{display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.6rem}
+.dp-th{padding:0;border:2px solid var(--line);border-radius:3px;background:#fff;cursor:pointer}
+.dp-th[aria-current="true"]{border-color:var(--bleu)}
+.dp-th img{display:block;width:72px;height:56px;object-fit:contain}
+.dp-info .piece-head{margin-top:0}
+.dp-buy-box{display:flex;flex-wrap:wrap;gap:.6rem;align-items:end;margin:1rem 0 1.4rem}
+.dp-qty-l{display:flex;flex-direction:column;font-family:var(--label);font-size:.8rem;letter-spacing:.05em;color:var(--muted)}
+.dp-qty{width:5rem}
+.dp-buy-box .btn,.dp-buy-box .btn-ghost{padding:.6rem 1.1rem;font-size:1rem}
+table.dp-stock{border-collapse:collapse;width:100%;min-width:0;margin:.3rem 0 .6rem;font-size:.95rem}
+.dp-stock th{font-family:var(--label);letter-spacing:.05em;font-size:.8rem;color:var(--muted);text-align:left;font-weight:400;border-bottom:1px solid var(--line);padding:.3rem .4rem}
+.dp-stock td{border-bottom:1px solid var(--line);padding:.4rem;vertical-align:middle}
+.dp-stock tr.out td{color:var(--muted)}
+.dp-stock input[type=text]{width:100%}
+.dp-fld{display:flex;flex-direction:column;gap:.2rem;margin:.5rem 0;font-family:var(--label);font-size:.82rem;letter-spacing:.05em;color:var(--muted)}
+.dp-fld input,.dp-fld select{font-family:var(--body);color:var(--ink);max-width:24rem}
+.dp-lbl{font-family:var(--label);letter-spacing:.05em;font-size:.82rem;color:var(--muted);margin:.8rem 0 .3rem}
+.dp-ph-list{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:.6rem}
+.dp-ph-list li{border:1px solid var(--line);border-radius:3px;padding:.3rem;background:var(--sheet)}
+.dp-ph-list img{display:block;width:110px;height:84px;object-fit:contain;background:#fff}
+.dp-ph-tools{display:flex;gap:.25rem;justify-content:center;margin-top:.25rem}
+.dp-sec{max-width:75ch;margin:0 0 1.8rem}
+.dp-ref{max-width:none;border:1px solid var(--line);border-radius:4px;background:var(--sheet);padding:1rem 1.2rem}
+.dp-ref-in{display:grid;grid-template-columns:160px minmax(0,1fr);gap:1.2rem;align-items:start}
+@media (max-width:640px){.dp-ref-in{grid-template-columns:1fr}}
+.dp-ref-pic{display:block;width:160px;height:120px;object-fit:contain;background:#fff;border:1px solid var(--line);border-radius:3px}
+.dp-ref-t{margin:0 0 .3rem;font-size:1.2rem}
+.dp-ref-lead{color:var(--muted)}
+.dp-pat{border-left:3px solid var(--chasseur);padding:.1rem 0 .1rem .9rem;margin:.6rem 0}
+.dp-pat-h{margin:0 0 .3rem}
+.dp-pat-h .dp-lbl{margin:0}
+.dp-deps-ed{margin:0 0 1.2rem;max-width:44rem}
+.dp-info{min-width:0}
+.dp-ref .ver-specs{min-width:0;max-width:32rem}

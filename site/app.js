@@ -198,6 +198,8 @@
     str: function () { return ''; },
     pair: function () { return ['', '']; },
     reg: function () { return { _new: true, year: '', name: '', parts: [{ label: '', fr: '', tr: { ca: '' } }] }; },
+    depot: function () { var x = { id: 'd' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), name: '', place: {} }; x.place[S.lang] = ''; return x; },
+    dpstock: function () { return { depot: '', qty: '' }; },
     regpart: function () { return { label: '', fr: '', tr: { ca: '' } }; },
     group: function () { return { title: { ca: '' }, desc: { ca: '' }, figs: [] }; },
     version: function () { var v = { year: '', title: {}, text: {}, specs: {}, image: '', nine: false }; v.title[S.lang] = ''; v.text[S.lang] = ''; v.specs[S.lang] = []; return v; }
@@ -317,6 +319,7 @@
         }).join('') + '</ol></li>' : '') + '</ol>' +
       '<p>' + esc(t('index')) + '</p><ol class="menu-items">' + S.children[''].map(nav).join('') + '</ol>' +
       '<ol class="extra"><li><a href="#regulacions" data-sec="regulacions"><span class="n">§</span><span>' + esc(L((S.site.regs || {}).title) || t('regs_page')) + '</span></a></li>' +
+      '<li><a href="#depot" data-sec="depot"><span class="n">▦</span><span>' + esc(L((S.site.depot || {}).title) || t('depot')) + '</span></a></li>' +
       '<li><a href="#decisions" data-sec="decisions"><span class="n">·</span><span>' + esc(L((S.site.decisions || {}).title) || t('decisions')) + '</span></a></li>' +
       '<li><a href="#fonts" data-sec="fonts"><span class="n">·</span><span>' + esc(L((S.site.fonts || {}).title) || t('sources')) + '</span></a></li>' +
       (isMember() ? '<li><a href="#simulator" data-sec="simulator"><span class="n">▶</span><span>' + esc(L((S.site.simulator || {}).title) || t('sim_title')) + '</span></a></li>' : '') +
@@ -350,9 +353,9 @@
   /* ------------------------------------------------------------------ routing */
   function routeId() { return (decodeURIComponent((location.hash || '').replace(/^#/, '')) || 'home').split('~')[0]; }
   function routeAnchor() { var h = decodeURIComponent((location.hash || '').replace(/^#/, '')); return h.indexOf('~') > -1 ? h.slice(h.indexOf('~') + 1) : ''; }
-  var SPECIAL = { home: 1, decisions: 1, fonts: 1, regulacions: 1, simulator: 1, registre: 1, compte: 1, gestio: 1, nova: 1, contrasenya: 1 };
+  var SPECIAL = { home: 1, decisions: 1, fonts: 1, regulacions: 1, simulator: 1, depot: 1, registre: 1, compte: 1, gestio: 1, nova: 1, contrasenya: 1 };
 
-  function draftKeyFor(id) { var blk = { home: 1, decisions: 1, fonts: 1, simulator: 1, regulacions: 1 }; if (SPECIAL[id] && !blk[id]) return null; return S.byId[id] || blk[id] ? id : null; }
+  function draftKeyFor(id) { if (isDepotRoute(id)) return 'depot'; var blk = { home: 1, decisions: 1, fonts: 1, simulator: 1, regulacions: 1 }; if (SPECIAL[id] && !blk[id]) return null; return S.byId[id] || blk[id] ? id : null; }
   function makeDraft(id) {
     S.draftKey = id; S.dirty = false; S.prefilled = [];
     if (S.byId[id]) {
@@ -370,6 +373,8 @@
       s.home = s.home || {}; ['eyebrow', 'h1', 'lead1', 'lead2', 'lead3', 'crit', 'platecap'].forEach(function (k) { s.home[k] = s.home[k] || { ca: '' }; });
       ['decisions', 'fonts', 'simulator'].forEach(function (k) { s[k] = s[k] || {}; s[k].title = s[k].title || { ca: '' }; s[k].html = s[k].html || { ca: '' }; });
       s.regs = s.regs || {}; ['title', 'intro_r', 'intro_i'].forEach(function (k) { s.regs[k] = s.regs[k] || { ca: '' }; });
+      s.depot = s.depot || {}; ['title', 'intro'].forEach(function (k) { s.depot[k] = s.depot[k] || { ca: '' }; });
+      s.depot.depots = s.depot.depots || []; s.depot.items = s.depot.items || [];
     }
     prefillLang();
   }
@@ -427,11 +432,12 @@
   var lastRoute = null;
   function route() {
     var id = routeId(), anc = routeAnchor();
-    if (lastRoute && id !== lastRoute && S.edit && S.dirty && !window.confirm(t('unsaved'))) {
+    var keepDraft = lastRoute && isDepotRoute(lastRoute) && isDepotRoute(id);
+    if (lastRoute && id !== lastRoute && !keepDraft && S.edit && S.dirty && !window.confirm(t('unsaved'))) {
       history.replaceState(null, '', '#' + (lastRoute === 'home' ? '' : lastRoute));
       return;
     }
-    if (lastRoute !== id) { S.draft = null; S.dirty = false; }
+    if (lastRoute !== id && !keepDraft) { S.draft = null; S.dirty = false; }
     var changed = lastRoute !== id;
     lastRoute = id;
     render();
@@ -469,6 +475,7 @@
     if (id === 'home') html = homeView();
     else if (id === 'decisions' || id === 'fonts') html = blockView(id);
     else if (id === 'regulacions') html = regsAllView();
+    else if (isDepotRoute(id)) html = depotView(id);
     else if (id === 'simulator' && isMember()) html = simulatorView();
     else if (id === 'registre') { html = homeView(); setTimeout(function () { history.replaceState(null, '', location.pathname); openRegister(); }, 0); }
     else if (id === 'compte') html = accountView();
@@ -482,7 +489,7 @@
     setBarH();
     loadDiagrams();
     Array.prototype.forEach.call(document.querySelectorAll('#menu-body a[data-sec]'), function (a) {
-      var on = a.getAttribute('data-sec') === id;
+      var on = a.getAttribute('data-sec') === (isDepotRoute(id) ? 'depot' : id);
       a.classList.toggle('active', on);
       if (on) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
     });
@@ -491,6 +498,7 @@
     cmMount(id);
     if (id === 'gestio' && isAdmin()) loadMembers();
     if (SQ_ROUTES[id] && isAdmin()) loadSquad();
+    if (id === 'depot') dpFilter();
     document.title = (S.byId[id] ? (S.byId[id].name + ' · ') : '') + '9e Légère';
   }
 
@@ -637,6 +645,248 @@
       '<div class="table-wrap block-' + key + '">' + F('site.' + key + '.html.' + S.lang, body, 'div', 'block-html', { raw: 1 }) + '</div>' +
       (S.edit && key === 'decisions' ? '<button type="button" class="add-btn" data-act="addrow">+ ' + esc(t('add_row')) + '</button>' : '') +
       '</section>';
+  }
+
+  /* ------------------------------------------------------------------ Depot: public catalogue of what the 9e depots hold (no purchase yet)
+     Data lives in site.depot = { title{}, intro{}, depots:[{id, name, place{}}],
+       items:[{id, name{}, price, desc{}, photos:[url], page, ver, stock:[{depot, qty}]}] }.
+     "Add to cart" and "Order" are placeholders: they do nothing on purpose. */
+  function isDepotRoute(id) { return id === 'depot' || String(id).indexOf('depot/') === 0; }
+  function dpData() { var site = S.edit && S.draft && S.draft.site ? S.draft.site : S.site; return site.depot || {}; }
+  function dpNum(v) { var n = parseFloat(String(v == null ? '' : v).replace(',', '.')); return isNaN(n) ? null : n; }
+  function dpPrice(v) {
+    var n = dpNum(v); if (n == null) return '';
+    try { return new Intl.NumberFormat(S.lang, { style: 'currency', currency: 'EUR' }).format(n); } catch (e) { return n.toFixed(2) + ' €'; }
+  }
+  function dpLs(k, v) { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (e) { return null; } }
+  function dpTop(pid) { var id = pid, n = 0; while (id && parentOf(id) && n++ < 9) id = parentOf(id); return id && S.byId[id] ? id : ''; }
+  function dpCatName(top) { var p = S.byId[top]; return p ? (plain(L((p.content || {}).h2)) || p.name || top) : ''; }
+  function dpName(it) { return plain(L(it.name)) || ((S.byId[it.page] || {}).name) || t('dp_untitled'); }
+  function dpDepot(d, id) { return (d.depots || []).filter(function (x) { return x.id === id; })[0] || null; }
+  function dpDepName(dep) { return dep ? (plain(dep.name) || '—') : '—'; }
+  // availability: rows without a quantity count as "available, number not given"
+  function dpAvail(d, it) {
+    var rows = (it.stock || []).filter(function (s) { return s.depot && dpDepot(d, s.depot); });
+    if (!rows.length) return { cls: 'tbc', txt: t('dp_tbc'), deps: [] };
+    var on = rows.filter(function (s) { var n = dpNum(s.qty); return n == null || n > 0; });
+    if (!on.length) return { cls: 'out', txt: t('dp_out'), deps: [] };
+    var ids = on.map(function (s) { return s.depot; });
+    return { cls: 'in', deps: ids, txt: ids.length === 1 ? t('dp_instock_1').replace('{d}', dpDepName(dpDepot(d, ids[0]))) : t('dp_instock_n').replace('{n}', ids.length) };
+  }
+  function dpVersions(pid) {
+    var p = S.byId[pid]; if (!p) return [];
+    var pr = S.priv && S.priv[pid];
+    if (pr && pr.versions && pr.versions.length) return pr.versions;
+    var c = p.content || {};
+    return (c.versions && c.versions.length) ? c.versions : (c.pats || []);
+  }
+  function dpVer(it) {
+    var vs = dpVersions(it.page); if (!vs.length) return null;
+    var pick = null;
+    if (it.ver) vs.forEach(function (v) { if (!pick && String(v.year) === String(it.ver)) pick = v; });
+    if (!pick) vs.forEach(function (v) { if (!pick && v.nine) pick = v; });
+    return pick || vs[vs.length - 1];
+  }
+  function dpThumb(src, cls) {
+    return src ? '<img class="' + cls + '" src="' + imgSrc(src) + '" alt="" loading="lazy">' : '<span class="img-ph ' + cls + '" aria-hidden="true"></span>';
+  }
+  function dpItemImg(it) { var p = S.byId[it.page]; return (it.photos || [])[0] || (p ? (p.card || p.image) : ''); }
+
+  function depotView(id) {
+    var d = dpData();
+    if (id !== 'depot') return depotItemView(d, id.slice(6));
+    var E = S.edit, lg = S.lang, items = d.items || [], deps = d.depots || [];
+    var st = S.dp = S.dp || { q: '', cat: '', dep: '', sort: 'name', view: dpLs('9e-depot-view') === 'list' ? 'list' : 'grid' };
+    var title = E ? (d.title || {})[lg] : (L(d.title) || t('depot'));
+    var intro = E ? (d.intro || {})[lg] : (L(d.intro) || t('dp_intro_def'));
+    var cats = {};
+    items.forEach(function (it) { var c = dpTop(it.page); if (c) cats[c] = dpCatName(c); });
+    var list = items.map(function (it, i) { return { it: it, i: i, name: dpName(it), price: dpNum(it.price) }; });
+    list.sort(function (a, b) {
+      if (st.sort === 'pa' || st.sort === 'pd') {
+        var x = a.price == null ? Infinity : a.price, y = b.price == null ? Infinity : b.price;
+        if (x !== y) return st.sort === 'pa' ? x - y : (y === Infinity ? -1 : x === Infinity ? 1 : y - x);
+      }
+      return a.name.localeCompare(b.name, lg);
+    });
+    var opt = function (v, label, cur) { return '<option value="' + esc(v) + '"' + (v === cur ? ' selected' : '') + '>' + esc(label) + '</option>'; };
+    var tools = '<div class="dp-tools"><form class="dp-search" role="search" onsubmit="return false"><input type="search" class="dp-q" value="' + esc(st.q) + '" autocomplete="off" placeholder="' + esc(t('dp_search')) + '" aria-label="' + esc(t('dp_search')) + '"></form>' +
+      '<select class="dp-f" data-k="cat" aria-label="' + esc(t('dp_cat')) + '">' + opt('', t('dp_all_cats'), st.cat) + Object.keys(cats).map(function (k) { return opt(k, cats[k], st.cat); }).join('') + '</select>' +
+      (deps.length ? '<select class="dp-f" data-k="dep" aria-label="' + esc(t('dp_depot')) + '">' + opt('', t('dp_all_deps'), st.dep) + deps.map(function (x) { return opt(x.id, dpDepName(x), st.dep); }).join('') + '</select>' : '') +
+      '<select class="dp-f" data-k="sort" aria-label="' + esc(t('dp_sort')) + '">' + opt('name', t('dp_sort_name'), st.sort) + opt('pa', t('dp_sort_pa'), st.sort) + opt('pd', t('dp_sort_pd'), st.sort) + '</select>' +
+      '<span class="dp-views" role="group" aria-label="' + esc(t('dp_view')) + '">' +
+        '<button type="button" class="dp-vbtn" data-act="dp-view" data-v="grid" aria-pressed="' + (st.view === 'grid') + '" title="' + esc(t('dp_grid')) + '"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z" fill="none" stroke="currentColor" stroke-width="1.8"/></svg><span>' + esc(t('dp_grid')) + '</span></button>' +
+        '<button type="button" class="dp-vbtn" data-act="dp-view" data-v="list" aria-pressed="' + (st.view === 'list') + '" title="' + esc(t('dp_list')) + '"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M4 6h3M10 6h10M4 12h3M10 12h10M4 18h3M10 18h10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg><span>' + esc(t('dp_list')) + '</span></button>' +
+      '</span><span class="dp-count muted" aria-live="polite"></span></div>';
+    var cards = list.map(function (x) {
+      var it = x.it, av = dpAvail(d, it), top = dpTop(it.page), href = '#depot/' + encodeURIComponent(it.id);
+      var txt = foldText([x.name, plain(L(it.desc)), cats[top] || '', (S.byId[it.page] || {}).name || ''].join(' '));
+      return '<li class="dp-card" data-txt="' + esc(txt) + '" data-cat="' + esc(top) + '" data-deps="' + esc(av.deps.join(' ')) + '">' +
+        '<a class="dp-link" href="' + href + '">' + dpThumb(dpItemImg(it), 'dp-img') + '</a>' +
+        '<div class="dp-body"><a class="dp-name" href="' + href + '">' + esc(x.name) + '</a>' +
+        (top ? '<span class="dp-cat">' + esc(cats[top]) + '</span>' : '') +
+        '<span class="dp-av ' + av.cls + '">' + esc(av.txt) + '</span></div>' +
+        '<div class="dp-buy"><span class="dp-price">' + esc(dpPrice(it.price) || t('dp_noprice')) + '</span>' +
+        '<button type="button" class="btn dp-cart" data-act="dp-cart">' + esc(t('dp_cart')) + '</button></div></li>';
+    }).join('');
+    var depEd = '';
+    if (E) {
+      depEd = '<section class="dp-deps-ed"><h3 class="sum-h">' + esc(t('dp_depots_h')) + '</h3><table class="dp-stock"><thead><tr><th>' + esc(t('dp_depot_name')) + '</th><th>' + esc(t('dp_place')) + '</th><th></th></tr></thead><tbody>' +
+        deps.map(function (x, j) {
+          var p = 'site.depot.depots.' + j;
+          return '<tr><td><input type="text" data-path="' + p + '.name" value="' + esc(x.name || '') + '" placeholder="' + esc(t('dp_depot_name')) + '"></td><td>' +
+            F(p + '.place.' + lg, (x.place || {})[lg], 'span', 'dp-place-ed', { raw: 1, single: 1, ph: t('dp_place') }) + '</td><td>' + listBtns('site.depot.depots', j) + '</td></tr>';
+        }).join('') + '</tbody></table>' + addBtn('site.depot.depots', 'depot', 'dp_add_depot') + '</section>';
+    }
+    return '<section class="view depot" data-view="depot"><p class="crumb"><a href="#">' + esc(t('home')) + '</a> <span aria-hidden="true">/</span> ' + esc(plain(L(d.title)) || t('depot')) + '</p>' +
+      '<div class="piece-head">' + F('site.depot.title.' + lg, title, 'h2', 'page-title', { raw: 1, single: 1, attr: ' tabindex="-1"' }) + penBtn() + '</div>' +
+      F('site.depot.intro.' + lg, intro, 'div', 'dp-intro', { raw: 1, ph: t('dp_intro_def') }) +
+      depEd +
+      (E ? '<p><button type="button" class="btn" data-act="dp-new">+ ' + esc(t('dp_new')) + '</button></p>' : '') +
+      (items.length ? tools + '<ul class="dp-items dp-' + st.view + '">' + cards + '</ul><p class="dp-none muted" hidden>' + esc(t('dp_none')) + '</p>'
+        : '<p class="muted">' + esc(t('dp_empty')) + '</p>') +
+      '</section>';
+  }
+  function dpFilter() {
+    var box = main.querySelector('.dp-items'); if (!box) return;
+    var st = S.dp || {}, words = foldText(st.q).trim().split(/\s+/).filter(Boolean), n = 0;
+    Array.prototype.forEach.call(box.children, function (li) {
+      var ok = words.every(function (w) { return li.getAttribute('data-txt').indexOf(w) > -1; }) &&
+        (!st.cat || li.getAttribute('data-cat') === st.cat) &&
+        (!st.dep || (' ' + li.getAttribute('data-deps') + ' ').indexOf(' ' + st.dep + ' ') > -1);
+      li.hidden = !ok; if (ok) n++;
+    });
+    var c = main.querySelector('.dp-count'); if (c) c.textContent = t('dp_n').replace('{n}', n);
+    var e = main.querySelector('.dp-none'); if (e) e.hidden = n > 0;
+  }
+
+  function depotItemView(d, iid) {
+    var items = d.items || [], i = -1;
+    items.forEach(function (x, k) { if (x.id === iid) i = k; });
+    var crumb0 = '<p class="crumb"><a href="#">' + esc(t('home')) + '</a> <span aria-hidden="true">/</span> <a href="#depot">' + esc(plain(L(d.title)) || t('depot')) + '</a>';
+    if (i < 0) return '<section class="view">' + crumb0 + '</p><h2 class="page-title" tabindex="-1">' + esc(t('not_found')) + '</h2><p><a href="#depot">' + esc(t('dp_back')) + '</a></p></section>';
+    var it = items[i], E = S.edit, lg = S.lang, P = 'site.depot.items.' + i, pg = S.byId[it.page], deps = d.depots || [];
+    var name = dpName(it), av = dpAvail(d, it), top = dpTop(it.page), photos = it.photos || [];
+    // gallery: the product photos, or the guide picture when there are none
+    var pics = photos.length ? photos : (pg && (pg.image || pg.card) ? [pg.image || pg.card] : []);
+    var gal = '<div class="dp-gal">' + (pics.length ? '<figure class="dp-main"><img id="dp-main" src="' + imgSrc(pics[0]) + '" alt="' + esc(name) + '"></figure>' : '<span class="img-ph dp-main" aria-hidden="true"></span>') +
+      (pics.length > 1 && !E ? '<div class="dp-thumbs">' + pics.map(function (src, k) {
+        return '<button type="button" class="dp-th" data-act="dp-pic" data-src="' + esc(src) + '"' + (k === 0 ? ' aria-current="true"' : '') + ' aria-label="' + esc(t('dp_photo_n').replace('{n}', k + 1)) + '"><img src="' + imgSrc(src) + '" alt="" loading="lazy"></button>';
+      }).join('') + '</div>' : '');
+    if (E) {
+      gal += '<div class="dp-ph-ed"><p class="dp-lbl">' + esc(t('dp_photos')) + '</p><ol class="dp-ph-list">' + photos.map(function (src, k) {
+        return '<li><img src="' + imgSrc(src) + '" alt="">' +
+          '<span class="dp-ph-tools"><button type="button" class="mini" data-act="up" data-list="' + P + '.photos" data-i="' + k + '" aria-label="' + esc(t('dp_left')) + '" title="' + esc(t('dp_left')) + '">←</button>' +
+          '<button type="button" class="mini" data-act="down" data-list="' + P + '.photos" data-i="' + k + '" aria-label="' + esc(t('dp_right')) + '" title="' + esc(t('dp_right')) + '">→</button>' +
+          '<button type="button" class="mini del" data-act="del" data-list="' + P + '.photos" data-i="' + k + '" aria-label="' + esc(t('remove')) + '" title="' + esc(t('remove')) + '">' + BIN + '</button></span></li>';
+      }).join('') + '</ol><button type="button" class="add-btn" data-act="dp-photos" data-list="' + P + '.photos">+ ' + esc(t('dp_add_photos')) + '</button></div>';
+    }
+    gal += '</div>';
+    // where it is: one row per depot
+    var stock = it.stock || [];
+    var where = E
+      ? '<table class="dp-stock"><thead><tr><th>' + esc(t('dp_depot')) + '</th><th>' + esc(t('dp_units')) + '</th><th></th></tr></thead><tbody>' + stock.map(function (s, j) {
+          var sp = P + '.stock.' + j;
+          return '<tr><td><select data-path="' + sp + '.depot"><option value="">—</option>' + deps.map(function (x) { return '<option value="' + esc(x.id) + '"' + (x.id === s.depot ? ' selected' : '') + '>' + esc(dpDepName(x)) + '</option>'; }).join('') + '</select></td>' +
+            '<td><input type="text" inputmode="numeric" size="5" data-path="' + sp + '.qty" value="' + esc(s.qty == null ? '' : s.qty) + '"></td><td>' + listBtns(P + '.stock', j) + '</td></tr>';
+        }).join('') + '</tbody></table>' + addBtn(P + '.stock', 'dpstock', 'dp_add_stock') + (deps.length ? '' : '<p class="muted">' + esc(t('dp_no_deps')) + '</p>')
+      : (stock.filter(function (s) { return dpDepot(d, s.depot); }).length
+        ? '<table class="dp-stock"><thead><tr><th>' + esc(t('dp_depot')) + '</th><th>' + esc(t('dp_place')) + '</th><th>' + esc(t('dp_units')) + '</th></tr></thead><tbody>' +
+          stock.filter(function (s) { return dpDepot(d, s.depot); }).map(function (s) {
+            var dep = dpDepot(d, s.depot), n = dpNum(s.qty);
+            return '<tr class="' + (n === 0 ? 'out' : '') + '"><td>' + esc(dpDepName(dep)) + '</td><td>' + esc(plain(L(dep.place))) + '</td><td>' + (n == null ? '—' : esc(n === 0 ? t('dp_out') : n)) + '</td></tr>';
+          }).join('') + '</tbody></table>'
+        : '<p class="muted">' + esc(t('dp_tbc')) + '</p>');
+    var pageOpts = S.order.filter(function (x) { return !isSection(x); }).map(function (x) { return S.byId[x]; })
+      .sort(function (a, b) { return String(a.name).localeCompare(String(b.name), lg); });
+    var vs = dpVersions(it.page);
+    var info = '<div class="dp-info"><div class="piece-head">' + F(P + '.name.' + lg, E ? (it.name || {})[lg] : name, 'h2', 'page-title dp-title', { raw: 1, single: 1, ph: t('dp_name_ph'), attr: ' tabindex="-1"' }) + penBtn() + '</div>' +
+      (top ? '<p class="dp-cat">' + esc(dpCatName(top)) + '</p>' : '') +
+      (E ? '<label class="dp-fld"><span>' + esc(t('dp_price')) + ' (€)</span><input type="text" inputmode="decimal" data-path="' + P + '.price" value="' + esc(it.price == null ? '' : it.price) + '"></label>' +
+           '<label class="dp-fld"><span>' + esc(t('dp_guide_item')) + '</span><select class="dp-resel" data-path="' + P + '.page"><option value="">' + esc(t('dp_guide_none')) + '</option>' +
+             pageOpts.map(function (p) { return '<option value="' + esc(p.id) + '"' + (p.id === it.page ? ' selected' : '') + '>' + esc(p.name || p.id) + '</option>'; }).join('') + '</select></label>' +
+           (vs.length ? '<label class="dp-fld"><span>' + esc(t('dp_ver')) + '</span><select class="dp-resel" data-path="' + P + '.ver"><option value="">' + esc(t('dp_ver_def')) + '</option>' +
+             vs.map(function (v) { return '<option value="' + esc(v.year) + '"' + (String(v.year) === String(it.ver || '') ? ' selected' : '') + '>' + esc((v.year || '—') + ' · ' + plain(L(v.title))) + (v.nine ? ' (9e)' : '') + '</option>'; }).join('') + '</select></label>' : '')
+         : '<p class="dp-price big">' + esc(dpPrice(it.price) || t('dp_noprice')) + '</p>') +
+      '<p class="dp-av ' + av.cls + '">' + esc(av.txt) + '</p>' +
+      '<div class="dp-buy-box"><label class="dp-qty-l"><span>' + esc(t('dp_qty')) + '</span><input type="number" class="dp-qty" min="1" value="1"></label>' +
+        '<button type="button" class="btn dp-cart" data-act="dp-cart">' + esc(t('dp_cart')) + '</button>' +
+        '<button type="button" class="btn-ghost dp-order" data-act="dp-order">' + esc(t('dp_order')) + '</button></div>' +
+      '<h3 class="sum-h">' + esc(t('dp_where')) + '</h3>' + where +
+      (E ? '<p><button type="button" class="btn-danger" data-act="dp-del" data-i="' + i + '">' + esc(t('dp_del')) + '</button></p>' : '') + '</div>';
+    var desc = E || plain(L(it.desc)) ? '<section class="dp-sec"><h3 class="sum-h">' + esc(t('dp_desc')) + '</h3>' + F(P + '.desc.' + lg, E ? (it.desc || {})[lg] : L(it.desc), 'div', 'dp-desc', { pid: it.page }) + '</section>' : '';
+    return '<section class="view depot-item" data-view="depot">' + crumb0 + ' <span aria-hidden="true">/</span> ' + esc(name) + '</p>' +
+      '<div class="dp-detail">' + gal + info + '</div>' + desc + dpRefHtml(it) + '</section>';
+  }
+  // what the uniform guide says about the item: the page lead and the pattern the product corresponds to (years, text, measures)
+  function dpRefHtml(it) {
+    var pg = S.byId[it.page]; if (!pg) return '';
+    var c = pg.content || {}, v = dpVer(it), body = '';
+    if (L(c.lead)) body += '<p class="dp-ref-lead">' + rich(L(c.lead), pg.id) + '</p>';
+    if (v) {
+      var sp = LA(v.specs);
+      body += '<div class="dp-pat"><p class="dp-pat-h"><span class="dp-lbl">' + esc(t('dp_pattern')) + '</span> <b class="vtl-y">' + esc(v.year || '—') + '</b> ' + esc(plain(L(v.title))) + (v.nine ? ' <span class="nine-b">9e</span>' : '') + '</p>' +
+        (L(v.text) ? '<div class="dp-pat-t">' + rich(L(v.text), pg.id) + '</div>' : '') +
+        (sp.length ? '<table class="ver-specs">' + sp.map(function (r) { return '<tr><th scope="row">' + clean(r[0]) + '</th><td>' + clean(r[1]) + '</td></tr>'; }).join('') + '</table>' : '') + '</div>';
+    }
+    if (!v || !L(v.text)) {
+      var p0 = LA(c.desc).filter(function (x) { return !/^\[\[fig:/.test(plain(x)); })[0];
+      if (p0) body += '<p>' + rich(p0, pg.id) + '</p>';
+    }
+    return '<section class="dp-sec dp-ref"><h3 class="sum-h">' + esc(t('dp_ref_h')) + '</h3><div class="dp-ref-in">' +
+      '<a class="dp-ref-img" href="#' + esc(pg.id) + '">' + dpThumb(pg.card || pg.image, 'dp-ref-pic') + '</a><div>' +
+      '<h4 class="dp-ref-t"><a href="#' + esc(pg.id) + '" lang="fr">' + esc(pg.name || pg.id) + '</a></h4>' + body +
+      '<p><a class="tlink" href="#' + esc(pg.id) + '">' + esc(t('dp_ref_more')) + '</a></p></div></div></section>';
+  }
+  document.addEventListener('input', function (e) {
+    if (!e.target.classList || !e.target.classList.contains('dp-q')) return;
+    S.dp.q = e.target.value; dpFilter();
+  });
+  document.addEventListener('change', function (e) {
+    var el = e.target;
+    if (el.classList && el.classList.contains('dp-f')) {
+      var k = el.getAttribute('data-k'); S.dp[k] = el.value;
+      if (k === 'sort') { if (S.draft) syncDraft(); keepScroll(render); } else dpFilter();
+      return;
+    }
+    if (el.classList && el.classList.contains('dp-resel') && S.draft) { syncDraft(); S.dirty = true; keepScroll(render); }
+  });
+  function dpClick(act, el) {
+    if (act === 'dp-cart' || act === 'dp-order') return true; // placeholders: purchasing is not built yet
+    if (act === 'dp-view') { S.dp.view = el.getAttribute('data-v'); dpLs('9e-depot-view', S.dp.view); if (S.draft) syncDraft(); keepScroll(render); return true; }
+    if (act === 'dp-pic') {
+      var m = document.getElementById('dp-main'); if (m) m.src = el.getAttribute('data-src');
+      Array.prototype.forEach.call(main.querySelectorAll('.dp-th'), function (b) { if (b === el) b.setAttribute('aria-current', 'true'); else b.removeAttribute('aria-current'); });
+      return true;
+    }
+    if (act === 'dp-new') {
+      syncDraft();
+      var dd = S.draft.site.depot, it = { id: 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), name: {}, price: '', desc: {}, photos: [], page: '', ver: '', stock: [] };
+      it.name[S.lang] = ''; it.desc[S.lang] = '';
+      dd.items.push(it); S.dirty = true;
+      location.hash = '#depot/' + it.id; return true;
+    }
+    if (act === 'dp-del') {
+      if (!window.confirm(t('dp_del_q'))) return true;
+      syncDraft(); S.draft.site.depot.items.splice(parseInt(el.getAttribute('data-i'), 10), 1); S.dirty = true;
+      location.hash = '#depot'; return true;
+    }
+    if (act === 'dp-photos') {
+      var lp = el.getAttribute('data-list');
+      pickFile('image/*', true).then(function (files) {
+        if (!files.length) return;
+        syncDraft();
+        var job = busy(t('up_image'), files.length), urls = [];
+        return files.reduce(function (pr, f) {
+          return pr.then(function () { return upload(PUBLIC_BUCKET, f, 'depot', IMG.page).then(function (u) { urls.push(u); job.tick(); }); });
+        }, Promise.resolve()).then(function () {
+          var arr = getPath(S.draft, lp); if (!Array.isArray(arr)) { arr = []; setPath(S.draft, lp, arr); }
+          urls.forEach(function (u) { arr.push(u); }); S.dirty = true; job.end(true); keepScroll(render);
+        }, function (er) { job.end(false); throw er; });
+      }).catch(fail);
+      return true;
+    }
+    return false;
   }
 
   /* ------------------------------------------------------------------ 9e Simulator (game hosted in site/simulator/, notes editable like the other blocks) */
@@ -1752,7 +2002,7 @@ function campaignBlock() {
         if (orphans.length) return sb.storage.from(PRIVATE_BUCKET).remove(orphans).catch(function (e) { console.warn(e); });
       });
     } else {
-      var rows = ['home', 'decisions', 'fonts', 'simulator', 'regs'].map(function (k) { return { key: k, value: S.draft.site[k] }; });
+      var rows = ['home', 'decisions', 'fonts', 'simulator', 'regs', 'depot'].filter(function (k) { return S.draft.site[k]; }).map(function (k) { return { key: k, value: S.draft.site[k] }; });
       job = sb.from('site').upsert(rows).then(q);
     }
     return job.then(function () { return loadPublic(); }).then(loadPrivate).then(function () {
@@ -1946,6 +2196,7 @@ function campaignBlock() {
         S.edit = !S.edit; S.draft = null; S.dirty = false; render(); return;
       }
       if (act === 'save') { save(); return; }
+      if (act.indexOf('dp-') === 0 && dpClick(act, el)) return;
       if (act === 'discard') { if (isBusy() && !window.confirm(t('busy_leave'))) return; S.draft = null; S.dirty = false; S.edit = false; render(); return; }
       if (act === 'add' || act === 'del' || act === 'up' || act === 'down') {
         listAction(act, el.getAttribute('data-list'), parseInt(el.getAttribute('data-i') || '0', 10), el.getAttribute('data-tpl')); return;
